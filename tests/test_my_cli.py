@@ -1,7 +1,7 @@
 import pytest
 from click.testing import CliRunner
-from my_package.cli import run
-from my_package._version import __version__
+from nwm_explorer.cli import run
+from nwm_explorer._version import __version__
 
 @pytest.fixture
 def runner_result():

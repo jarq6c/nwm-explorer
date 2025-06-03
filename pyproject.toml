@@ -3,7 +3,7 @@ requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "my_package"
+name = "nwm_explorer"
 authors = [
     { name = "Jason A. Regina", email = "jregina@duck.com" },
 ]
@@ -29,16 +29,16 @@ dependencies = [
 dynamic = ["version"]
 
 [tool.setuptools.dynamic]
-version = { attr = "my_package._version.__version__" }
+version = { attr = "nwm_explorer._version.__version__" }
 
 [project.optional-dependencies]
 develop = ["pytest"]
 
 [project.urls]
-Homepage = "https://github.com/jarq6c/my_package"
-Documentation = "https://jarq6c.github.io/my_package"
-Repository = "https://github.com/jarq6c/my_package"
-"Bug Tracker" = "https://github.com/jarq6c/my_package/issues"
+Homepage = "https://github.com/jarq6c/nwm-explorer"
+Documentation = "https://jarq6c.github.io/nwm-explorer"
+Repository = "https://github.com/jarq6c/nwm-explorer"
+"Bug Tracker" = "https://github.com/jarq6c/nwm-explorer/issues"
 
 [project.scripts]
-my-package-cli = "my_package.cli:run"
+nwm-explorer = "nwm_explorer.cli:run"
