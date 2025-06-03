@@ -1,3 +1,4 @@
+from typing import Literal
 import click
 import pandas as pd
 from nwm_explorer._version import __version__
@@ -19,18 +20,17 @@ analysis_group = click.Group()
 obs_group = click.Group()
 
 @analysis_group.command()
-@click.argument("domain", nargs=1, required=True, type=click.Choice([d.value for d in Domain]))
+@click.argument("domain", nargs=1, required=True, type=click.Choice(Domain))
 # @click.option("-o", "--output", nargs=1, type=click.File("w"), help="Output file path", default="-")
-# @click.option("-s", "--startDT", "startDT", nargs=1, type=TimestampParamType(), help="Start datetime")
-# @click.option("-e", "--endDT", "endDT", nargs=1, type=TimestampParamType(), help="End datetime")
+@click.option("-s", "--startDT", "startDT", nargs=1, type=TimestampParamType(), help="Start datetime")
+@click.option("-e", "--endDT", "endDT", nargs=1, type=TimestampParamType(), help="End datetime")
 # @click.option('--comments/--no-comments', default=True, help="Enable/disable comments in output, enabled by default")
 # @click.option('--header/--no-header', default=True, help="Enable/disable header in output, enabled by default")
 def analysis(
-    domain: str, 
+    domain: Domain,
     # output: click.File,
-    # startDT: pd.Timestamp = None,
-    # endDT: pd.Timestamp = None,
-    # parameterCd: str = "00060",
+    startDT: pd.Timestamp = None,
+    endDT: pd.Timestamp = None,
     # comments: bool = True,
     # header: bool = True
     ) -> None:
@@ -41,6 +41,8 @@ def analysis(
     nwm-explorer analysis alaska
     """
     print(domain)
+    print(startDT)
+    print(endDT)
 
 @analysis_group.command()
 @click.argument("domain", nargs=1, required=True)
