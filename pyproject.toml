@@ -41,4 +41,4 @@ Repository = "https://github.com/jarq6c/nwm-explorer"
 "Bug Tracker" = "https://github.com/jarq6c/nwm-explorer/issues"
 
 [project.scripts]
-nwm-explorer = "nwm_explorer.cli:run"
+nwm-explorer = "nwm_explorer.cli:cli"

@@ -1,28 +1,74 @@
 import click
 import pandas as pd
-from nwm_explorer.my_module import make_dataframe
 from nwm_explorer._version import __version__
 
-@click.command()
-@click.option("-c", "--ncols", "ncols", nargs=1, type=int, help="Number of columns", default=3)
-@click.option("-r", "--nrows", "nrows", nargs=1, type=int, help="Number of rows", default=4)
-def run(
-    ncols: int,
-    nrows: int
+class TimestampParamType(click.ParamType):
+    name = "timestamp"
+
+    def convert(self, value, param, ctx):
+        if isinstance(value, pd.Timestamp):
+            return value
+
+        try:
+            return pd.Timestamp(value)
+        except ValueError:
+            self.fail(f"{value!r} is not a valid timestamp", param, ctx)
+
+analysis_group = click.Group()
+obs_group = click.Group()
+
+@analysis_group.command()
+@click.argument("domain", nargs=1, required=True)
+# @click.option("-o", "--output", nargs=1, type=click.File("w"), help="Output file path", default="-")
+# @click.option("-s", "--startDT", "startDT", nargs=1, type=TimestampParamType(), help="Start datetime")
+# @click.option("-e", "--endDT", "endDT", nargs=1, type=TimestampParamType(), help="End datetime")
+# @click.option('--comments/--no-comments', default=True, help="Enable/disable comments in output, enabled by default")
+# @click.option('--header/--no-header', default=True, help="Enable/disable header in output, enabled by default")
+def analysis(
+    domain: str, 
+    # output: click.File,
+    # startDT: pd.Timestamp = None,
+    # endDT: pd.Timestamp = None,
+    # parameterCd: str = "00060",
+    # comments: bool = True,
+    # header: bool = True
     ) -> None:
-    """Generate a random dataframe and print to screen.
+    """Retrieve NWM analysis data from Google Cloud and write in CSV format.
 
     Example:
     
-    my-cli -c 3 -r 6
+    nwm-explorer analysis alaska
     """
-    # Get a dataframe
-    df = make_dataframe(ncols=ncols, nrows=nrows)
+    print(domain)
 
-    # Print
-    print(f"my_package {__version__}")
-    with pd.option_context("display.precision", 2):
-        print(df)
+@analysis_group.command()
+@click.argument("domain", nargs=1, required=True)
+# @click.option("-o", "--output", nargs=1, type=click.File("w"), help="Output file path", default="-")
+# @click.option("-s", "--startDT", "startDT", nargs=1, type=TimestampParamType(), help="Start datetime")
+# @click.option("-e", "--endDT", "endDT", nargs=1, type=TimestampParamType(), help="End datetime")
+# @click.option('--comments/--no-comments', default=True, help="Enable/disable comments in output, enabled by default")
+# @click.option('--header/--no-header', default=True, help="Enable/disable header in output, enabled by default")
+def obs(
+    domain: str, 
+    # output: click.File,
+    # startDT: pd.Timestamp = None,
+    # endDT: pd.Timestamp = None,
+    # parameterCd: str = "00060",
+    # comments: bool = True,
+    # header: bool = True
+    ) -> None:
+    """Retrieve data from the USGS IV Web Service API and write in CSV format.
+
+    Example:
+    
+    nwm-explorer obs alaska
+    """
+    print(domain)
+
+cli = click.CommandCollection(sources=[
+    analysis_group,
+    obs_group
+    ])
 
 if __name__ == "__main__":
-    run()
+    cli()
