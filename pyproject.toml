@@ -39,3 +39,6 @@ Homepage = "https://github.com/jarq6c/my_package"
 Documentation = "https://jarq6c.github.io/my_package"
 Repository = "https://github.com/jarq6c/my_package"
 "Bug Tracker" = "https://github.com/jarq6c/my_package/issues"
+
+[project.scripts]
+my-package-cli = "my_package.cli:run"
