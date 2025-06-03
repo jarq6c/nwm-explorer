@@ -1,6 +1,7 @@
 import click
 import pandas as pd
 from nwm_explorer._version import __version__
+from nwm_explorer.mappings import Domain
 
 class TimestampParamType(click.ParamType):
     name = "timestamp"
@@ -18,7 +19,7 @@ analysis_group = click.Group()
 obs_group = click.Group()
 
 @analysis_group.command()
-@click.argument("domain", nargs=1, required=True)
+@click.argument("domain", nargs=1, required=True, type=click.Choice([d.value for d in Domain]))
 # @click.option("-o", "--output", nargs=1, type=click.File("w"), help="Output file path", default="-")
 # @click.option("-s", "--startDT", "startDT", nargs=1, type=TimestampParamType(), help="Start datetime")
 # @click.option("-e", "--endDT", "endDT", nargs=1, type=TimestampParamType(), help="End datetime")

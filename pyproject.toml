@@ -24,7 +24,8 @@ classifiers = [
 ]
 dependencies = [
     "click",
-    "pandas"
+    "pandas",
+    "polars"
 ]
 dynamic = ["version"]
 
