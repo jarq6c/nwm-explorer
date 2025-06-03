@@ -13,8 +13,8 @@ import ssl
 from http import HTTPStatus
 import warnings
 
-from .urls import ROUTELINKS_URL
-from .manifests import ROUTELINKS_MANIFEST
+from nwm_explorer.urls import ROUTELINKS_URL
+from nwm_explorer.manifests import ROUTELINKS_MANIFEST
 
 def default_file_validator(filepath: Path) -> None:
     """

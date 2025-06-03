@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from .mappings import (ROUTELINK_SCHEMA, DOMAIN_MAPPING, Domain,
+from nwm_explorer.mappings import (ROUTELINK_SCHEMA, DOMAIN_MAPPING, Domain,
     Configuration, FileType, Variable, Units, TIMEZONE_MAPPING)
 
 def netcdf_validator(filepath: Path) -> None:

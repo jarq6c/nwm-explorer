@@ -4,17 +4,17 @@ import warnings
 import pandas as pd
 import polars as pl
 
-from .urls import generate_reference_dates, NWM_URL_BUILDERS, generate_usgs_urls
-from .manifests import generate_default_manifest, generate_usgs_manifest
-from .downloads import download_files, download_routelinks
-from .data import scan_routelinks, generate_filepath, generate_directory
-from .data import (process_netcdf_parallel, process_nwis_tsv_parallel,
+from nwm_explorer.urls import generate_reference_dates, NWM_URL_BUILDERS, generate_usgs_urls
+from nwm_explorer.manifests import generate_default_manifest, generate_usgs_manifest
+from nwm_explorer.downloads import download_files, download_routelinks
+from nwm_explorer.data import scan_routelinks, generate_filepath, generate_directory
+from nwm_explorer.data import (process_netcdf_parallel, process_nwis_tsv_parallel,
     delete_directory)
-from .mappings import FileType, Variable, Units, Domain, Configuration
-from .metrics import (resample, nash_sutcliffe_efficiency,
+from nwm_explorer.mappings import FileType, Variable, Units, Domain, Configuration
+from nwm_explorer.metrics import (resample, nash_sutcliffe_efficiency,
     mean_relative_bias, pearson_correlation_coefficient, relative_mean,
     relative_variability, kling_gupta_efficiency)
-from .data import netcdf_validator, csv_gz_validator
+from nwm_explorer.data import netcdf_validator, csv_gz_validator
 
 def load_NWM_output(
         root: Path,

@@ -1,8 +1,56 @@
-from typing import Literal
+from pathlib import Path
 import click
 import pandas as pd
+import polars as pl
 from nwm_explorer._version import __version__
-from nwm_explorer.mappings import Domain
+from nwm_explorer.mappings import Domain, Configuration
+from nwm_explorer.pipelines import load_NWM_output, load_USGS_observations
+from nwm_explorer.downloads import download_routelinks
+from nwm_explorer.data import scan_routelinks
+
+CSV_HEADERS: dict[str, str] = {
+    "value_time": "Datetime of measurement or forecast valid time (UTC) (datetime string)",
+    "variable": "Variable name (character string)",
+    "usgs_site_code": "USGS Gage Site Code (character string)",
+    "measurement_unit": "Units of measurement (character string)",
+    "value": "Value quantity (float)",
+    "qualifiers": "Qualifier string (character string)",
+    "series": "Series number in case multiple time series are returned (integer)",
+    "reference_time": "Forecast or analysis issue time or time zero (datetime string)",
+    "nwm_feature_id": "NWM channel feature identifier"
+}
+"""Column header descriptions."""
+
+def write_to_csv(
+    data: pl.LazyFrame,
+    ofile: click.File,
+    comments: bool = True,
+    header: bool = True
+    ) -> None:
+    # Comments
+    if comments:
+        output = "# NWM Explorer Data Export\n# \n"
+        
+        for col in data.collect_schema().names():
+            output += f"# {col}: {CSV_HEADERS[col]}\n"
+
+        # Add version, link, and write time
+        now = pd.Timestamp.utcnow()
+        output += f"# \n# Generated at {now}\n"
+        output += f"# nwm_explorer version: {__version__}\n"
+        output += "# Source code: https://github.com/jarq6c/nwm_explorer\n# \n"
+
+        # Write comments to file
+        ofile.write(output)
+
+    # Write data to file
+    data.sink_csv(
+        path=ofile,
+        float_precision=2,
+        include_header=header,
+        batch_size=20000,
+        datetime_format="%Y-%m-%dT%H:%M"
+        )
 
 class TimestampParamType(click.ParamType):
     name = "timestamp"
@@ -16,42 +64,62 @@ class TimestampParamType(click.ParamType):
         except ValueError:
             self.fail(f"{value!r} is not a valid timestamp", param, ctx)
 
-analysis_group = click.Group()
-obs_group = click.Group()
+export_group = click.Group()
+metrics_group = click.Group()
 
-@analysis_group.command()
+@export_group.command()
 @click.argument("domain", nargs=1, required=True, type=click.Choice(Domain))
-# @click.option("-o", "--output", nargs=1, type=click.File("w"), help="Output file path", default="-")
-@click.option("-s", "--startDT", "startDT", nargs=1, type=TimestampParamType(), help="Start datetime")
-@click.option("-e", "--endDT", "endDT", nargs=1, type=TimestampParamType(), help="End datetime")
-# @click.option('--comments/--no-comments', default=True, help="Enable/disable comments in output, enabled by default")
-# @click.option('--header/--no-header', default=True, help="Enable/disable header in output, enabled by default")
-def analysis(
+@click.argument("configuration", nargs=1, required=True, type=click.Choice(Configuration))
+@click.option("-o", "--output", nargs=1, type=click.File("w", lazy=False), help="Output file path", default="-")
+@click.option("-s", "--startDT", "startDT", nargs=1, required=True, type=TimestampParamType(), help="Start datetime")
+@click.option("-e", "--endDT", "endDT", nargs=1, required=True, type=TimestampParamType(), help="End datetime")
+@click.option('--comments/--no-comments', default=True, help="Enable/disable comments in output, enabled by default")
+@click.option('--header/--no-header', default=True, help="Enable/disable header in output, enabled by default")
+@click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
+def export(
     domain: Domain,
-    # output: click.File,
-    startDT: pd.Timestamp = None,
-    endDT: pd.Timestamp = None,
-    # comments: bool = True,
-    # header: bool = True
+    configuration: Configuration,
+    output: click.File,
+    startDT: pd.Timestamp,
+    endDT: pd.Timestamp,
+    comments: bool = True,
+    header: bool = True,
+    directory: Path = Path("data")
     ) -> None:
-    """Retrieve NWM analysis data from Google Cloud and write in CSV format.
+    """Export NWM evaluation data to CSV format.
 
     Example:
     
-    nwm-explorer analysis alaska
+    nwm-explorer export ALASKA ANALYSIS -s 20231001 -e 20240101 -o alaska_analysis_data.csv
     """
-    print(domain)
-    print(startDT)
-    print(endDT)
+    routelinks = scan_routelinks(*download_routelinks(directory / "routelinks"))
 
-@analysis_group.command()
+    if configuration == Configuration.OBSERVATIONS:
+        data = load_USGS_observations(
+            root=directory,
+            start_date=startDT,
+            end_date=endDT,
+            routelinks=routelinks
+            )[domain]
+    else:
+        data = load_NWM_output(
+            root=directory,
+            start_date=startDT,
+            end_date=endDT,
+            routelinks=routelinks
+        )[(domain, configuration)]
+    
+    # Write to CSV
+    write_to_csv(data=data, ofile=output, comments=comments, header=header)
+
+@metrics_group.command()
 @click.argument("domain", nargs=1, required=True)
 # @click.option("-o", "--output", nargs=1, type=click.File("w"), help="Output file path", default="-")
 # @click.option("-s", "--startDT", "startDT", nargs=1, type=TimestampParamType(), help="Start datetime")
 # @click.option("-e", "--endDT", "endDT", nargs=1, type=TimestampParamType(), help="End datetime")
 # @click.option('--comments/--no-comments', default=True, help="Enable/disable comments in output, enabled by default")
 # @click.option('--header/--no-header', default=True, help="Enable/disable header in output, enabled by default")
-def obs(
+def metrics(
     domain: str, 
     # output: click.File,
     # startDT: pd.Timestamp = None,
@@ -69,8 +137,8 @@ def obs(
     print(domain)
 
 cli = click.CommandCollection(sources=[
-    analysis_group,
-    obs_group
+    export_group,
+    metrics_group
     ])
 
 if __name__ == "__main__":

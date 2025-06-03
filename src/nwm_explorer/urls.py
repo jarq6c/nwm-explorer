@@ -1,7 +1,7 @@
 """URLS to various data sources."""
 from typing import Callable
 import pandas as pd
-from .mappings import Domain, Configuration
+from nwm_explorer.mappings import Domain, Configuration
 
 ROUTELINKS_URL: str = (
     "https://www.hydroshare.org/resource/"

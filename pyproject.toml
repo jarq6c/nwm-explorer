@@ -25,7 +25,11 @@ classifiers = [
 dependencies = [
     "click",
     "pandas",
-    "polars"
+    "polars",
+    "xarray",
+    "aiohttp",
+    "aiofiles",
+    "numba"
 ]
 dynamic = ["version"]
 
