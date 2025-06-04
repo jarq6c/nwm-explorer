@@ -143,6 +143,26 @@ def analysis_assim_puertorico_no_da(
         time_slices=time_slices
     )
 
+def medium_range_gfs_conus(
+        reference_dates: list[str]
+) -> list[str]:
+    """
+    Generate public urls for medium_range_mem1.
+    """
+    configuration = "medium_range_mem1/"
+    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 6)]
+    file_type = "medium_range.channel_rt_1."
+    suffix = "conus.nc"
+    time_slices = ["f" + str(p).zfill(3) + "." for p in range(1, 241)]
+    return build_gcs_public_urls(
+        reference_dates=reference_dates,
+        configuration=configuration,
+        prefixes=prefixes,
+        file_type=file_type,
+        suffix=suffix,
+        time_slices=time_slices
+    )
+
 NWM_URL_BUILDERS: dict[tuple[Domain, Configuration], Callable] = {
     (Domain.ALASKA, Configuration.ANALYSIS): analysis_assim_extend_alaska_no_da,
     (Domain.CONUS, Configuration.ANALYSIS): analysis_assim_extend_no_da,

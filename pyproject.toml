@@ -30,7 +30,9 @@ dependencies = [
     "aiohttp",
     "aiofiles",
     "numba",
-    "pyarrow"
+    "pyarrow",
+    "netcdf4",
+    "dask"
 ]
 dynamic = ["version"]
 

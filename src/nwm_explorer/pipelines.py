@@ -86,8 +86,8 @@ def load_NWM_output(
             filepaths=file_list,
             variables=["streamflow"],
             features=features,
-            max_processes=12,
-            files_per_job=25
+            max_processes=6,
+            files_per_job=15
         ).rename(columns={
                 "time": "value_time",
                 "feature_id": "nwm_feature_id",

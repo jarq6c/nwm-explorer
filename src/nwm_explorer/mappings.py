@@ -67,3 +67,9 @@ class Units(StrEnum):
     """Symbols used for common units."""
     CUBIC_FEET_PER_SECOND = "cfs"
     METRICS = "metrics"
+
+class Confidence(StrEnum):
+    """Symbols used to describe confidence interval range estimates."""
+    POINT = "point"
+    LOWER = "lower"
+    UPPER = "upper"
