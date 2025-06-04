@@ -8,6 +8,7 @@ from nwm_explorer.pipelines import (load_NWM_output, load_USGS_observations,
     load_metrics)
 from nwm_explorer.downloads import download_routelinks
 from nwm_explorer.data import scan_routelinks
+from nwm_explorer.logger import get_logger
 
 CSV_HEADERS: dict[str, str] = {
     "value_time": "Datetime of measurement or forecast valid time (UTC) (datetime string)",
@@ -38,6 +39,8 @@ def write_to_csv(
     header: bool = True,
     title: str = "# NWM Explorer Data Export\n# \n"
     ) -> None:
+    logger = get_logger("nwm_explorer.cli.write_to_csv")
+    logger.info(f"Exporting to {ofile.name}")
     # Comments
     if comments:
         output = title

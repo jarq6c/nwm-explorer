@@ -15,6 +15,7 @@ from nwm_explorer.metrics import (resample, nash_sutcliffe_efficiency,
     mean_relative_bias, pearson_correlation_coefficient, relative_mean,
     relative_variability, kling_gupta_efficiency)
 from nwm_explorer.data import netcdf_validator, csv_gz_validator
+from nwm_explorer.logger import get_logger
 
 def load_NWM_output(
         root: Path,
@@ -40,6 +41,7 @@ def load_NWM_output(
     -------
     dict[tuple[Domain, Configuration], pl.LazyFrame]
     """
+    logger = get_logger("nwm_explorer.pipelines.load_NWM_output")
     reference_dates = generate_reference_dates(start_date, end_date)
 
     # Download and process model output
@@ -50,7 +52,9 @@ def load_NWM_output(
             root, FileType.PARQUET, domain, configuration, Variable.STREAMFLOW,
             Units.CUBIC_FEET_PER_SECOND, start_date, end_date
         )
+        logger.info(f"Building {parquet_file}")
         if parquet_file.exists():
+            logger.info(f"Found existing {parquet_file}")
             model_output[(domain, configuration)] = pl.scan_parquet(parquet_file)
             continue
 
@@ -59,12 +63,14 @@ def load_NWM_output(
         download_directory = generate_directory(
             root, FileType.NETCDF, domain, configuration
         )
+        logger.info(f"Downloading to {download_directory}")
         manifest = generate_default_manifest(len(urls),
             directory=download_directory)
         download_files(*zip(urls, manifest), limit=10, timeout=3600,
             file_validator=netcdf_validator)
         
         # Validate manifest
+        logger.info(f"Validating manifest {domain} {configuration}")
         file_list = []
         for fp in manifest:
             if fp.exists():
@@ -73,6 +79,7 @@ def load_NWM_output(
             warnings.warn(f"{fp} does not exist.", RuntimeWarning)
 
         # Process
+        logger.info(f"Processing raw data {domain} {configuration}")
         features = routelinks[domain].select(
             "nwm_feature_id").collect()["nwm_feature_id"].to_list()
         data = process_netcdf_parallel(
@@ -91,10 +98,12 @@ def load_NWM_output(
         data["value"] = data["value"].div(0.3048 ** 3.0)
 
         # Save to parquet
+        logger.info(f"Saving {parquet_file}")
         pl.DataFrame(data).write_parquet(parquet_file)
         model_output[(domain, configuration)] = pl.scan_parquet(parquet_file)
 
         # Clean-up
+        logger.info(f"Cleaning up {download_directory}")
         delete_directory(download_directory, parquet_file)
     return model_output
 
@@ -122,6 +131,7 @@ def load_USGS_observations(
     -------
     dict[Domain, pl.LazyFrame]
     """
+    logger = get_logger("nwm_explorer.pipelines.load_USGS_observations")
     # Download and process model output
     observations = {}
     for domain, rl in routelinks.items():
@@ -131,7 +141,9 @@ def load_USGS_observations(
             Variable.STREAMFLOW, Units.CUBIC_FEET_PER_SECOND, start_date,
             end_date
         )
+        logger.info(f"Building {parquet_file}")
         if parquet_file.exists():
+            logger.info(f"Found existing {parquet_file}")
             observations[domain] = pl.scan_parquet(parquet_file)
             continue
 
@@ -145,6 +157,7 @@ def load_USGS_observations(
         download_directory = generate_directory(
             root, FileType.TSV, domain, Configuration.OBSERVATIONS
         )
+        logger.info(f"Downloading to {download_directory}")
         manifest = generate_usgs_manifest(
             sites,
             directory=download_directory)
@@ -153,6 +166,7 @@ def load_USGS_observations(
             file_validator=csv_gz_validator)
         
         # Validate manifest
+        logger.info(f"Validating manifest {domain}")
         file_list = []
         for fp in manifest:
             if fp.exists():
@@ -161,6 +175,7 @@ def load_USGS_observations(
             warnings.warn(f"{fp} does not exist.", RuntimeWarning)
 
         # Process
+        logger.info(f"Processing raw data {domain}")
         data = process_nwis_tsv_parallel(
             filepaths=file_list,
             max_processes=12
@@ -171,10 +186,12 @@ def load_USGS_observations(
         })
 
         # Save to parquet
+        logger.info(f"Saving {parquet_file}")
         pl.DataFrame(data).write_parquet(parquet_file)
         observations[domain] = pl.scan_parquet(parquet_file)
 
         # Clean-up
+        logger.info(f"Cleaning up {download_directory}")
         delete_directory(download_directory, parquet_file)
     return observations
 
@@ -199,6 +216,7 @@ def load_pairs(
     -------
     dict[tuple[Domain, Configuration], pl.LazyFrame]
     """
+    logger = get_logger("nwm_explorer.pipelines.load_pairs")
     routelinks = scan_routelinks(*download_routelinks(root / "routelinks"))
 
     observations = load_USGS_observations(
@@ -221,11 +239,14 @@ def load_pairs(
             root, FileType.PARQUET, domain, configuration, Variable.STREAMFLOW_PAIRS,
             Units.CUBIC_FEET_PER_SECOND, start_date, end_date
         )
+        logger.info(f"Building {parquet_file}")
         if parquet_file.exists():
+            logger.info(f"Found existing {parquet_file}")
             pairs[(domain, configuration)] = pl.scan_parquet(parquet_file)
             continue
 
         # Pair data
+        logger.info(f"Pairing data {domain} {configuration}")
         crosswalk = routelinks[domain].select(["nwm_feature_id",
             "usgs_site_code"]).collect()
         obs = observations[domain].with_columns(
@@ -239,6 +260,7 @@ def load_pairs(
                     {"value": "predicted", "value_obs": "observed"})
 
         # Save to parquet
+        logger.info(f"Saving {parquet_file}")
         paired_data.collect().write_parquet(parquet_file)
         pairs[(domain, configuration)] = pl.scan_parquet(parquet_file)
     return pairs
@@ -264,6 +286,7 @@ def load_metrics(
     -------
     dict[tuple[Domain, Configuration], pl.LazyFrame]
     """
+    logger = get_logger("nwm_explorer.pipelines.load_metrics")
     pairs = load_pairs(
         root=root,
         start_date=start_date,
@@ -277,11 +300,16 @@ def load_metrics(
             root, FileType.PARQUET, domain, configuration, Variable.STREAMFLOW_METRICS,
             Units.METRICS, start_date, end_date
         )
+        logger.info(f"Building {parquet_file}")
         if parquet_file.exists():
+            logger.info(f"Found existing {parquet_file}")
             results[(domain, configuration)] = pl.scan_parquet(parquet_file)
             continue
 
+        logger.info(f"Resampling {domain} {configuration}")
         daily_max = resample(data)
+
+        logger.info(f"Computing metrics {domain} {configuration}")
         metric_results = daily_max.group_by(
             "usgs_site_code").agg(
             pl.struct(["observed", "predicted"])
@@ -337,6 +365,7 @@ def load_metrics(
         )
 
         # Save to parquet
+        logger.info(f"Saving {parquet_file}")
         metric_results.collect().write_parquet(parquet_file)
         results[(domain, configuration)] = pl.scan_parquet(parquet_file)
     return results
