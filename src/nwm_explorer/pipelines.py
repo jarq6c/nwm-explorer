@@ -12,6 +12,7 @@ from nwm_explorer.data import scan_routelinks, generate_filepath, generate_direc
 from nwm_explorer.data import (process_netcdf_parallel, process_nwis_tsv_parallel,
     delete_directory)
 from nwm_explorer.mappings import FileType, Variable, Units, Domain, Configuration
+from nwm_explorer.mappings import LEAD_TIME_MAPPING
 from nwm_explorer.metrics import (resample, nash_sutcliffe_efficiency,
     mean_relative_bias, pearson_correlation_coefficient, relative_mean,
     relative_variability, kling_gupta_efficiency)
@@ -330,8 +331,30 @@ def load_metrics(
             results[(domain, configuration)] = pl.scan_parquet(parquet_file)
             continue
 
-        logger.info(f"Resampling {domain} {configuration}")
-        daily_max = resample(data)
+        # if LEAD_TIME_MAPPING.get(configuration, False):
+        #     logger.info(f"Resampling {domain} {configuration}")
+        #     daily_max = resample(
+        #         data,
+        #         sort_by=("usgs_site_code", "reference_time", "value_time"),
+        #         group_by=["usgs_site_code", "reference_time"]
+        #         )
+        #     logger.info(f"Adding lead times {domain} {configuration}")
+        #     daily_max = daily_max.with_columns(
+        #         (pl.col("value_time").sub(pl.col("reference_time")) / pl.duration(hours=1)).alias("lead_time_hours")
+        #     )
+        # else:
+        #     logger.info(f"Resampling {domain} {configuration}")
+        #     daily_max = resample(data)
+
+        # print(daily_max.head().collect())
+        # NOTE The groupby sets the label to the left boundary. This means the 6Z value will get repositioned to the 0Z. This will produce negative lead times.
+        daily_max = data.sort(("usgs_site_code", "reference_time", "value_time")).group_by_dynamic(
+            "value_time",
+            every="1d",
+            group_by=("usgs_site_code", "reference_time")
+        ).agg(pl.col("predicted").max())
+        print(daily_max.head().collect())
+        quit()
 
         logger.info(f"Computing metrics {domain} {configuration}")
         metric_results = daily_max.group_by(
