@@ -4,7 +4,8 @@ import pandas as pd
 import polars as pl
 from nwm_explorer._version import __version__
 from nwm_explorer.mappings import Domain, Configuration
-from nwm_explorer.pipelines import load_NWM_output, load_USGS_observations
+from nwm_explorer.pipelines import (load_NWM_output, load_USGS_observations,
+    load_metrics)
 from nwm_explorer.downloads import download_routelinks
 from nwm_explorer.data import scan_routelinks
 
@@ -113,28 +114,40 @@ def export(
     write_to_csv(data=data, ofile=output, comments=comments, header=header)
 
 @metrics_group.command()
-@click.argument("domain", nargs=1, required=True)
-# @click.option("-o", "--output", nargs=1, type=click.File("w"), help="Output file path", default="-")
-# @click.option("-s", "--startDT", "startDT", nargs=1, type=TimestampParamType(), help="Start datetime")
-# @click.option("-e", "--endDT", "endDT", nargs=1, type=TimestampParamType(), help="End datetime")
-# @click.option('--comments/--no-comments', default=True, help="Enable/disable comments in output, enabled by default")
-# @click.option('--header/--no-header', default=True, help="Enable/disable header in output, enabled by default")
+@click.argument("domain", nargs=1, required=True, type=click.Choice(Domain))
+@click.argument("configuration", nargs=1, required=True, type=click.Choice(Configuration))
+@click.option("-o", "--output", nargs=1, type=click.File("w", lazy=False), help="Output file path", default="-")
+@click.option("-s", "--startDT", "startDT", nargs=1, required=True, type=TimestampParamType(), help="Start datetime")
+@click.option("-e", "--endDT", "endDT", nargs=1, required=True, type=TimestampParamType(), help="End datetime")
+@click.option('--comments/--no-comments', default=True, help="Enable/disable comments in output, enabled by default")
+@click.option('--header/--no-header', default=True, help="Enable/disable header in output, enabled by default")
+@click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
 def metrics(
-    domain: str, 
-    # output: click.File,
-    # startDT: pd.Timestamp = None,
-    # endDT: pd.Timestamp = None,
-    # parameterCd: str = "00060",
-    # comments: bool = True,
-    # header: bool = True
+    domain: Domain,
+    configuration: Configuration,
+    output: click.File,
+    startDT: pd.Timestamp,
+    endDT: pd.Timestamp,
+    comments: bool = True,
+    header: bool = True,
+    directory: Path = Path("data")
     ) -> None:
-    """Retrieve data from the USGS IV Web Service API and write in CSV format.
+    """Export NWM evaluation metrics to CSV format.
 
     Example:
     
-    nwm-explorer obs alaska
+    nwm-explorer metrics ALASKA ANALYSIS -s 20231001 -e 20240101 -o alaska_analysis_metrics.csv
     """
-    print(domain)
+    data = load_metrics(
+        root=directory,
+        start_date=startDT,
+        end_date=endDT
+    )[(domain, configuration)]
+
+    print(data.head().collect())
+    
+    # Write to CSV
+    # write_to_csv(data=data, ofile=output, comments=comments, header=header)
 
 cli = click.CommandCollection(sources=[
     export_group,
