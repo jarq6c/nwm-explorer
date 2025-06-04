@@ -29,7 +29,8 @@ dependencies = [
     "xarray",
     "aiohttp",
     "aiofiles",
-    "numba"
+    "numba",
+    "pyarrow"
 ]
 dynamic = ["version"]
 

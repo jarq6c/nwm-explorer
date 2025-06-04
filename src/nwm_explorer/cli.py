@@ -80,6 +80,7 @@ class TimestampParamType(click.ParamType):
 
 export_group = click.Group()
 metrics_group = click.Group()
+evaluate_group = click.Group()
 
 @export_group.command()
 @click.argument("domain", nargs=1, required=True, type=click.Choice(Domain))
@@ -161,9 +162,31 @@ def metrics(
     write_to_csv(data=data, ofile=output, comments=comments, header=header,
         title="# NWM Explorer Metrics Export\n# \n")
 
+@evaluate_group.command()
+@click.option("-s", "--startDT", "startDT", nargs=1, required=True, type=TimestampParamType(), help="Start datetime")
+@click.option("-e", "--endDT", "endDT", nargs=1, required=True, type=TimestampParamType(), help="End datetime")
+@click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
+def evaluate(
+    startDT: pd.Timestamp,
+    endDT: pd.Timestamp,
+    directory: Path = Path("data")
+    ) -> None:
+    """Run standard evaluation and generate parquet files.
+
+    Example:
+    
+    nwm-explorer evaluate -s 20231001 -e 20240101
+    """
+    load_metrics(
+        root=directory,
+        start_date=startDT,
+        end_date=endDT
+    )
+
 cli = click.CommandCollection(sources=[
     export_group,
-    metrics_group
+    metrics_group,
+    evaluate_group
     ])
 
 if __name__ == "__main__":
