@@ -193,7 +193,7 @@ def resample(
         Additional column to group on. Default is 'usgs_site_code'.
     sampling: Iterable[pl.Expr], optional
         Functions to use for each column. Default is to take the maximum of
-        each group for 'value_pred' and 'value_obs' columns.
+        each group for 'predicted' and 'observed' columns.
     sampling_frequency: str | timedelta, optional
         Desired resultant frequency. Default is daily.
 
@@ -205,8 +205,8 @@ def resample(
         sort_by = ("usgs_site_code", "value_time")
     if sampling is None:
         sampling = (
-            pl.col("value_pred").max(),
-            pl.col("value_obs").max()
+            pl.col("predicted").max(),
+            pl.col("observed").max()
             )
     return data.sort(sort_by).group_by_dynamic(
         index_column,
@@ -215,9 +215,9 @@ def resample(
     ).agg(*sampling)
 
 def kling_gupta_efficiency() -> pl.Expr:
-    """Returns an expression used to add a 'KGE' column to a dataframe."""
+    """Returns an expression used to add a 'kling_gupta_efficiency' column to a dataframe."""
     return (1.0 - np.sqrt(
-        ((pl.col("PCC") - 1.0)) ** 2.0 + 
+        ((pl.col("pearson_correlation_coefficient") - 1.0)) ** 2.0 + 
         ((pl.col("relative_variability") - 1.0)) ** 2.0 + 
         ((pl.col("relative_mean") - 1.0)) ** 2.0
-        )).alias("KGE")
+        )).alias("kling_gupta_efficiency")

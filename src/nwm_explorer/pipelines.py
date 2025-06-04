@@ -235,7 +235,8 @@ def load_pairs(
             usgs_site_code=pl.col("nwm_feature_id").replace_strict(
                 crosswalk["nwm_feature_id"], crosswalk["usgs_site_code"])
         ).join(obs, on=["usgs_site_code", "value_time"], how="left",
-                suffix="_obs").drop_nulls().rename({"value": "value_pred"})
+                suffix="_obs").drop_nulls().rename(
+                    {"value": "predicted", "value_obs": "observed"})
 
         # Save to parquet
         paired_data.collect().write_parquet(parquet_file)
@@ -283,52 +284,52 @@ def load_metrics(
         daily_max = resample(data)
         metric_results = daily_max.group_by(
             "usgs_site_code").agg(
-            pl.struct(["value_obs", "value_pred"])
+            pl.struct(["observed", "predicted"])
             .map_batches(
                 lambda combined: nash_sutcliffe_efficiency(
-                    combined.struct.field("value_obs"),
-                    combined.struct.field("value_pred")
+                    combined.struct.field("observed"),
+                    combined.struct.field("predicted")
                 ),
                 returns_scalar=True
             )
-            .alias("NSE"),
-            pl.struct(["value_obs", "value_pred"])
+            .alias("nash_sutcliffe_efficiency"),
+            pl.struct(["observed", "predicted"])
             .map_batches(
                 lambda combined: pearson_correlation_coefficient(
-                    combined.struct.field("value_obs"),
-                    combined.struct.field("value_pred")
+                    combined.struct.field("observed"),
+                    combined.struct.field("predicted")
                 ),
                 returns_scalar=True
             )
-            .alias("PCC"),
-            pl.struct(["value_obs", "value_pred"])
+            .alias("pearson_correlation_coefficient"),
+            pl.struct(["observed", "predicted"])
             .map_batches(
                 lambda combined: mean_relative_bias(
-                    combined.struct.field("value_obs"),
-                    combined.struct.field("value_pred")
+                    combined.struct.field("observed"),
+                    combined.struct.field("predicted")
                 ),
                 returns_scalar=True
             )
-            .alias("MRB"),
-            pl.struct(["value_obs", "value_pred"])
+            .alias("mean_relative_bias"),
+            pl.struct(["observed", "predicted"])
             .map_batches(
                 lambda combined: relative_variability(
-                    combined.struct.field("value_obs"),
-                    combined.struct.field("value_pred")
+                    combined.struct.field("observed"),
+                    combined.struct.field("predicted")
                 ),
                 returns_scalar=True
             )
             .alias("relative_variability"),
-            pl.struct(["value_obs", "value_pred"])
+            pl.struct(["observed", "predicted"])
             .map_batches(
                 lambda combined: relative_mean(
-                    combined.struct.field("value_obs"),
-                    combined.struct.field("value_pred")
+                    combined.struct.field("observed"),
+                    combined.struct.field("predicted")
                 ),
                 returns_scalar=True
             )
             .alias("relative_mean"),
-            pl.col("value_obs").count().alias("sample_size"),
+            pl.col("observed").count().alias("sample_size"),
             pl.col("value_time").min().alias("start_date"),
             pl.col("value_time").max().alias("end_date")
         ).with_columns(

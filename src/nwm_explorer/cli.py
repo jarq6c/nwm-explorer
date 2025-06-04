@@ -18,7 +18,16 @@ CSV_HEADERS: dict[str, str] = {
     "qualifiers": "Qualifier string (character string)",
     "series": "Series number in case multiple time series are returned (integer)",
     "reference_time": "Forecast or analysis issue time or time zero (datetime string)",
-    "nwm_feature_id": "NWM channel feature identifier"
+    "nwm_feature_id": "NWM channel feature identifier",
+    "nash_sutcliffe_efficiency": "Nash-Sutcliffe Model Efficiency Score",
+    "pearson_correlation_coefficient": "Pearson Linear Correlation Coefficient",
+    "mean_relative_bias": "Mean relative bias or mean relative error",
+    "relative_variability": "Ratio of predicted standard deviation to observed standard deviation",
+    "relative_mean": "Ratio of predicted mean to observed mean",
+    "sample_size": "Number of resampled pairs used to compute metrics",
+    "start_date": "Earliest valid time in evaluation pairs",
+    "end_date": "Latest valid time in evaluation pairs",
+    "kling_gupta_efficiency": "Kling-Gupta Model Efficiency Score"
 }
 """Column header descriptions."""
 
@@ -26,11 +35,12 @@ def write_to_csv(
     data: pl.LazyFrame,
     ofile: click.File,
     comments: bool = True,
-    header: bool = True
+    header: bool = True,
+    title: str = "# NWM Explorer Data Export\n# \n"
     ) -> None:
     # Comments
     if comments:
-        output = "# NWM Explorer Data Export\n# \n"
+        output = title
         
         for col in data.collect_schema().names():
             output += f"# {col}: {CSV_HEADERS[col]}\n"
@@ -143,11 +153,10 @@ def metrics(
         start_date=startDT,
         end_date=endDT
     )[(domain, configuration)]
-
-    print(data.head().collect())
     
     # Write to CSV
-    # write_to_csv(data=data, ofile=output, comments=comments, header=header)
+    write_to_csv(data=data, ofile=output, comments=comments, header=header,
+        title="# NWM Explorer Metrics Export\n# \n")
 
 cli = click.CommandCollection(sources=[
     export_group,
