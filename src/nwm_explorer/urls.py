@@ -163,11 +163,43 @@ def medium_range_gfs_conus(
         time_slices=time_slices
     )
 
+def medium_range_nbm_conus(
+        reference_dates: list[str]
+) -> list[str]:
+    """
+    Generate public urls for medium_range_blend.
+    """
+    configuration = "medium_range_blend/"
+    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 6)]
+    file_type = "medium_range_blend.channel_rt."
+    suffix = "conus.nc"
+    time_slices = ["f" + str(p).zfill(3) + "." for p in range(1, 241)]
+    return build_gcs_public_urls(
+        reference_dates=reference_dates,
+        configuration=configuration,
+        prefixes=prefixes,
+        file_type=file_type,
+        suffix=suffix,
+        time_slices=time_slices
+    )
+
 NWM_URL_BUILDERS: dict[tuple[Domain, Configuration], Callable] = {
-    (Domain.ALASKA, Configuration.ANALYSIS): analysis_assim_extend_alaska_no_da,
-    (Domain.CONUS, Configuration.ANALYSIS): analysis_assim_extend_no_da,
-    (Domain.HAWAII, Configuration.ANALYSIS): analysis_assim_hawaii_no_da,
-    (Domain.PUERTORICO, Configuration.ANALYSIS): analysis_assim_puertorico_no_da
+    # (Domain.ALASKA, Configuration.ANALYSIS): analysis_assim_extend_alaska_no_da,
+    # (Domain.CONUS, Configuration.ANALYSIS): analysis_assim_extend_no_da,
+    # (Domain.HAWAII, Configuration.ANALYSIS): analysis_assim_hawaii_no_da,
+    # (Domain.PUERTORICO, Configuration.ANALYSIS): analysis_assim_puertorico_no_da,
+    (Domain.CONUS, Configuration.MRF_GFS): medium_range_gfs_conus,
+    # (Domain.CONUS, Configuration.MRF_NBM): medium_range_nbm_conus,
+    # (Domain.CONUS, Configuration.MRF_GFS_NO_DA): medium_range_gfs_conus_no_da,
+    # (Domain.CONUS, Configuration.SRF_HRRR): short_range_hrrr_conus,
+    # (Domain.HAWAII, Configuration.SRF_NAM): short_range_nam_hawaii,
+    # (Domain.HAWAII, Configuration.SRF_NAM_NO_DA): short_range_nam_hawaii_no_da,
+    # (Domain.PUERTORICO, Configuration.SRF_NAM): short_range_nam_puertorico,
+    # (Domain.PUERTORICO, Configuration.SRF_NAM_NO_DA): short_range_nam_puertorico_no_da
+    # (Domain.ALASKA, Configuration.MRF_GFS): medium_range_gfs_alaska,
+    # (Domain.ALASKA, Configuration.MRF_NBM): medium_range_nbm_alaska,
+    # (Domain.ALASKA, Configuration.MRF_GFS_NO_DA): medium_range_gfs_alaska_no_da,
+    # (Domain.ALASKA, Configuration.SRF_HRRR): short_range_hrrr_alaska,
 }
 """Mapping from (Domain, Configuration) to url builder function."""
 

@@ -50,6 +50,8 @@ class Configuration(StrEnum):
     """Symbols used to reference data configurations."""
     ANALYSIS = "analysis"
     OBSERVATIONS = "observations"
+    MRF_GFS = "mrf_gfs"
+    MRF_NBM = "mrf_nbm"
 
 class FileType(StrEnum):
     """Symbols used for common file types."""

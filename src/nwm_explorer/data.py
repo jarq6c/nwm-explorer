@@ -116,9 +116,14 @@ def process_netcdf(
     -------
     pandas.DataFrame
     """
-    with xr.open_mfdataset(job.filepaths)[job.variables].sel(
-        feature_id=job.features) as ds:
-        return ds.to_dataframe().reset_index().dropna()
+    with xr.open_mfdataset(job.filepaths) as ds:
+        df = ds[job.variables].sel(feature_id=job.features
+            ).to_dataframe().reset_index().dropna()
+        if "time" not in df:
+            df["time"] = ds.time.values[0]
+        if "reference_time" not in df:
+            df["reference_time"] = ds.reference_time.values[0]
+        return df
 
 def process_netcdf_parallel(
     filepaths: list[Path],
@@ -229,6 +234,7 @@ def generate_directory(
         filetype: FileType,
         domain: Domain,
         configuration: Configuration,
+        part: int | None = None,
         create: bool = True
 ) -> Path:
     """
@@ -244,12 +250,19 @@ def generate_directory(
         Model domain.
     configuration: Configuration, required
         Model Configuration.
+    part: int, optional
+        Integer indicating part of larger dataset.
+    create: bool, optional, default True
+        Create the directory.
     
     Returns
     -------
     Path
     """
-    odir = root / filetype / configuration / domain
+    if part is None:
+        odir = root / filetype / configuration / domain
+    else:
+        odir = root / filetype / configuration / domain / f"part_{part}"
     if create:
         odir.mkdir(exist_ok=True, parents=True)
     return odir
@@ -262,7 +275,8 @@ def generate_filepath(
         variable: Variable,
         units: Units,
         start_date: pd.Timestamp,
-        end_date: pd.Timestamp
+        end_date: pd.Timestamp,
+        part: int | None = None
 ) -> Path:
     """
     Generate a standardized file path.
@@ -285,19 +299,28 @@ def generate_filepath(
         Start date.
     end_date: pd.Timestamp, required
         End date.
+    part: int, optional
+        Integer indicating part of larger dataset.
     
     Returns
     -------
     Path
     """
-    odir = generate_directory(root, filetype, domain, configuration)
+    odir = generate_directory(root, filetype, domain, configuration, part)
     start = start_date.strftime("%Y%m%dT%H")
     end = end_date.strftime("%Y%m%dT%H")
-    filename = (
-        f"{configuration}_"
-        f"{variable}_{units}_"
-        f"{start}_{end}.{filetype}"
-        )
+    if part is None:
+        filename = (
+            f"{configuration}_"
+            f"{variable}_{units}_"
+            f"{start}_{end}.{filetype}"
+            )
+    else:
+        filename = (
+            f"{configuration}_"
+            f"{variable}_{units}_"
+            f"{start}_{end}_{part}.{filetype}"
+            )
     return odir / filename
 
 def delete_directory(
