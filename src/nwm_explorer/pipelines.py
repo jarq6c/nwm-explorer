@@ -285,7 +285,7 @@ def load_pairs(
 
         # Save to parquet
         logger.info(f"Saving {parquet_file}")
-        paired_data.collect().write_parquet(parquet_file)
+        paired_data.sink_parquet(parquet_file)
         pairs[(domain, configuration)] = pl.scan_parquet(parquet_file)
     return pairs
 
@@ -390,6 +390,6 @@ def load_metrics(
 
         # Save to parquet
         logger.info(f"Saving {parquet_file}")
-        metric_results.collect().write_parquet(parquet_file)
+        metric_results.sink_parquet(parquet_file)
         results[(domain, configuration)] = pl.scan_parquet(parquet_file)
     return results
