@@ -204,12 +204,12 @@ def medium_range_no_da(
     )
 
 NWM_URL_BUILDERS: dict[tuple[Domain, Configuration], Callable] = {
-    # (Domain.alaska, Configuration.analysis_assim_extend_alaska_no_da): analysis_assim_extend_alaska_no_da,
-    # (Domain.conus, Configuration.analysis_assim_extend_no_da): analysis_assim_extend_no_da,
-    # (Domain.hawaii, Configuration.analysis_assim_hawaii_no_da): analysis_assim_hawaii_no_da,
-    # (Domain.puertorico, Configuration.analysis_assim_puertorico_no_da): analysis_assim_puertorico_no_da,
-    # (Domain.conus, Configuration.medium_range_mem1): medium_range_mem1,
-    # (Domain.conus, Configuration.medium_range_blend): medium_range_blend,
+    (Domain.alaska, Configuration.analysis_assim_extend_alaska_no_da): analysis_assim_extend_alaska_no_da,
+    (Domain.conus, Configuration.analysis_assim_extend_no_da): analysis_assim_extend_no_da,
+    (Domain.hawaii, Configuration.analysis_assim_hawaii_no_da): analysis_assim_hawaii_no_da,
+    (Domain.puertorico, Configuration.analysis_assim_puertorico_no_da): analysis_assim_puertorico_no_da,
+    (Domain.conus, Configuration.medium_range_mem1): medium_range_mem1,
+    (Domain.conus, Configuration.medium_range_blend): medium_range_blend,
     (Domain.conus, Configuration.medium_range_no_da): medium_range_no_da,
     # (Domain.conus, Configuration.SRF_HRRR): short_range_hrrr_conus,
     # (Domain.hawaii, Configuration.SRF_NAM): short_range_nam_hawaii,
