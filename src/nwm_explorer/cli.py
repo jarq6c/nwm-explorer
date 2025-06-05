@@ -28,7 +28,8 @@ CSV_HEADERS: dict[str, str] = {
     "sample_size": "Number of resampled pairs used to compute metrics",
     "start_date": "Earliest valid time in evaluation pairs",
     "end_date": "Latest valid time in evaluation pairs",
-    "kling_gupta_efficiency": "Kling-Gupta Model Efficiency Score"
+    "kling_gupta_efficiency": "Kling-Gupta Model Efficiency Score",
+    "lead_time_min": "Minimum lead time in days."
 }
 """Column header descriptions."""
 

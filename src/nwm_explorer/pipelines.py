@@ -331,34 +331,31 @@ def load_metrics(
             results[(domain, configuration)] = pl.scan_parquet(parquet_file)
             continue
 
-        # if LEAD_TIME_MAPPING.get(configuration, False):
-        #     logger.info(f"Resampling {domain} {configuration}")
-        #     daily_max = resample(
-        #         data,
-        #         sort_by=("usgs_site_code", "reference_time", "value_time"),
-        #         group_by=["usgs_site_code", "reference_time"]
-        #         )
-        #     logger.info(f"Adding lead times {domain} {configuration}")
-        #     daily_max = daily_max.with_columns(
-        #         (pl.col("value_time").sub(pl.col("reference_time")) / pl.duration(hours=1)).alias("lead_time_hours")
-        #     )
-        # else:
-        #     logger.info(f"Resampling {domain} {configuration}")
-        #     daily_max = resample(data)
-
-        # print(daily_max.head().collect())
-        # NOTE The groupby sets the label to the left boundary. This means the 6Z value will get repositioned to the 0Z. This will produce negative lead times.
-        daily_max = data.sort(("usgs_site_code", "reference_time", "value_time")).group_by_dynamic(
-            "value_time",
-            every="1d",
-            group_by=("usgs_site_code", "reference_time")
-        ).agg(pl.col("predicted").max())
-        print(daily_max.head().collect())
-        quit()
+        logger.info(f"Resampling {domain} {configuration}")
+        if LEAD_TIME_MAPPING.get(configuration, False):
+            logger.info(f"Adding lead times {domain} {configuration}")
+            data = data.with_columns(
+                (pl.col("value_time").sub(pl.col("reference_time")) /
+                 pl.duration(days=1)).floor().alias("lead_time_min")
+            )
+            daily_max = resample(
+                data,
+                sort_by=("usgs_site_code", "reference_time", "value_time"),
+                group_by=("usgs_site_code", "reference_time"),
+                sampling=(
+                    pl.col("observed").max(),
+                    pl.col("predicted").max(),
+                    pl.col("lead_time_min").min()
+                )
+                )
+            metric_groups = ["usgs_site_code", "lead_time_min"]
+        else:
+            daily_max = resample(data)
+            metric_groups = ["usgs_site_code"]
 
         logger.info(f"Computing metrics {domain} {configuration}")
         metric_results = daily_max.group_by(
-            "usgs_site_code").agg(
+            metric_groups).agg(
             pl.struct(["observed", "predicted"])
             .map_batches(
                 lambda combined: nash_sutcliffe_efficiency(
@@ -409,10 +406,10 @@ def load_metrics(
             pl.col("value_time").max().alias("end_date")
         ).with_columns(
             kling_gupta_efficiency()
-        )
+        ).sort(metric_groups)
 
         # Save to parquet
         logger.info(f"Saving {parquet_file}")
-        metric_results.sink_parquet(parquet_file)
+        metric_results.collect().write_parquet(parquet_file)
         results[(domain, configuration)] = pl.scan_parquet(parquet_file)
     return results
