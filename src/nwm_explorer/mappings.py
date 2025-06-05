@@ -54,14 +54,6 @@ class Configuration(StrEnum):
     MRF_GFS = "mrf_gfs"
     MRF_NBM = "mrf_nbm"
 
-LEAD_TIME_MAPPING: dict[Configuration, bool] = {
-    Configuration.ANALYSIS: False,
-    Configuration.OBSERVATIONS: False,
-    Configuration.MRF_GFS: True,
-    Configuration.MRF_NBM: True
-}
-"""Mapping to indicate whether to compute lead time."""
-
 @dataclass
 class LeadTimeSpec:
     """Dataclass for storing lead time specifications."""

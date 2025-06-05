@@ -12,7 +12,7 @@ from nwm_explorer.data import scan_routelinks, generate_filepath, generate_direc
 from nwm_explorer.data import (process_netcdf_parallel, process_nwis_tsv_parallel,
     delete_directory)
 from nwm_explorer.mappings import FileType, Variable, Units, Domain, Configuration
-from nwm_explorer.mappings import LEAD_TIME_MAPPING, LEAD_TIME_FREQUENCY
+from nwm_explorer.mappings import LEAD_TIME_FREQUENCY
 from nwm_explorer.metrics import (resample, nash_sutcliffe_efficiency,
     mean_relative_bias, pearson_correlation_coefficient, relative_mean,
     relative_variability, kling_gupta_efficiency)
@@ -332,7 +332,7 @@ def load_metrics(
             continue
 
         logger.info(f"Resampling {domain} {configuration}")
-        if LEAD_TIME_MAPPING.get(configuration, False):
+        if configuration in LEAD_TIME_FREQUENCY:
             logger.info(f"Adding lead times {domain} {configuration}")
             lead_time_spec = LEAD_TIME_FREQUENCY[configuration]
             data = data.with_columns(
