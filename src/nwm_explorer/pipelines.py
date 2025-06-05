@@ -107,7 +107,6 @@ def load_NWM_output(
             # Save to parquet
             logger.info(f"Saving {parquet_file}")
             pl.DataFrame(data).with_columns(
-                pl.col("nwm_feature_id").cast(pl.Int32),
                 pl.col("value").cast(pl.Float32)
             ).write_parquet(parquet_file)
 
