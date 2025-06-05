@@ -12,7 +12,7 @@ from nwm_explorer.data import scan_routelinks, generate_filepath, generate_direc
 from nwm_explorer.data import (process_netcdf_parallel, process_nwis_tsv_parallel,
     delete_directory)
 from nwm_explorer.mappings import FileType, Variable, Units, Domain, Configuration
-from nwm_explorer.mappings import LEAD_TIME_MAPPING
+from nwm_explorer.mappings import LEAD_TIME_MAPPING, LEAD_TIME_FREQUENCY
 from nwm_explorer.metrics import (resample, nash_sutcliffe_efficiency,
     mean_relative_bias, pearson_correlation_coefficient, relative_mean,
     relative_variability, kling_gupta_efficiency)
@@ -334,9 +334,12 @@ def load_metrics(
         logger.info(f"Resampling {domain} {configuration}")
         if LEAD_TIME_MAPPING.get(configuration, False):
             logger.info(f"Adding lead times {domain} {configuration}")
+            lead_time_spec = LEAD_TIME_FREQUENCY[configuration]
             data = data.with_columns(
                 (pl.col("value_time").sub(pl.col("reference_time")) /
-                 pl.duration(days=1)).floor().alias("lead_time_min")
+                 lead_time_spec.duration).floor().alias(
+                     lead_time_spec.label
+                 )
             )
             daily_max = resample(
                 data,
@@ -345,10 +348,10 @@ def load_metrics(
                 sampling=(
                     pl.col("observed").max(),
                     pl.col("predicted").max(),
-                    pl.col("lead_time_min").min()
+                    pl.col(lead_time_spec.label).min()
                 )
                 )
-            metric_groups = ["usgs_site_code", "lead_time_min"]
+            metric_groups = ["usgs_site_code", lead_time_spec.label]
         else:
             daily_max = resample(data)
             metric_groups = ["usgs_site_code"]

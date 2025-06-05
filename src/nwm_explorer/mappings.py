@@ -1,4 +1,5 @@
 """Various mappings."""
+from dataclasses import dataclass
 from enum import StrEnum
 import polars as pl
 
@@ -60,6 +61,18 @@ LEAD_TIME_MAPPING: dict[Configuration, bool] = {
     Configuration.MRF_NBM: True
 }
 """Mapping to indicate whether to compute lead time."""
+
+@dataclass
+class LeadTimeSpec:
+    """Dataclass for storing lead time specifications."""
+    duration: pl.Duration
+    label: str
+
+LEAD_TIME_FREQUENCY: dict[Configuration, LeadTimeSpec] = {
+    Configuration.MRF_GFS: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min"),
+    Configuration.MRF_NBM: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min")
+}
+"""Mapping used for computing lead time."""
 
 class FileType(StrEnum):
     """Symbols used for common file types."""
