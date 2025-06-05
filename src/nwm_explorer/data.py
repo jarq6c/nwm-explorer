@@ -64,7 +64,7 @@ def scan_routelinks(
         Dataframes will only have columns found in schema. Keys are model
         Domain. Domain mapping uses schemas.DOMAIN_MAPPING by default.
         For example: ./parent/csv/RouteLink_HI.csv will be loaded and
-        accessible using the key Domain.HAWAII
+        accessible using the key Domain.hawaii
     """
     frames = {}
     for fp in filepaths:
@@ -75,7 +75,7 @@ def scan_routelinks(
             schema_overrides=schema
             ).select(list(schema.keys()))
         
-        if domain == Domain.CONUS:
+        if domain == Domain.conus:
             frames[domain] = frames[domain].with_columns(
                     pl.col("usgs_site_code").replace("8313150", "08313150")
                 )
@@ -232,10 +232,9 @@ def process_nwis_tsv_parallel(
 def generate_directory(
         root: Path,
         filetype: FileType,
-        domain: Domain,
-        configuration: Configuration,
-        part: int | None = None,
-        create: bool = True
+        date_string: str,
+        create: bool = True,
+        configuration: Configuration | None = None
 ) -> Path:
     """
     Generate, and optionally create, a standardized directory path.
@@ -246,12 +245,8 @@ def generate_directory(
         Root path.
     filetype: FileType, required
         Type of file.
-    domain: Domain, required
-        Model domain.
-    configuration: Configuration, required
-        Model Configuration.
-    part: int, optional
-        Integer indicating part of larger dataset.
+    date_string: str, required
+        Reference day folder.
     create: bool, optional, default True
         Create the directory.
     
@@ -259,10 +254,10 @@ def generate_directory(
     -------
     Path
     """
-    if part is None:
-        odir = root / filetype / configuration / domain
-    else:
-        odir = root / filetype / configuration / domain / f"part_{part}"
+    odir = root / filetype / date_string
+    if configuration is not None:
+        odir = odir / configuration
+
     if create:
         odir.mkdir(exist_ok=True, parents=True)
     return odir
@@ -270,13 +265,10 @@ def generate_directory(
 def generate_filepath(
         root: Path,
         filetype: FileType,
-        domain: Domain,
         configuration: Configuration,
         variable: Variable,
         units: Units,
-        start_date: pd.Timestamp,
-        end_date: pd.Timestamp,
-        part: int | None = None
+        date_string: str
 ) -> Path:
     """
     Generate a standardized file path.
@@ -295,32 +287,18 @@ def generate_filepath(
         Output variable.
     units: Units, required
         Measurement units.
-    start_date: pd.Timestamp, required
-        Start date.
-    end_date: pd.Timestamp, required
-        End date.
-    part: int, optional
-        Integer indicating part of larger dataset.
+    date_string: str, required
+        Reference day folder.
     
     Returns
     -------
     Path
     """
-    odir = generate_directory(root, filetype, domain, configuration, part)
-    start = start_date.strftime("%Y%m%dT%H")
-    end = end_date.strftime("%Y%m%dT%H")
-    if part is None:
-        filename = (
-            f"{configuration}_"
-            f"{variable}_{units}_"
-            f"{start}_{end}.{filetype}"
-            )
-    else:
-        filename = (
-            f"{configuration}_"
-            f"{variable}_{units}_"
-            f"{start}_{end}_{part}.{filetype}"
-            )
+    odir = generate_directory(root, filetype, date_string)
+    filename = (
+        f"{configuration}_"
+        f"{variable}_{units}.{filetype}"
+        )
     return odir / filename
 
 def delete_directory(

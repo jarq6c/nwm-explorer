@@ -30,29 +30,32 @@ ROUTELINK_SCHEMA: dict[str, pl.DataType] = {
 
 class Domain(StrEnum):
     """Symbols used to reference different model domains."""
-    ALASKA = "alaska"
-    CONUS = "conus"
-    HAWAII = "hawaii"
-    PUERTORICO = "puertorico"
+    alaska = "alaska"
+    conus = "conus"
+    hawaii = "hawaii"
+    puertorico = "puertorico"
 
 DOMAIN_MAPPING: dict[str, Domain] = {
-    "alaska": Domain.ALASKA,
-    "conus": Domain.CONUS,
-    "hawaii": Domain.HAWAII,
-    "puertorico": Domain.PUERTORICO,
-    "RouteLink_AK.csv": Domain.ALASKA,
-    "RouteLink_CONUS.csv": Domain.CONUS,
-    "RouteLink_HI.csv": Domain.HAWAII,
-    "RouteLink_PRVI.csv": Domain.PUERTORICO
+    "alaska": Domain.alaska,
+    "conus": Domain.conus,
+    "hawaii": Domain.hawaii,
+    "puertorico": Domain.puertorico,
+    "RouteLink_AK.csv": Domain.alaska,
+    "RouteLink_CONUS.csv": Domain.conus,
+    "RouteLink_HI.csv": Domain.hawaii,
+    "RouteLink_PRVI.csv": Domain.puertorico
 }
 """Mapping from common strings to standard symbols."""
 
 class Configuration(StrEnum):
     """Symbols used to reference data configurations."""
-    ANALYSIS = "analysis"
-    OBSERVATIONS = "observations"
-    MRF_GFS = "mrf_gfs"
-    MRF_NBM = "mrf_nbm"
+    analysis_assim_extend_alaska_no_da = "analysis_assim_extend_alaska_no_da"
+    analysis_assim_extend_no_da = "analysis_assim_extend_no_da"
+    analysis_assim_hawaii_no_da = "analysis_assim_hawaii_no_da"
+    analysis_assim_puertorico_no_da = "analysis_assim_puertorico_no_da"
+    usgs = "usgs"
+    medium_range_mem1 = "medium_range_mem1"
+    medium_range_blend = "medium_range_blend"
 
 @dataclass
 class LeadTimeSpec:
@@ -61,30 +64,30 @@ class LeadTimeSpec:
     label: str
 
 LEAD_TIME_FREQUENCY: dict[Configuration, LeadTimeSpec] = {
-    Configuration.MRF_GFS: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min"),
-    Configuration.MRF_NBM: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min")
+    Configuration.medium_range_mem1: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min"),
+    Configuration.medium_range_blend: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min")
 }
 """Mapping used for computing lead time."""
 
 class FileType(StrEnum):
     """Symbols used for common file types."""
-    NETCDF = "netcdf"
-    PARQUET = "parquet"
-    TSV = "tsv"
+    netcdf = "netcdf"
+    parquet = "parquet"
+    tsv = "tsv"
 
 class Variable(StrEnum):
     """Symbols used for common variables."""
-    STREAMFLOW = "streamflow"
-    STREAMFLOW_PAIRS = "streamflow_pairs"
-    STREAMFLOW_METRICS = "streamflow_metrics"
+    streamflow = "streamflow"
+    streamflow_pairs = "streamflow_pairs"
+    streamflow_metrics = "streamflow_metrics"
 
 class Units(StrEnum):
     """Symbols used for common units."""
-    CUBIC_FEET_PER_SECOND = "cfs"
-    METRICS = "metrics"
+    cubic_feet_per_second = "cfs"
+    metrics = "metrics"
 
 class Confidence(StrEnum):
     """Symbols used to describe confidence interval range estimates."""
-    POINT = "point"
-    LOWER = "lower"
-    UPPER = "upper"
+    point = "point"
+    lower = "lower"
+    upper = "upper"

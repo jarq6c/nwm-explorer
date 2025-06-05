@@ -143,7 +143,7 @@ def analysis_assim_puertorico_no_da(
         time_slices=time_slices
     )
 
-def medium_range_gfs_conus(
+def medium_range_mem1(
         reference_dates: list[str]
 ) -> list[str]:
     """
@@ -188,7 +188,7 @@ NWM_URL_BUILDERS: dict[tuple[Domain, Configuration], Callable] = {
     # (Domain.CONUS, Configuration.ANALYSIS): analysis_assim_extend_no_da,
     # (Domain.HAWAII, Configuration.ANALYSIS): analysis_assim_hawaii_no_da,
     # (Domain.PUERTORICO, Configuration.ANALYSIS): analysis_assim_puertorico_no_da,
-    (Domain.CONUS, Configuration.MRF_GFS): medium_range_gfs_conus,
+    (Domain.conus, Configuration.medium_range_mem1): medium_range_mem1,
     # (Domain.CONUS, Configuration.MRF_NBM): medium_range_nbm_conus,
     # (Domain.CONUS, Configuration.MRF_GFS_NO_DA): medium_range_gfs_conus_no_da,
     # (Domain.CONUS, Configuration.SRF_HRRR): short_range_hrrr_conus,

@@ -23,7 +23,7 @@ def load_NWM_output(
         root: Path,
         start_date: pd.Timestamp,
         end_date: pd.Timestamp,
-        routelinks: dict[Domain, pl.LazyFrame]
+        routelinks: dict[Domain, pl.LazyFrame] | None = None
 ) -> dict[tuple[Domain, Configuration], pl.LazyFrame]:
     """
     Download and process NWM output.
@@ -43,51 +43,41 @@ def load_NWM_output(
     -------
     dict[tuple[Domain, Configuration], pl.LazyFrame]
     """
+    if routelinks is None:
+        routelinks = scan_routelinks(*download_routelinks(root / "routelinks"))
+
     logger = get_logger("nwm_explorer.pipelines.load_NWM_output")
     reference_dates = generate_reference_dates(start_date, end_date)
 
     # Download and process model output
     model_output = {}
     for (domain, configuration), url_builder in NWM_URL_BUILDERS.items():
-        # Check for file existence
-        parquet_file = generate_filepath(
-            root, FileType.PARQUET, domain, configuration, Variable.STREAMFLOW,
-            Units.CUBIC_FEET_PER_SECOND, start_date, end_date
-        )
-        logger.info(f"Building {parquet_file}")
-        if parquet_file.exists():
-            logger.info(f"Found existing {parquet_file}")
-            model_output[(domain, configuration)] = pl.scan_parquet(parquet_file)
-            continue
-
-        # Download in parts
-        urls = url_builder(reference_dates)
-        number_of_chunks = max(1, len(urls) // 100)
-        url_chunks = np.array_split(urls, number_of_chunks)
-        partial_files = []
-        for part, chunk in enumerate(url_chunks):
+        day_files = []
+        for rd in reference_dates:
             # Check for file existence
-            partial_file = generate_filepath(
-                root, FileType.PARQUET, domain, configuration, Variable.STREAMFLOW,
-                Units.CUBIC_FEET_PER_SECOND, start_date, end_date, part
+            parquet_file = generate_filepath(
+                root, FileType.parquet, configuration, Variable.streamflow,
+                Units.cubic_feet_per_second, rd
             )
-            logger.info(f"Building {partial_file}")
-            if partial_file.exists():
-                logger.info(f"Found existing {partial_file}")
-                partial_files.append(partial_file)
+            logger.info(f"Building {parquet_file}")
+            if parquet_file.exists():
+                logger.info(f"Found existing {parquet_file}")
+                day_files.append(parquet_file)
                 continue
 
+            # Download
+            urls = url_builder([rd])
             download_directory = generate_directory(
-                root, FileType.NETCDF, domain, configuration, part=part
+                root, FileType.netcdf, rd, configuration=configuration
             )
             logger.info(f"Downloading to {download_directory}")
-            manifest = generate_default_manifest(len(chunk),
+            manifest = generate_default_manifest(len(urls),
                 directory=download_directory)
-            download_files(*zip(chunk, manifest), limit=10, timeout=3600,
+            download_files(*zip(urls, manifest), limit=20, timeout=3600,
                 file_validator=netcdf_validator)
             
             # Validate manifest
-            logger.info(f"Validating manifest {domain} {configuration}")
+            logger.info(f"Validating manifest {domain} {configuration} {rd}")
             file_list = []
             for fp in manifest:
                 if fp.exists():
@@ -96,7 +86,7 @@ def load_NWM_output(
                 warnings.warn(f"{fp} does not exist.", RuntimeWarning)
 
             # Process
-            logger.info(f"Processing raw data {domain} {configuration}")
+            logger.info(f"Processing raw data {domain} {configuration} {rd}")
             features = routelinks[domain].select(
                 "nwm_feature_id").collect()["nwm_feature_id"].to_list()
             data = process_netcdf_parallel(
@@ -115,21 +105,20 @@ def load_NWM_output(
             data["value"] = data["value"].div(0.3048 ** 3.0)
 
             # Save to parquet
-            logger.info(f"Saving {partial_file}")
-            pl.DataFrame(data).write_parquet(partial_file)
+            logger.info(f"Saving {parquet_file}")
+            pl.DataFrame(data).with_columns(
+                pl.col("nwm_feature_id").cast(pl.Int32),
+                pl.col("value").cast(pl.Float32)
+            ).write_parquet(parquet_file)
 
             # Clean-up
             logger.info(f"Cleaning up {download_directory}")
-            delete_directory(download_directory, partial_file)
-            partial_files.append(partial_file)
+            delete_directory(download_directory, parquet_file)
+            day_files.append(parquet_file)
         
         # Merge files
-        logger.info(f"Merging {parquet_file}")
-        pl.scan_parquet(partial_files).with_columns(
-            pl.col("nwm_feature_id").cast(pl.Int32),
-            pl.col("value").cast(pl.Float32)
-        ).sink_parquet(parquet_file)
-        model_output[(domain, configuration)] = pl.scan_parquet(parquet_file)
+        logger.info(f"Merging parquet files")
+        model_output[(domain, configuration)] = pl.scan_parquet(day_files)
     return model_output
 
 def load_USGS_observations(
