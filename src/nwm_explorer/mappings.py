@@ -56,6 +56,7 @@ class Configuration(StrEnum):
     usgs = "usgs"
     medium_range_mem1 = "medium_range_mem1"
     medium_range_blend = "medium_range_blend"
+    medium_range_no_da = "medium_range_no_da"
 
 @dataclass
 class LeadTimeSpec:

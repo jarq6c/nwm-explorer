@@ -183,14 +183,34 @@ def medium_range_blend(
         time_slices=time_slices
     )
 
+def medium_range_no_da(
+        reference_dates: list[str]
+) -> list[str]:
+    """
+    Generate public urls for medium_range_no_da.
+    """
+    configuration = "medium_range_no_da/"
+    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 6)]
+    file_type = "medium_range_no_da.channel_rt."
+    suffix = "conus.nc"
+    time_slices = ["f" + str(p).zfill(3) + "." for p in range(3, 241, 3)]
+    return build_gcs_public_urls(
+        reference_dates=reference_dates,
+        configuration=configuration,
+        prefixes=prefixes,
+        file_type=file_type,
+        suffix=suffix,
+        time_slices=time_slices
+    )
+
 NWM_URL_BUILDERS: dict[tuple[Domain, Configuration], Callable] = {
-    (Domain.alaska, Configuration.analysis_assim_extend_alaska_no_da): analysis_assim_extend_alaska_no_da,
-    (Domain.conus, Configuration.analysis_assim_extend_no_da): analysis_assim_extend_no_da,
-    (Domain.hawaii, Configuration.analysis_assim_hawaii_no_da): analysis_assim_hawaii_no_da,
-    (Domain.puertorico, Configuration.analysis_assim_puertorico_no_da): analysis_assim_puertorico_no_da,
-    (Domain.conus, Configuration.medium_range_mem1): medium_range_mem1,
-    (Domain.conus, Configuration.medium_range_blend): medium_range_blend,
-    # (Domain.conus, Configuration.MRF_GFS_NO_DA): medium_range_gfs_conus_no_da,
+    # (Domain.alaska, Configuration.analysis_assim_extend_alaska_no_da): analysis_assim_extend_alaska_no_da,
+    # (Domain.conus, Configuration.analysis_assim_extend_no_da): analysis_assim_extend_no_da,
+    # (Domain.hawaii, Configuration.analysis_assim_hawaii_no_da): analysis_assim_hawaii_no_da,
+    # (Domain.puertorico, Configuration.analysis_assim_puertorico_no_da): analysis_assim_puertorico_no_da,
+    # (Domain.conus, Configuration.medium_range_mem1): medium_range_mem1,
+    # (Domain.conus, Configuration.medium_range_blend): medium_range_blend,
+    (Domain.conus, Configuration.medium_range_no_da): medium_range_no_da,
     # (Domain.conus, Configuration.SRF_HRRR): short_range_hrrr_conus,
     # (Domain.hawaii, Configuration.SRF_NAM): short_range_nam_hawaii,
     # (Domain.hawaii, Configuration.SRF_NAM_NO_DA): short_range_nam_hawaii_no_da,
