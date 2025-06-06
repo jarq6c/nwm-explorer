@@ -272,7 +272,8 @@ def download_routelinks(
         directory: str | Path = Path("."),
         create_directory: bool = True,
         url: str | URL = ROUTELINKS_URL,
-        manifest: tuple[Path, ...] | None = ROUTELINKS_MANIFEST
+        manifest: tuple[Path, ...] | None = ROUTELINKS_MANIFEST,
+        read_only: bool = False
         ) -> tuple[Path, ...]:
     """
     Download routelink tarball from url. Save to directory and extract.
@@ -288,6 +289,9 @@ def download_routelinks(
     manifest: list[str], optional
         List of expected filepaths beneath directory after download and
         extraction.
+    read_only: bool, optional, default True
+        Skip directory creation, download, and extraction. Assumes files
+        have already been downloaded.
 
     Returns
     -------
@@ -296,7 +300,7 @@ def download_routelinks(
     url = URL(url)
     directory = Path(directory)
     filepath = directory / url.name
-    if filepath.exists():
+    if filepath.exists() or read_only:
         return tuple(
             directory / fp for fp in manifest if (directory / fp).exists()
             )
