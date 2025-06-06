@@ -32,7 +32,8 @@ dependencies = [
     "numba",
     "pyarrow",
     "netcdf4",
-    "dask"
+    "dask",
+    "panel"
 ]
 dynamic = ["version"]
 

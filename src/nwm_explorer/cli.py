@@ -9,6 +9,7 @@ from nwm_explorer.pipelines import (load_NWM_output, load_USGS_observations,
 from nwm_explorer.downloads import download_routelinks
 from nwm_explorer.data import scan_routelinks
 from nwm_explorer.logger import get_logger
+from nwm_explorer.gui import start_dashboard
 
 CSV_HEADERS: dict[str, str] = {
     "value_time": "Datetime of measurement or forecast valid time (UTC) (datetime string)",
@@ -83,6 +84,7 @@ class TimestampParamType(click.ParamType):
 export_group = click.Group()
 metrics_group = click.Group()
 evaluate_group = click.Group()
+display_group = click.Group()
 
 @export_group.command()
 @click.argument("domain", nargs=1, required=True, type=click.Choice(Domain))
@@ -185,10 +187,24 @@ def evaluate(
         end_date=endDT
     )
 
+@display_group.command()
+@click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
+def display(
+    directory: Path = Path("data")
+    ) -> None:
+    """Visualize and explore evaluation data.
+
+    Example:
+    
+    nwm-explorer display
+    """
+    start_dashboard(directory)
+
 cli = click.CommandCollection(sources=[
     export_group,
     metrics_group,
-    evaluate_group
+    evaluate_group,
+    display_group
     ])
 
 if __name__ == "__main__":
