@@ -2,10 +2,18 @@
 
 A web-based application used to explore National Water Model output and evaluation metrics.
 
-## Interfaces
+## Installation
+```bash
+$ python3 -m venv env
+$ source env/bin/activate
+(env) $ pip install -U pip wheel
+(env) $ pip install nwm_explorer
+```
+
+## Usage
 
 ```console
-$ nwm-explorer --help
+(env) $ nwm-explorer --help
 Usage: nwm-explorer [OPTIONS] COMMAND [ARGS]...
 
 Options:
@@ -18,7 +26,7 @@ Commands:
 ```
 
 ```console
-$ nwm-explorer evaluate --help
+(env) $ nwm-explorer evaluate --help
 Usage: nwm-explorer evaluate [OPTIONS]
 
   Run standard evaluation and generate parquet files.
@@ -35,7 +43,7 @@ Options:
 ```
 
 ```console
-$ nwm-explorer export --help
+(env) $ nwm-explorer export --help
 Usage: nwm-explorer export [OPTIONS] {alaska|conus|hawaii|puertorico} {analysi
                            s_assim_extend_alaska_no_da|analysis_assim_extend_n
                            o_da|analysis_assim_hawaii_no_da|analysis_assim_pue
@@ -62,7 +70,7 @@ Options:
 ```
 
 ```console
-$ nwm-explorer metrics --help
+(env) $ nwm-explorer metrics --help
 Usage: nwm-explorer metrics [OPTIONS] {alaska|conus|hawaii|puertorico} {analys
                             is_assim_extend_alaska_no_da|analysis_assim_extend
                             _no_da|analysis_assim_hawaii_no_da|analysis_assim_
