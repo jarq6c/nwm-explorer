@@ -12,14 +12,22 @@ def generate_dashboard(root: Path = Path("data")) -> BootstrapTemplate:
         options=[]
     )
 
+    # Panes
+    readout = pn.pane.Markdown("# Number of sites: ")
+
     # Layout
     template = BootstrapTemplate(title="Title")
     template.sidebar.append(domain_selector)
+    template.main.append(readout)
 
     # Callbacks
     routelinks = read_routelinks(root)
     domain_selector.options = list(routelinks.keys())
-    
+    def update_readout(domain):
+        number_of_sites = routelinks[domain].select("usgs_site_code").count().collect().item(0, 0)
+        readout.object = f"# Number of sites: {number_of_sites}"
+    pn.bind(update_readout, domain_selector, watch=True)
+
     return template
 
 def generate_dashboard_closure(root: Path = Path("data")) -> BootstrapTemplate:
