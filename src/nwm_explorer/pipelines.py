@@ -347,7 +347,8 @@ def load_metrics(
                     pl.col("observed").max(),
                     pl.col("predicted").max(),
                     pl.col(lead_time_spec.label).min()
-                )
+                ),
+                sampling_frequency=lead_time_spec.sampling_frequency
                 )
             metric_groups = ["usgs_site_code", lead_time_spec.label]
         else:
