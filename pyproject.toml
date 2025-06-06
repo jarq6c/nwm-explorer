@@ -7,7 +7,7 @@ name = "nwm_explorer"
 authors = [
     { name = "Jason A. Regina", email = "jregina@duck.com" },
 ]
-description = "PyPI compatible template package."
+description = "A web-based application used to explore National Water Model output and evaluation metrics."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
