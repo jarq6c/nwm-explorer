@@ -5,14 +5,14 @@ from nwm_explorer.mappings import Domain
 from nwm_explorer.downloads import download_routelinks
 from nwm_explorer.data import scan_routelinks
 
-def read_routelinks(directory: Path) -> dict[Domain, pl.LazyFrame]:
+def read_routelinks(root: Path) -> dict[Domain, pl.LazyFrame]:
     """
     Lazily open routelink files as polars dataframes.
     
     Parameters
     ----------
-    directory: str | Path, optional, default "."
-        Data directory.
+    root: str | Path, optional, default "."
+        Base data directory.
     
     Returns
     -------
@@ -23,6 +23,6 @@ def read_routelinks(directory: Path) -> dict[Domain, pl.LazyFrame]:
         accessible using the key Domain.hawaii
     """
     return scan_routelinks(*download_routelinks(
-        directory=directory,
+        directory=root / "routelinks",
         read_only=True
     ))
