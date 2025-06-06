@@ -203,6 +203,197 @@ def medium_range_no_da(
         time_slices=time_slices
     )
 
+def medium_range_alaska_mem1(
+        reference_dates: list[str]
+) -> list[str]:
+    """
+    Generate public urls for medium_range_alaska_mem1.
+    """
+    configuration = "medium_range_alaska_mem1/"
+    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 6)]
+    file_type = "medium_range.channel_rt_1."
+    suffix = "alaska.nc"
+    time_slices = ["f" + str(p).zfill(3) + "." for p in range(1, 241)]
+    return build_gcs_public_urls(
+        reference_dates=reference_dates,
+        configuration=configuration,
+        prefixes=prefixes,
+        file_type=file_type,
+        suffix=suffix,
+        time_slices=time_slices
+    )
+
+def medium_range_blend_alaska(
+        reference_dates: list[str]
+) -> list[str]:
+    """
+    Generate public urls for medium_range_blend_alaska.
+    """
+    configuration = "medium_range_blend_alaska/"
+    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 6)]
+    file_type = "medium_range_blend.channel_rt."
+    suffix = "alaska.nc"
+    time_slices = ["f" + str(p).zfill(3) + "." for p in range(1, 241)]
+    return build_gcs_public_urls(
+        reference_dates=reference_dates,
+        configuration=configuration,
+        prefixes=prefixes,
+        file_type=file_type,
+        suffix=suffix,
+        time_slices=time_slices
+    )
+
+def medium_range_alaska_no_da(
+        reference_dates: list[str]
+) -> list[str]:
+    """
+    Generate public urls for medium_range_alaska_no_da.
+    """
+    configuration = "medium_range_alaska_no_da/"
+    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 6)]
+    file_type = "medium_range_no_da.channel_rt."
+    suffix = "alaska.nc"
+    time_slices = ["f" + str(p).zfill(3) + "." for p in range(3, 241, 3)]
+    return build_gcs_public_urls(
+        reference_dates=reference_dates,
+        configuration=configuration,
+        prefixes=prefixes,
+        file_type=file_type,
+        suffix=suffix,
+        time_slices=time_slices
+    )
+
+def short_range(
+        reference_dates: list[str]
+) -> list[str]:
+    """
+    Generate public urls for short_range.
+    """
+    configuration = "short_range/"
+    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24)]
+    file_type = "short_range.channel_rt."
+    suffix = "conus.nc"
+    time_slices = ["f" + str(p).zfill(3) + "." for p in range(1, 19)]
+    return build_gcs_public_urls(
+        reference_dates=reference_dates,
+        configuration=configuration,
+        prefixes=prefixes,
+        file_type=file_type,
+        suffix=suffix,
+        time_slices=time_slices
+    )
+
+def short_range_alaska(
+        reference_dates: list[str]
+) -> list[str]:
+    """
+    Generate public urls for short_range_alaska.
+    """
+    configuration = "short_range_alaska/"
+    prefixes_15 = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 6)]
+    prefixes_45 = ["nwm.t" + str(p).zfill(2) + "z." for p in range(3, 27, 6)]
+    file_type = "short_range.channel_rt."
+    suffix = "conus.nc"
+    time_slices_15 = ["f" + str(p).zfill(3) + "." for p in range(1, 16)]
+    time_slices_45 = ["f" + str(p).zfill(3) + "." for p in range(1, 46)]
+    urls_15 = build_gcs_public_urls(
+        reference_dates=reference_dates,
+        configuration=configuration,
+        prefixes=prefixes_15,
+        file_type=file_type,
+        suffix=suffix,
+        time_slices=time_slices_15
+    )
+    urls_45 = build_gcs_public_urls(
+        reference_dates=reference_dates,
+        configuration=configuration,
+        prefixes=prefixes_45,
+        file_type=file_type,
+        suffix=suffix,
+        time_slices=time_slices_45
+    )
+    return urls_15 + urls_45
+
+def short_range_hawaii(
+        reference_dates: list[str]
+) -> list[str]:
+    """
+    Generate public urls for short_range_hawaii.
+    """
+    configuration = "short_range_hawaii/"
+    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 12)]
+    file_type = "short_range.channel_rt."
+    suffix = "hawaii.nc"
+    time_slices = ["f" + str(t).zfill(5) + "." for t in range(15, 4815, 15)]
+    return build_gcs_public_urls(
+        reference_dates=reference_dates,
+        configuration=configuration,
+        prefixes=prefixes,
+        file_type=file_type,
+        suffix=suffix,
+        time_slices=time_slices
+    )
+
+def short_range_hawaii_no_da(
+        reference_dates: list[str]
+) -> list[str]:
+    """
+    Generate public urls for short_range_hawaii_no_da.
+    """
+    configuration = "short_range_hawaii_no_da/"
+    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 12)]
+    file_type = "short_range_no_da.channel_rt."
+    suffix = "hawaii.nc"
+    time_slices = ["f" + str(t).zfill(5) + "." for t in range(15, 4815, 15)]
+    return build_gcs_public_urls(
+        reference_dates=reference_dates,
+        configuration=configuration,
+        prefixes=prefixes,
+        file_type=file_type,
+        suffix=suffix,
+        time_slices=time_slices
+    )
+
+def short_range_puertorico(
+        reference_dates: list[str]
+) -> list[str]:
+    """
+    Generate public urls for short_range_puertorico.
+    """
+    configuration = "short_range_puertorico/"
+    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(6, 30, 12)]
+    file_type = "short_range.channel_rt."
+    suffix = "puertorico.nc"
+    time_slices = ["f" + str(p).zfill(3) + "." for p in range(1, 49)]
+    return build_gcs_public_urls(
+        reference_dates=reference_dates,
+        configuration=configuration,
+        prefixes=prefixes,
+        file_type=file_type,
+        suffix=suffix,
+        time_slices=time_slices
+    )
+
+def short_range_puertorico_no_da(
+        reference_dates: list[str]
+) -> list[str]:
+    """
+    Generate public urls for short_range_puertorico_no_da.
+    """
+    configuration = "short_range_puertorico_no_da/"
+    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(6, 30, 12)]
+    file_type = "short_range_no_da.channel_rt."
+    suffix = "puertorico.nc"
+    time_slices = ["f" + str(p).zfill(3) + "." for p in range(1, 49)]
+    return build_gcs_public_urls(
+        reference_dates=reference_dates,
+        configuration=configuration,
+        prefixes=prefixes,
+        file_type=file_type,
+        suffix=suffix,
+        time_slices=time_slices
+    )
+
 NWM_URL_BUILDERS: dict[tuple[Domain, Configuration], Callable] = {
     (Domain.alaska, Configuration.analysis_assim_extend_alaska_no_da): analysis_assim_extend_alaska_no_da,
     (Domain.conus, Configuration.analysis_assim_extend_no_da): analysis_assim_extend_no_da,
@@ -211,15 +402,15 @@ NWM_URL_BUILDERS: dict[tuple[Domain, Configuration], Callable] = {
     (Domain.conus, Configuration.medium_range_mem1): medium_range_mem1,
     (Domain.conus, Configuration.medium_range_blend): medium_range_blend,
     (Domain.conus, Configuration.medium_range_no_da): medium_range_no_da,
-    # (Domain.conus, Configuration.SRF_HRRR): short_range_hrrr_conus,
-    # (Domain.hawaii, Configuration.SRF_NAM): short_range_nam_hawaii,
-    # (Domain.hawaii, Configuration.SRF_NAM_NO_DA): short_range_nam_hawaii_no_da,
-    # (Domain.puertorico, Configuration.SRF_NAM): short_range_nam_puertorico,
-    # (Domain.puertorico, Configuration.SRF_NAM_NO_DA): short_range_nam_puertorico_no_da
-    # (Domain.alaska, Configuration.MRF_GFS): medium_range_gfs_alaska,
-    # (Domain.alaska, Configuration.MRF_NBM): medium_range_nbm_alaska,
-    # (Domain.alaska, Configuration.MRF_GFS_NO_DA): medium_range_gfs_alaska_no_da,
-    # (Domain.alaska, Configuration.SRF_HRRR): short_range_hrrr_alaska,
+    # (Domain.alaska, Configuration.medium_range_alaska_mem1): medium_range_alaska_mem1,
+    # (Domain.alaska, Configuration.medium_range_blend_alaska): medium_range_blend_alaska,
+    # (Domain.alaska, Configuration.medium_range_alaska_no_da): medium_range_alaska_no_da,
+    # (Domain.conus, Configuration.short_range): short_range,
+    # (Domain.alaska, Configuration.short_range_alaska): short_range_alaska,
+    # (Domain.hawaii, Configuration.short_range_hawaii): short_range_hawaii,
+    # (Domain.hawaii, Configuration.short_range_hawaii_no_da): short_range_hawaii_no_da,
+    # (Domain.puertorico, Configuration.short_range_puertorico): short_range_puertorico,
+    # (Domain.puertorico, Configuration.short_range_puertorico_no_da): short_range_puertorico_no_da
 }
 """Mapping from (Domain, Configuration) to url builder function."""
 
