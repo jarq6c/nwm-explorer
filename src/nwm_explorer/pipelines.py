@@ -84,6 +84,11 @@ def load_NWM_output(
                     file_list.append(fp)
                     continue
                 warnings.warn(f"{fp} does not exist.", RuntimeWarning)
+            
+            # Check for at least one file
+            if not file_list:
+                logger.info(f"Found no files for {domain} {configuration} {rd}")
+                continue
 
             # Process
             logger.info(f"Processing raw data {domain} {configuration} {rd}")
@@ -114,6 +119,11 @@ def load_NWM_output(
             logger.info(f"Cleaning up {download_directory}")
             delete_directory(download_directory, parquet_file)
             day_files.append(parquet_file)
+            
+        # Check for at least one file
+        if not day_files:
+            logger.info(f"Found no data for {domain} {configuration}")
+            continue
         
         # Merge files
         logger.info(f"Merging parquet files")
