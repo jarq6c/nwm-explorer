@@ -107,11 +107,11 @@ def export(
 
     Example:
     
-    nwm-explorer export ALASKA ANALYSIS -s 20231001 -e 20240101 -o alaska_analysis_data.csv
+    nwm-explorer export alaska analysis_assim_extend_alaska_no_da -s 20231001 -e 20240101 -o alaska_analysis_data.csv
     """
     routelinks = scan_routelinks(*download_routelinks(directory / "routelinks"))
 
-    if configuration == Configuration.OBSERVATIONS:
+    if configuration == Configuration.usgs:
         data = load_USGS_observations(
             root=directory,
             start_date=startDT,
@@ -131,7 +131,7 @@ def export(
 
 @metrics_group.command()
 @click.argument("domain", nargs=1, required=True, type=click.Choice(Domain))
-@click.argument("configuration", nargs=1, required=True, type=click.Choice(Configuration))
+@click.argument("configuration", nargs=1, required=True, type=click.Choice(list(Configuration)[:-1]))
 @click.option("-o", "--output", nargs=1, type=click.File("w", lazy=False), help="Output file path", default="-")
 @click.option("-s", "--startDT", "startDT", nargs=1, required=True, type=TimestampParamType(), help="Start datetime")
 @click.option("-e", "--endDT", "endDT", nargs=1, required=True, type=TimestampParamType(), help="End datetime")
@@ -152,7 +152,7 @@ def metrics(
 
     Example:
     
-    nwm-explorer metrics ALASKA ANALYSIS -s 20231001 -e 20240101 -o alaska_analysis_metrics.csv
+    nwm-explorer metrics alaska analysis_assim_extend_alaska_no_da -s 20231001 -e 20240101 -o alaska_analysis_metrics.csv
     """
     data = load_metrics(
         root=directory,

@@ -53,7 +53,6 @@ class Configuration(StrEnum):
     analysis_assim_extend_no_da = "analysis_assim_extend_no_da"
     analysis_assim_hawaii_no_da = "analysis_assim_hawaii_no_da"
     analysis_assim_puertorico_no_da = "analysis_assim_puertorico_no_da"
-    usgs = "usgs"
     medium_range_mem1 = "medium_range_mem1"
     medium_range_blend = "medium_range_blend"
     medium_range_no_da = "medium_range_no_da"
@@ -66,6 +65,7 @@ class Configuration(StrEnum):
     # short_range_hawaii_no_da = "short_range_hawaii_no_da"
     # short_range_puertorico = "short_range_puertorico"
     # short_range_puertorico_no_da = "short_range_puertorico_no_da"
+    usgs = "usgs"
 
 @dataclass
 class LeadTimeSpec:
