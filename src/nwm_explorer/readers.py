@@ -3,7 +3,7 @@ from pathlib import Path
 from dataclasses import dataclass
 import pandas as pd
 import geopandas as gpd
-from nwm_explorer.mappings import Domain
+from nwm_explorer.mappings import Domain, Configuration
 from nwm_explorer.downloads import download_routelinks
 from nwm_explorer.data import scan_routelinks
 
@@ -56,3 +56,29 @@ class RoutelinkReader:
             y=data["latitude"],
             crs="EPSG:4326"
         )
+
+@dataclass
+class MetricsReader:
+    root: Path
+
+    @property
+    def configurations(self):
+        return list(Configuration)[:-1]
+
+    @property
+    def domains(self):
+        return list(Domain)
+
+    @property
+    def periods(self):
+        return [
+            "FY2024 Q1",
+            "FY2024 Q2",
+            "FY2024 Q3",
+            "FY2024 Q4",
+            "FY2025 Q1"
+        ]
+    
+    @property
+    def metrics(self):
+        return ["Mean relative bias", "Nash-Sutcliffe Efficiency"]

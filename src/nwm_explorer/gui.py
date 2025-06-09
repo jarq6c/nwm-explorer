@@ -4,7 +4,7 @@ import panel as pn
 from panel.template import BootstrapTemplate
 import numpy as np
 
-from nwm_explorer.readers import RoutelinkReader
+from nwm_explorer.readers import RoutelinkReader, MetricsReader
 from nwm_explorer.plotters import SiteMapPlotter
 
 def generate_dashboard(
@@ -13,8 +13,11 @@ def generate_dashboard(
         ) -> BootstrapTemplate:
     # Data
     routelink_reader = RoutelinkReader(root)
+    metrics_reader = MetricsReader(root)
     domain_list = routelink_reader.domains
-    metric_labels = ["Mean relative bias", "Nash-Sutcliffe Efficiency"]
+    metric_labels = metrics_reader.metrics
+    configurations = metrics_reader.configurations
+    periods = metrics_reader.periods
 
     # Plotters
     site_map = SiteMapPlotter()
@@ -24,6 +27,16 @@ def generate_dashboard(
         name="Select Domain",
         options=domain_list,
         value=domain_list[0]
+    )
+    configuration_selector = pn.widgets.Select(
+        name="Select Model Configuration",
+        options=configurations,
+        value=configurations[0]
+    )
+    period_selector = pn.widgets.Select(
+        name="Select Evaluation Period",
+        options=periods,
+        value=periods[0]
     )
     metric_selector = pn.widgets.Select(
         name="Select Metric",
@@ -71,6 +84,8 @@ def generate_dashboard(
     # Layout
     template = BootstrapTemplate(title=title)
     template.sidebar.append(domain_selector)
+    template.sidebar.append(configuration_selector)
+    template.sidebar.append(period_selector)
     template.sidebar.append(metric_selector)
     template.main.append(site_map_pane)
 
