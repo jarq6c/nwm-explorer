@@ -7,8 +7,20 @@ import plotly.graph_objects as go
 import geopandas as gpd
 
 from nwm_explorer.readers import RoutelinkReader
+from nwm_explorer.mappings import Domain
 
-def generate_map(geometry: gpd.GeoSeries) -> dict[str, Any]:
+DEFAULT_ZOOM: dict[Domain, int] = {
+    Domain.alaska: 5,
+    Domain.conus: 3,
+    Domain.hawaii: 6,
+    Domain.puertorico: 8
+}
+"""Default map zoom for each domain."""
+
+def generate_map(
+        geometry: gpd.GeoSeries,
+        default_zoom: int = 2
+        ) -> dict[str, Any]:
     """
     Generate a map of points.
 
@@ -77,7 +89,7 @@ def generate_map(geometry: gpd.GeoSeries) -> dict[str, Any]:
                 "lat": geometry.y.mean(),
                 "lon": geometry.x.mean()
                 },
-            zoom=2
+            zoom=default_zoom
         ),
         clickmode="event",
         modebar=dict(
@@ -112,21 +124,23 @@ def generate_dashboard(
     )
 
     # Panes
-    site_map = pn.pane.Plotly(generate_map(geometry))
-    # readout = pn.pane.Markdown(f"# Number of sites: {len(initial_site_list)}")
+    site_map = pn.pane.Plotly(generate_map(
+        geometry,
+        DEFAULT_ZOOM[initial_domain]
+        ))
 
-    # # Callbacks
-    # def update_readout(domain):
-    #     site_list = rr.site_list(domain)
-    #     readout.object = f"# Number of sites: {len(site_list)}"
-    #     usgs_site_code_selector.options = site_list
-    # pn.bind(update_readout, domain_selector, watch=True)
+    # Callbacks
+    def update_map(domain):
+        site_map.object = generate_map(
+            rr.geometry(domain),
+            DEFAULT_ZOOM[domain]
+            )
+    pn.bind(update_map, domain_selector, watch=True)
 
     # Layout
     template = BootstrapTemplate(title=title)
     template.sidebar.append(domain_selector)
     template.sidebar.append(usgs_site_code_selector)
-    # template.main.append(readout)
     template.main.append(site_map)
 
     return template
