@@ -5,7 +5,10 @@ from panel.template import BootstrapTemplate
 
 from nwm_explorer.readers import read_routelinks
 
-def generate_dashboard(root: Path = Path("data")) -> BootstrapTemplate:
+def generate_dashboard(
+        root: Path,
+        title: str
+        ) -> BootstrapTemplate:
     # Data
     routelinks = read_routelinks(root)
     domain_list = list(routelinks.keys())
@@ -30,7 +33,7 @@ def generate_dashboard(root: Path = Path("data")) -> BootstrapTemplate:
     readout = pn.pane.Markdown(f"# Number of sites: {n}")
 
     # Layout
-    template = BootstrapTemplate(title="National Water Model Explorer")
+    template = BootstrapTemplate(title=title)
     template.sidebar.append(domain_selector)
     template.sidebar.append(usgs_site_code_selector)
     template.main.append(readout)
@@ -45,13 +48,19 @@ def generate_dashboard(root: Path = Path("data")) -> BootstrapTemplate:
 
     return template
 
-def generate_dashboard_closure(root: Path = Path("data")) -> BootstrapTemplate:
+def generate_dashboard_closure(
+        root: Path,
+        title: str
+        ) -> BootstrapTemplate:
     def closure():
-        return generate_dashboard(root)
+        return generate_dashboard(root, title)
     return closure
 
-def serve_dashboards(root: Path = Path("data")):
+def serve_dashboard(
+        root: Path,
+        title: str
+        ) -> None:
     endpoints = {
-        "nwm-explorer": generate_dashboard_closure(root)
+        "nwm-explorer": generate_dashboard_closure(root, title)
     }
     pn.serve(endpoints)

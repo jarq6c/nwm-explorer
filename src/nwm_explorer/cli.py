@@ -9,7 +9,7 @@ from nwm_explorer.pipelines import (load_NWM_output, load_USGS_observations,
 from nwm_explorer.downloads import download_routelinks
 from nwm_explorer.data import scan_routelinks
 from nwm_explorer.logger import get_logger
-from nwm_explorer.gui import serve_dashboards
+from nwm_explorer.gui import serve_dashboard
 
 CSV_HEADERS: dict[str, str] = {
     "value_time": "Datetime of measurement or forecast valid time (UTC) (datetime string)",
@@ -189,8 +189,10 @@ def evaluate(
 
 @display_group.command()
 @click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
+@click.option("-t", "--title", "title", nargs=1, type=click.STRING, default="National Water Model Explorer", help="Dashboard title header")
 def display(
-    directory: Path = Path("data")
+    directory: Path = Path("data"),
+    title: str = "National Water Model Explorer"
     ) -> None:
     """Visualize and explore evaluation data.
 
@@ -198,7 +200,7 @@ def display(
     
     nwm-explorer display
     """
-    serve_dashboards(directory)
+    serve_dashboard(directory, title)
 
 cli = click.CommandCollection(sources=[
     export_group,
