@@ -3,17 +3,17 @@ from pathlib import Path
 import panel as pn
 from panel.template import BootstrapTemplate
 
-from nwm_explorer.readers import read_routelinks
+from nwm_explorer.readers import RoutelinkReader
 
 def generate_dashboard(
         root: Path,
         title: str
         ) -> BootstrapTemplate:
     # Data
-    routelinks = read_routelinks(root)
-    domain_list = list(routelinks.keys())
+    rr = RoutelinkReader(root)
+    domain_list = rr.domains
     initial_domain = domain_list[0]
-    initial_site_list = routelinks[initial_domain].select("usgs_site_code").collect()["usgs_site_code"].to_list()
+    initial_site_list = rr.site_list(initial_domain)
 
     # Widgets
     domain_selector = pn.widgets.Select(
@@ -29,8 +29,7 @@ def generate_dashboard(
     )
 
     # Panes
-    n = routelinks[initial_domain].select("usgs_site_code").count().collect().item(0, 0)
-    readout = pn.pane.Markdown(f"# Number of sites: {n}")
+    readout = pn.pane.Markdown(f"# Number of sites: {len(initial_site_list)}")
 
     # Layout
     template = BootstrapTemplate(title=title)
@@ -40,9 +39,8 @@ def generate_dashboard(
 
     # Callbacks
     def update_readout(domain):
-        number_of_sites = routelinks[domain].select("usgs_site_code").count().collect().item(0, 0)
-        readout.object = f"# Number of sites: {number_of_sites}"
-        site_list = routelinks[domain].select("usgs_site_code").collect()["usgs_site_code"].to_list()
+        site_list = rr.site_list(domain)
+        readout.object = f"# Number of sites: {len(site_list)}"
         usgs_site_code_selector.options = site_list
     pn.bind(update_readout, domain_selector, watch=True)
 
