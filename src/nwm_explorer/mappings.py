@@ -112,3 +112,11 @@ class Confidence(StrEnum):
     point = "point"
     lower = "lower"
     upper = "upper"
+
+DEFAULT_ZOOM: dict[Domain, int] = {
+    Domain.alaska: 5,
+    Domain.conus: 3,
+    Domain.hawaii: 6,
+    Domain.puertorico: 8
+}
+"""Default map zoom for each domain."""
