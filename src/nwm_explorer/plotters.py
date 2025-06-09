@@ -1,5 +1,6 @@
 """Plot managers."""
 from dataclasses import dataclass
+from typing import Any
 import plotly.graph_objects as go
 import colorcet as cc
 import numpy.typing as npt
@@ -61,11 +62,11 @@ class SiteMapPlotter:
     def update_points(
             self,
             domain: Domain,
-            geometry: npt.ArrayLike,
             values: npt.ArrayLike,
             metric_label: str,
             routelink_reader: RoutelinkReader
-            ) -> None:
+            ) -> tuple[float, float, float]:
+        geometry = routelink_reader.geometry(domain)
         self.scatter.update(dict(
             lat=geometry.y,
             lon=geometry.x,
@@ -90,10 +91,47 @@ class SiteMapPlotter:
                 cmin=-1.0,
                 cmax=1.0
         ))
+        lat = geometry.y.mean()
+        lon = geometry.x.mean()
+        zoom = DEFAULT_ZOOM[domain]
         self.layout["map"].update(dict(
             center={
-                "lat": geometry.y.mean(),
-                "lon": geometry.x.mean()
+                "lat": lat,
+                "lon": lon
                 },
-            zoom=DEFAULT_ZOOM[domain]
+            zoom=zoom
         ))
+        return lat, lon, zoom
+
+    def update_colors(
+            self,
+            values: npt.ArrayLike,
+            metric_label: str,
+            relayout_data: dict[str, Any]
+            ) -> None:
+        self.scatter.update(dict(
+            hovertemplate=(
+                SITE_MAP_HOVER_TEMPLATE +
+                f"<br>{metric_label}: " +
+                "%{marker.color:.2f}"
+            )
+        ))
+        self.scatter["marker"].update(dict(
+            color=values,
+            colorbar=dict(
+                title=dict(
+                    text=metric_label,
+                    side="right"
+                    )
+                ),
+                cmin=-1.0,
+                cmax=1.0
+        ))
+        if "map.center" in relayout_data:
+            self.layout["map"]["center"].update({
+                "lat": relayout_data["map.center"]["lat"],
+                "lon": relayout_data["map.center"]["lon"]
+            })
+            self.layout["map"].update({
+                "zoom": relayout_data["map.zoom"]
+            })

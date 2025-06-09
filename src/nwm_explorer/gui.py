@@ -12,9 +12,8 @@ def generate_dashboard(
         title: str
         ) -> BootstrapTemplate:
     # Data
-    rr = RoutelinkReader(root)
-    domain_list = rr.domains
-    geometry = rr.geometry(domain_list[0])
+    routelink_reader = RoutelinkReader(root)
+    domain_list = routelink_reader.domains
     metric_labels = ["Mean relative bias", "Nash-Sutcliffe Efficiency"]
 
     # Plotters
@@ -34,28 +33,40 @@ def generate_dashboard(
 
     # Panes
     rng = np.random.default_rng(seed=2025)
+    geometry = routelink_reader.geometry(domain_list[0])
     site_map.update_points(
         domain=domain_list[0],
-        geometry=geometry,
         values=rng.uniform(-1.0, 1.0, len(geometry)),
         metric_label=metric_selector.value,
-        routelink_reader=rr
+        routelink_reader=routelink_reader
     )
     site_map_pane = pn.pane.Plotly(site_map.figure)
 
     # Callbacks
     def domain_callbacks(domain):
+        geometry = routelink_reader.geometry(domain)
         # Update map
-        geometry = rr.geometry(domain)
-        site_map.update_points(
+        lat, lon, zoom = site_map.update_points(
             domain=domain,
-            geometry=geometry,
             values=rng.uniform(-1.0, 1.0, len(geometry)),
             metric_label=metric_selector.value,
-            routelink_reader=rr
+            routelink_reader=routelink_reader
         )
+        site_map_pane.relayout_data.update({
+            "map.center": {"lat": lat, "lon": lon}})
+        site_map_pane.relayout_data.update({"map.zoom": zoom})
         site_map_pane.object = site_map.figure
     pn.bind(domain_callbacks, domain_selector, watch=True)
+
+    def metric_callbacks(metric_label):
+        # Update map
+        site_map.update_colors(
+            values=rng.uniform(-1.0, 1.0, len(geometry)),
+            metric_label=metric_label,
+            relayout_data=site_map_pane.relayout_data
+        )
+        site_map_pane.object = site_map.figure
+    pn.bind(metric_callbacks, metric_selector, watch=True)
 
     # Layout
     template = BootstrapTemplate(title=title)
