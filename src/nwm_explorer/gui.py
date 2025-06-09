@@ -43,7 +43,7 @@ def generate_map(
         hovertemplate: str | None = None,
         stat_label: str = "Statistic",
         stat_lims: tuple[float, float] | None = None
-        ) -> dict[str, Any]:
+        ) -> tuple[go.Scattermap, go.Layout]:
     """
     Generate a map of points.
 
@@ -53,8 +53,7 @@ def generate_map(
         GeoSeries of POINT geometry.
     """
     # Site map
-    data = []
-    data.append(go.Scattermap(
+    scatter_map = go.Scattermap(
         showlegend=False,
         name="",
         lat=geometry.y,
@@ -75,7 +74,7 @@ def generate_map(
             f"<br>{stat_label}: " +
             "%{marker.color:.2f}"
         )
-    ))
+    )
 
     # Layout
     layout = go.Layout(
@@ -97,7 +96,7 @@ def generate_map(
         ),
         dragmode="zoom"
     )
-    return {"data": data, "layout": layout}
+    return scatter_map, layout
 
 def generate_dashboard(
         root: Path,
@@ -106,52 +105,80 @@ def generate_dashboard(
     # Data
     rr = RoutelinkReader(root)
     domain_list = rr.domains
-    initial_domain = domain_list[0]
-    geometry = rr.geometry(initial_domain)
+    geometry = rr.geometry(domain_list[0])
+    metric_labels = ["Mean relative bias", "Nash-Sutcliffe Efficiency"]
 
     # Widgets
     domain_selector = pn.widgets.Select(
         name="Select Domain",
         options=domain_list,
-        value=initial_domain
+        value=domain_list[0]
+    )
+    metric_selector = pn.widgets.Select(
+        name="Select Metric",
+        options=metric_labels,
+        value=metric_labels[0]
     )
 
     # Panes
     rng = np.random.default_rng(seed=2025)
-    site_map = pn.pane.Plotly(generate_map(
+    scatter_map, layout = generate_map(
         geometry=geometry,
         statistics=rng.uniform(-1.0, 1.0, len(geometry)),
-        default_zoom=DEFAULT_ZOOM[initial_domain],
+        default_zoom=DEFAULT_ZOOM[domain_list[0]],
         customdata=rr.select_columns(
-                initial_domain,
+                domain_list[0],
                 ROUTELINK_CUSTOM_DATA_COLUMNS
             ),
         hovertemplate=ROUTELINK_HOVER_TEMPLATE,
-        stat_label="Mean relative bias",
+        stat_label=metric_labels[0],
         stat_lims=(-1.0, 1.0)
-        ))
+        )
+    figure_data = {"data": [scatter_map], "layout": layout}
+    site_map = pn.pane.Plotly(figure_data)
 
     # Callbacks
     def domain_callbacks(domain):
         # Update map
         geometry = rr.geometry(domain)
-        site_map.object = generate_map(
-            geometry=geometry,
-            statistics=rng.uniform(-1.0, 1.0, len(geometry)),
-            default_zoom=DEFAULT_ZOOM[domain],
+        scatter_map.update(dict(
+            lat=geometry.y,
+            lon=geometry.x,
             customdata=rr.select_columns(
                     domain,
                     ROUTELINK_CUSTOM_DATA_COLUMNS
                 ),
-            hovertemplate=ROUTELINK_HOVER_TEMPLATE,
-            stat_label="Mean relative bias",
-            stat_lims=(-1.0, 1.0)
+            hovertemplate=(
+                ROUTELINK_HOVER_TEMPLATE +
+                f"<br>{metric_selector.value}: " +
+                "%{marker.color:.2f}"
             )
+        ))
+        scatter_map["marker"].update(dict(
+            color=rng.uniform(-1.0, 1.0, len(geometry)),
+            colorbar=dict(
+                title=dict(
+                    text=metric_selector.value,
+                    side="right"
+                    )
+                ),
+                # cmin=cmin,
+                # cmax=cmax
+        ))
+        layout["map"].update(dict(
+            center={
+                "lat": geometry.y.mean(),
+                "lon": geometry.x.mean()
+                },
+            zoom=DEFAULT_ZOOM[domain]
+        ))
+        site_map.object = figure_data
     pn.bind(domain_callbacks, domain_selector, watch=True)
 
     # Layout
     template = BootstrapTemplate(title=title)
     template.sidebar.append(domain_selector)
+    template.sidebar.append(metric_selector)
     template.main.append(site_map)
 
     return template
