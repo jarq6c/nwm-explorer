@@ -2,6 +2,7 @@
 from pathlib import Path
 from dataclasses import dataclass
 import polars as pl
+import geopandas as gpd
 from nwm_explorer.mappings import Domain
 from nwm_explorer.downloads import download_routelinks
 from nwm_explorer.data import scan_routelinks
@@ -42,3 +43,12 @@ class RoutelinkReader:
         return self.routelinks[domain].select("usgs_site_code"
             ).collect()["usgs_site_code"].to_list()
     
+    def geometry(self, domain: Domain) -> gpd.GeoSeries:
+        """Geometry of points for given domain."""
+        data = self.routelinks[domain].select(["latitude", "longitude"]
+            ).collect()
+        return gpd.GeoSeries.from_xy(
+            x=data["longitude"],
+            y=data["latitude"],
+            crs="EPSG:4326"
+        )

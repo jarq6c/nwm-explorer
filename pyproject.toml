@@ -33,7 +33,9 @@ dependencies = [
     "pyarrow",
     "netcdf4",
     "dask",
-    "panel"
+    "panel",
+    "geopandas",
+    "plotly"
 ]
 dynamic = ["version"]
 
