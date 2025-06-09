@@ -266,6 +266,18 @@ def download_files(
             warnings.warn(str(e), RuntimeWarning)
             warnings.warn("Server error, trying again", RuntimeWarning)
             sleep(5 * 2 ** attempt)
+            sleep(5 * 2 ** attempt)
+        except asyncio.TimeoutError:
+            # Validate files
+            for _, dst in src_dst:
+                fp = Path(dst)
+                if fp.exists():
+                    try:
+                        file_validator(fp)
+                    except:
+                        fp.unlink()
+            warnings.warn("Timeout error, trying again", RuntimeWarning)
+            sleep(5 * 2 ** attempt)
     warnings.warn("Unable to retrieve all files", RuntimeWarning)
 
 def download_routelinks(
