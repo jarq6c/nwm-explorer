@@ -4,6 +4,7 @@ from typing import Any
 import panel as pn
 from panel.template import BootstrapTemplate
 import plotly.graph_objects as go
+import pandas as pd
 import geopandas as gpd
 
 from nwm_explorer.readers import RoutelinkReader
@@ -17,9 +18,25 @@ DEFAULT_ZOOM: dict[Domain, int] = {
 }
 """Default map zoom for each domain."""
 
+ROUTELINK_CUSTOM_DATA_COLUMNS: list[str] = [
+    "usgs_site_code",
+    "nwm_feature_id"
+]
+"""Custom data columns for use with Plotly hover tooltips."""
+
+ROUTELINK_HOVER_TEMPLATE: str = (
+    "USGS Site Code: %{customdata[0]}<br>"
+    "NWM Feature ID: %{customdata[1]}<br>"
+    "Longitude: %{lon}<br>"
+    "Latitude: %{lat}<br>"
+)
+"""Plotly compatible hover template for site maps."""
+
 def generate_map(
         geometry: gpd.GeoSeries,
-        default_zoom: int = 2
+        default_zoom: int = 2,
+        customdata: pd.DataFrame | None = None,
+        hovertemplate: str | None = None
         ) -> dict[str, Any]:
     """
     Generate a map of points.
@@ -29,26 +46,8 @@ def generate_map(
     geodata: geopandas.GeoSeries
         GeoSeries of POINT geometry.
     """
-    # Site highlighter
-    data = []
-    data.append(go.Scattermap(
-        showlegend=False,
-        name="",
-        lat=geometry.y[:1],
-        lon=geometry.x[:1],
-        mode="markers",
-        marker=dict(
-            size=25,
-            color="magenta"
-            ),
-        selected=dict(
-            marker=dict(
-                color="magenta"
-            )
-        ),
-    ))
-
     # Site map
+    data = []
     data.append(go.Scattermap(
         showlegend=False,
         name="",
@@ -64,17 +63,8 @@ def generate_map(
                 color="cyan"
             )
         ),
-        # customdata=geodata[[
-        #     "LEFT FEATURE NAME",
-        #     "LEFT FEATURE DESCRIPTION",
-        #     "RIGHT FEATURE NAME"
-        #     ]],
-        # hovertemplate=
-        # "LEFT FEATURE DESCRIPTION: %{customdata[1]}<br>"
-        # "LEFT FEATURE NAME: %{customdata[0]}<br>"
-        # "RIGHT FEATURE NAME: %{customdata[2]}<br>"
-        # "LONGITUDE: %{lon}<br>"
-        # "LATITUDE: %{lat}<br>"
+        customdata=customdata,
+        hovertemplate=hovertemplate
     ))
 
     # Layout
@@ -107,7 +97,6 @@ def generate_dashboard(
     rr = RoutelinkReader(root)
     domain_list = rr.domains
     initial_domain = domain_list[0]
-    initial_site_list = rr.site_list(initial_domain)
     geometry = rr.geometry(initial_domain)
 
     # Widgets
@@ -116,31 +105,35 @@ def generate_dashboard(
         options=domain_list,
         value=initial_domain
     )
-    usgs_site_code_selector = pn.widgets.AutocompleteInput(
-        name="USGS Site Code",
-        options=initial_site_list,
-        search_strategy="includes",
-        placeholder=f"Select USGS Site Code"
-    )
 
     # Panes
     site_map = pn.pane.Plotly(generate_map(
-        geometry,
-        DEFAULT_ZOOM[initial_domain]
+        geometry=geometry,
+        default_zoom=DEFAULT_ZOOM[initial_domain],
+        customdata=rr.select_columns(
+                initial_domain,
+                ROUTELINK_CUSTOM_DATA_COLUMNS
+            ),
+        hovertemplate=ROUTELINK_HOVER_TEMPLATE
         ))
 
     # Callbacks
-    def update_map(domain):
+    def domain_callbacks(domain):
+        # Update map
         site_map.object = generate_map(
-            rr.geometry(domain),
-            DEFAULT_ZOOM[domain]
+            geometry=rr.geometry(domain),
+            default_zoom=DEFAULT_ZOOM[domain],
+            customdata=rr.select_columns(
+                    domain,
+                    ROUTELINK_CUSTOM_DATA_COLUMNS
+                ),
+            hovertemplate=ROUTELINK_HOVER_TEMPLATE
             )
-    pn.bind(update_map, domain_selector, watch=True)
+    pn.bind(domain_callbacks, domain_selector, watch=True)
 
     # Layout
     template = BootstrapTemplate(title=title)
     template.sidebar.append(domain_selector)
-    template.sidebar.append(usgs_site_code_selector)
     template.main.append(site_map)
 
     return template

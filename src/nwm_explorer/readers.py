@@ -1,7 +1,7 @@
 """Read-only methods."""
 from pathlib import Path
 from dataclasses import dataclass
-import polars as pl
+import pandas as pd
 import geopandas as gpd
 from nwm_explorer.mappings import Domain
 from nwm_explorer.downloads import download_routelinks
@@ -38,10 +38,14 @@ class RoutelinkReader:
         """List of available model domains."""
         return list(self.routelinks.keys())
     
-    def site_list(self, domain: Domain) -> list[str]:
+    def select_columns(
+            self,
+            domain: Domain,
+            columns: list[str]
+            ) -> pd.DataFrame:
         """List of available USGS sites codes for given domain."""
-        return self.routelinks[domain].select("usgs_site_code"
-            ).collect()["usgs_site_code"].to_list()
+        return self.routelinks[domain].select(columns
+            ).collect().to_pandas()
     
     def geometry(self, domain: Domain) -> gpd.GeoSeries:
         """Geometry of points for given domain."""
