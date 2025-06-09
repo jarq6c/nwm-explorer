@@ -143,7 +143,11 @@ def serve_dashboard(
         root: Path,
         title: str
         ) -> None:
+    # Slugify title
+    slug = title.lower().replace(" ", "-")
+
+    # Serve
     endpoints = {
-        "nwm-explorer": generate_dashboard_closure(root, title)
+        slug: generate_dashboard_closure(root, title)
     }
     pn.serve(endpoints)
