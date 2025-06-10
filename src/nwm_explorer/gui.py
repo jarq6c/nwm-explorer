@@ -21,7 +21,7 @@ class Dashboard:
             value="Alaska"
         )
         threshold_filter = pn.widgets.Select(
-            name="Streamflow Threshold",
+            name="Streamflow Threshold (≥)",
             options=[
                 "0th Percentile (All data)",
                 "85th Percentile",
@@ -36,6 +36,21 @@ class Dashboard:
                 "Nash-Sutcliffe efficiency",
                 "Pearson correlation coefficient",
                 "Kling-Gupta efficiency"
+            ]
+        )
+        confidence_filter = pn.widgets.Select(
+            name="Confidence Estimate (95%)",
+            options=[
+                "Point",
+                "Lower",
+                "Upper"
+            ]
+        )
+        evaluation_filter = pn.widgets.Select(
+            name="Evaluation",
+            options=[
+                "FY2024_Q1",
+                "FY2024_Q2"
             ]
         )
         self.current_domain = DOMAIN_MAPPING[domain_filter.value]
@@ -83,10 +98,12 @@ class Dashboard:
         # Layout filtering options
         self.filter_card = pn.Card(
             pn.Column(
+                evaluation_filter,
                 domain_filter,
                 self.configuration_filter,
                 threshold_filter,
                 metric_filter,
+                confidence_filter,
                 lead_time_filter
                 ),
             title="Filters",
