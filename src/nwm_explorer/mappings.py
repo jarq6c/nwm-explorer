@@ -1,7 +1,9 @@
 """Various mappings."""
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Callable
 import polars as pl
+import nwm_explorer.urls as nwm_urls
 
 TIMEZONE_MAPPING: dict[str, str] = {
     "AKST": "America/Anchorage",
@@ -120,3 +122,23 @@ DEFAULT_ZOOM: dict[Domain, int] = {
     Domain.puertorico: 8
 }
 """Default map zoom for each domain."""
+
+NWM_URL_BUILDERS: dict[tuple[Domain, Configuration], Callable] = {
+    (Domain.alaska, Configuration.analysis_assim_extend_alaska_no_da): nwm_urls.analysis_assim_extend_alaska_no_da,
+    (Domain.conus, Configuration.analysis_assim_extend_no_da): nwm_urls.analysis_assim_extend_no_da,
+    (Domain.hawaii, Configuration.analysis_assim_hawaii_no_da): nwm_urls.analysis_assim_hawaii_no_da,
+    (Domain.puertorico, Configuration.analysis_assim_puertorico_no_da): nwm_urls.analysis_assim_puertorico_no_da,
+    (Domain.conus, Configuration.medium_range_mem1): nwm_urls.medium_range_mem1,
+    (Domain.conus, Configuration.medium_range_blend): nwm_urls.medium_range_blend,
+    (Domain.conus, Configuration.medium_range_no_da): nwm_urls.medium_range_no_da,
+    (Domain.alaska, Configuration.medium_range_alaska_mem1): nwm_urls.medium_range_alaska_mem1,
+    (Domain.alaska, Configuration.medium_range_blend_alaska): nwm_urls.medium_range_blend_alaska,
+    (Domain.alaska, Configuration.medium_range_alaska_no_da): nwm_urls.medium_range_alaska_no_da,
+    (Domain.conus, Configuration.short_range): nwm_urls.short_range,
+    (Domain.alaska, Configuration.short_range_alaska): nwm_urls.short_range_alaska,
+    (Domain.hawaii, Configuration.short_range_hawaii): nwm_urls.short_range_hawaii,
+    (Domain.hawaii, Configuration.short_range_hawaii_no_da): nwm_urls.short_range_hawaii_no_da,
+    (Domain.puertorico, Configuration.short_range_puertorico): nwm_urls.short_range_puertorico,
+    (Domain.puertorico, Configuration.short_range_puertorico_no_da): nwm_urls.short_range_puertorico_no_da
+}
+"""Mapping from (Domain, Configuration) to url builder function."""
