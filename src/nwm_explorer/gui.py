@@ -37,6 +37,14 @@ class Dashboard:
                 "Kling-Gupta efficiency"
             ]
         )
+        self.lead_time_filter = pn.widgets.DiscretePlayer(
+            name="Minimum lead time (hours)",
+            options=[2, 4, 8, 16, 32, 64, 128],
+            value=32,
+            show_loop_controls=False,
+            visible_buttons=["previous", "next"],
+            width=300
+            )
         self.current_domain = DOMAIN_MAPPING[domain_filter.value]
         configurations = list(
             DOMAIN_CONFIGURATION_MAPPING[self.current_domain].keys())
@@ -68,7 +76,8 @@ class Dashboard:
                 domain_filter,
                 self.configuration_filter,
                 threshold_filter,
-                metric_filter
+                metric_filter,
+                self.lead_time_filter
                 ),
             title="Filters",
             collapsible=False
