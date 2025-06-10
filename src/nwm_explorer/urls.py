@@ -324,14 +324,17 @@ def short_range_hawaii(
     prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 12)]
     file_type = "short_range.channel_rt."
     suffix = "hawaii.nc"
-    time_slices = ["f" + str(t).zfill(5) + "." for t in range(15, 4815, 15)]
+    time_slices = []
+    for h in range(0, 4900, 100):
+        for m in range(0, 60, 15):
+            time_slices.append("f" + str(h+m).zfill(5) + ".")
     return build_gcs_public_urls(
         reference_dates=reference_dates,
         configuration=configuration,
         prefixes=prefixes,
         file_type=file_type,
         suffix=suffix,
-        time_slices=time_slices
+        time_slices=time_slices[1:-3]
     )
 
 def short_range_hawaii_no_da(
@@ -344,14 +347,17 @@ def short_range_hawaii_no_da(
     prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 12)]
     file_type = "short_range_no_da.channel_rt."
     suffix = "hawaii.nc"
-    time_slices = ["f" + str(t).zfill(5) + "." for t in range(15, 4815, 15)]
+    time_slices = []
+    for h in range(0, 4900, 100):
+        for m in range(0, 60, 15):
+            time_slices.append("f" + str(h+m).zfill(5) + ".")
     return build_gcs_public_urls(
         reference_dates=reference_dates,
         configuration=configuration,
         prefixes=prefixes,
         file_type=file_type,
         suffix=suffix,
-        time_slices=time_slices
+        time_slices=time_slices[1:-3]
     )
 
 def short_range_puertorico(
@@ -406,9 +412,9 @@ NWM_URL_BUILDERS: dict[tuple[Domain, Configuration], Callable] = {
     # (Domain.alaska, Configuration.medium_range_blend_alaska): medium_range_blend_alaska,
     # (Domain.alaska, Configuration.medium_range_alaska_no_da): medium_range_alaska_no_da,
     # (Domain.conus, Configuration.short_range): short_range,
-    # (Domain.alaska, Configuration.short_range_alaska): short_range_alaska,
-    # (Domain.hawaii, Configuration.short_range_hawaii): short_range_hawaii,
-    # (Domain.hawaii, Configuration.short_range_hawaii_no_da): short_range_hawaii_no_da,
+    (Domain.alaska, Configuration.short_range_alaska): short_range_alaska,
+    (Domain.hawaii, Configuration.short_range_hawaii): short_range_hawaii,
+    (Domain.hawaii, Configuration.short_range_hawaii_no_da): short_range_hawaii_no_da,
     (Domain.puertorico, Configuration.short_range_puertorico): short_range_puertorico,
     (Domain.puertorico, Configuration.short_range_puertorico_no_da): short_range_puertorico_no_da
 }
