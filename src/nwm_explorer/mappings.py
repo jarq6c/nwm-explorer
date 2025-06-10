@@ -81,12 +81,12 @@ class LeadTimeSpec:
     sampling_frequency: str
 
 LEAD_TIME_FREQUENCY: dict[Configuration, LeadTimeSpec] = {
-    Configuration.medium_range_mem1: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min", "1d"),
-    Configuration.medium_range_blend: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min", "1d"),
-    Configuration.medium_range_no_da: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min", "1d"),
-    Configuration.medium_range_alaska_mem1: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min", "1d"),
-    Configuration.medium_range_blend_alaska: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min", "1d"),
-    Configuration.medium_range_alaska_no_da: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min", "1d"),
+    Configuration.medium_range_mem1: LeadTimeSpec(pl.duration(hours=24), "lead_time_hours_min", "24h"),
+    Configuration.medium_range_blend: LeadTimeSpec(pl.duration(hours=24), "lead_time_hours_min", "24h"),
+    Configuration.medium_range_no_da: LeadTimeSpec(pl.duration(hours=24), "lead_time_hours_min", "24h"),
+    Configuration.medium_range_alaska_mem1: LeadTimeSpec(pl.duration(hours=24), "lead_time_hours_min", "24h"),
+    Configuration.medium_range_blend_alaska: LeadTimeSpec(pl.duration(hours=24), "lead_time_hours_min", "24h"),
+    Configuration.medium_range_alaska_no_da: LeadTimeSpec(pl.duration(hours=24), "lead_time_hours_min", "24h"),
     Configuration.short_range: LeadTimeSpec(pl.duration(hours=6), "lead_time_hours_min", "6h"),
     Configuration.short_range_alaska: LeadTimeSpec(pl.duration(hours=5), "lead_time_hours_min", "5h"),
     Configuration.short_range_hawaii: LeadTimeSpec(pl.duration(hours=6), "lead_time_hours_min", "6h"),
@@ -174,3 +174,19 @@ DOMAIN_CONFIGURATION_MAPPING: dict[Domain, dict[str, Configuration]] = {
     }
 }
 """Mapping from domains to pretty string representations of model configurations."""
+
+LEAD_TIME_VALUES: dict[Configuration, list[int]] = {
+    Configuration.medium_range_mem1: [l for l in range(0, 240, 24)],
+    Configuration.medium_range_blend: [l for l in range(0, 240, 24)],
+    Configuration.medium_range_no_da: [l for l in range(0, 240, 24)],
+    Configuration.medium_range_alaska_mem1: [l for l in range(0, 240, 24)],
+    Configuration.medium_range_blend_alaska: [l for l in range(0, 240, 24)],
+    Configuration.medium_range_alaska_no_da: [l for l in range(0, 240, 24)],
+    Configuration.short_range: [l for l in range(0, 18, 6)],
+    Configuration.short_range_alaska: [l for l in range(0, 45, 5)],
+    Configuration.short_range_hawaii: [l for l in range(0, 48, 6)],
+    Configuration.short_range_hawaii_no_da: [l for l in range(0, 48, 6)],
+    Configuration.short_range_puertorico: [l for l in range(0, 48, 6)],
+    Configuration.short_range_puertorico_no_da: [l for l in range(0, 48, 6)]
+}
+"""Mapping used to display available lead times."""

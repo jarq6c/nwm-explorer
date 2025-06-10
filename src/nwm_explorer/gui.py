@@ -3,7 +3,8 @@ from pathlib import Path
 import panel as pn
 from panel.template import BootstrapTemplate
 
-from nwm_explorer.mappings import DOMAIN_MAPPING, DOMAIN_CONFIGURATION_MAPPING
+from nwm_explorer.mappings import (DOMAIN_MAPPING, DOMAIN_CONFIGURATION_MAPPING,
+    LEAD_TIME_VALUES)
 
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
@@ -37,14 +38,6 @@ class Dashboard:
                 "Kling-Gupta efficiency"
             ]
         )
-        self.lead_time_filter = pn.widgets.DiscretePlayer(
-            name="Minimum lead time (hours)",
-            options=[2, 4, 8, 16, 32, 64, 128],
-            value=32,
-            show_loop_controls=False,
-            visible_buttons=["previous", "next"],
-            width=300
-            )
         self.current_domain = DOMAIN_MAPPING[domain_filter.value]
         configurations = list(
             DOMAIN_CONFIGURATION_MAPPING[self.current_domain].keys())
@@ -55,6 +48,16 @@ class Dashboard:
             )
         self.current_configuration = (
             DOMAIN_CONFIGURATION_MAPPING[self.current_domain][self.configuration_filter.value])
+        lead_times = LEAD_TIME_VALUES.get(self.current_configuration, [0])
+        lead_time_filter = pn.widgets.DiscretePlayer(
+            name="Minimum lead time (hours)",
+            options=lead_times,
+            value=lead_times[0],
+            show_loop_controls=False,
+            visible_buttons=["previous", "next"],
+            width=300
+            )
+        self.current_lead_time = lead_times[0]
         
         # Domain callbacks
         def domain_update(domain: str) -> None:
@@ -70,21 +73,28 @@ class Dashboard:
             self.handle_configuration_update(configuration)
         pn.bind(configuration_update, self.configuration_filter, watch=True)
 
+        # Lead time callbacks
+        def lead_time_update(lead_time: int) -> None:
+            if lead_time is None:
+                return
+            self.handle_lead_time_update(lead_time)
+        pn.bind(lead_time_update, lead_time_filter, watch=True)
+
         # Layout filtering options
-        filter_card = pn.Card(
+        self.filter_card = pn.Card(
             pn.Column(
                 domain_filter,
                 self.configuration_filter,
                 threshold_filter,
                 metric_filter,
-                self.lead_time_filter
+                lead_time_filter
                 ),
             title="Filters",
             collapsible=False
             )
 
         # Layout cards
-        grid = pn.Row(filter_card)
+        grid = pn.Row(self.filter_card)
         self.template = BootstrapTemplate(title=title)
         self.template.main.append(grid)
     
@@ -103,6 +113,32 @@ class Dashboard:
             DOMAIN_CONFIGURATION_MAPPING[self.current_domain][configuration]
             )
         print(self.current_configuration)
+
+        # Update lead time options
+        lead_times = LEAD_TIME_VALUES.get(self.current_configuration, [0])
+        if self.current_lead_time in lead_times:
+            current_lead_time = self.current_lead_time
+        else:
+            current_lead_time = lead_times[0]
+        lead_time_filter = pn.widgets.DiscretePlayer(
+            name="Minimum lead time (hours)",
+            options=lead_times,
+            value=current_lead_time,
+            show_loop_controls=False,
+            visible_buttons=["previous", "next"],
+            width=300
+            )
+        def lead_time_update(lead_time: int) -> None:
+            if lead_time is None:
+                return
+            self.handle_lead_time_update(lead_time)
+        pn.bind(lead_time_update, lead_time_filter, watch=True)
+        self.filter_card[0][-1] = lead_time_filter
+        self.handle_lead_time_update(current_lead_time)
+    
+    def handle_lead_time_update(self, lead_time: int) -> None:
+        self.current_lead_time = lead_time
+        print(self.current_lead_time)
 
 def generate_dashboard(
         root: Path,
