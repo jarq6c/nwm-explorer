@@ -1,16 +1,28 @@
 """Generate and serve exploratory applications."""
 from pathlib import Path
+from dataclasses import dataclass
 import panel as pn
 from panel.template import BootstrapTemplate
 
 from nwm_explorer.mappings import (DOMAIN_MAPPING, DOMAIN_CONFIGURATION_MAPPING,
-    LEAD_TIME_VALUES)
+    LEAD_TIME_VALUES, Domain, Configuration, Confidence)
+
+@dataclass
+class DashboardState:
+    """Dashboard state variables."""
+    evaluation: str
+    domain: Domain
+    configuration: Configuration
+    threshold: str
+    metric: str
+    confidence: Confidence
+    lead_time: int
 
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
     def __init__(self, root: Path, title: str):
         # Domain and configuration filtering options
-        domain_filter = pn.widgets.Select(
+        self.domain_filter = pn.widgets.Select(
             name="Model Domain",
             options=[
                 "Alaska",
@@ -20,7 +32,7 @@ class Dashboard:
             ],
             value="Alaska"
         )
-        threshold_filter = pn.widgets.Select(
+        self.threshold_filter = pn.widgets.Select(
             name="Streamflow Threshold (≥)",
             options=[
                 "0th Percentile (All data)",
@@ -29,7 +41,7 @@ class Dashboard:
                 "99th Percentile"
             ]
         )
-        metric_filter = pn.widgets.Select(
+        self.metric_filter = pn.widgets.Select(
             name="Evaluation Metric",
             options=[
                 "Mean relative bias",
@@ -38,7 +50,7 @@ class Dashboard:
                 "Kling-Gupta efficiency"
             ]
         )
-        confidence_filter = pn.widgets.Select(
+        self.confidence_filter = pn.widgets.Select(
             name="Confidence Estimate (95%)",
             options=[
                 "Point",
@@ -46,23 +58,23 @@ class Dashboard:
                 "Upper"
             ]
         )
-        evaluation_filter = pn.widgets.Select(
+        self.evaluation_filter = pn.widgets.Select(
             name="Evaluation",
             options=[
                 "FY2024_Q1",
                 "FY2024_Q2"
             ]
         )
-        self.current_domain = DOMAIN_MAPPING[domain_filter.value]
+        current_domain = DOMAIN_MAPPING[self.domain_filter.value]
         configurations = list(
-            DOMAIN_CONFIGURATION_MAPPING[self.current_domain].keys())
+            DOMAIN_CONFIGURATION_MAPPING[current_domain].keys())
         self.configuration_filter = pn.widgets.Select(
             name="Model Configuration",
             options=configurations,
             value=configurations[0]
             )
         self.current_configuration = (
-            DOMAIN_CONFIGURATION_MAPPING[self.current_domain][self.configuration_filter.value])
+            DOMAIN_CONFIGURATION_MAPPING[current_domain][self.configuration_filter.value])
         lead_times = LEAD_TIME_VALUES.get(self.current_configuration, [0])
         lead_time_filter = pn.widgets.DiscretePlayer(
             name="Minimum lead time (hours)",
@@ -79,7 +91,7 @@ class Dashboard:
             if domain is None:
                 return
             self.handle_domain_update(domain)
-        pn.bind(domain_update, domain_filter, watch=True)
+        pn.bind(domain_update, self.domain_filter, watch=True)
 
         # Configuration callbacks
         def configuration_update(configuration: str) -> None:
@@ -98,12 +110,12 @@ class Dashboard:
         # Layout filtering options
         self.filter_card = pn.Card(
             pn.Column(
-                evaluation_filter,
-                domain_filter,
+                self.evaluation_filter,
+                self.domain_filter,
                 self.configuration_filter,
-                threshold_filter,
-                metric_filter,
-                confidence_filter,
+                self.threshold_filter,
+                self.metric_filter,
+                self.confidence_filter,
                 lead_time_filter
                 ),
             title="Filters",
@@ -117,9 +129,9 @@ class Dashboard:
     
     def handle_domain_update(self, domain: str) -> None:
         # Update configuration options
-        self.current_domain = DOMAIN_MAPPING[domain]
+        current_domain = DOMAIN_MAPPING[domain]
         configurations = list(
-            DOMAIN_CONFIGURATION_MAPPING[self.current_domain].keys()
+            DOMAIN_CONFIGURATION_MAPPING[current_domain].keys()
             )
         self.configuration_filter.options = []
         self.configuration_filter.options = configurations
@@ -156,6 +168,18 @@ class Dashboard:
     def handle_lead_time_update(self, lead_time: int) -> None:
         self.current_lead_time = lead_time
         print(self.current_lead_time)
+    
+    @property
+    def state(self) -> DashboardState:
+        return DashboardState(
+            self.evaluation_filter.value,
+            DOMAIN_MAPPING[self.domain_filter.value],
+            DOMAIN_CONFIGURATION_MAPPING[self.domain_filter.value][self.configuration_filter.value],
+            self.threshold_filter.value,
+            self.metric_filter.value,
+            self.confidence_filter.value,
+            self.current_lead_time
+        )
 
 def generate_dashboard(
         root: Path,
