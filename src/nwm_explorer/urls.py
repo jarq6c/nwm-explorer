@@ -1,7 +1,5 @@
 """URLS to various data sources."""
-from typing import Callable
 import pandas as pd
-from nwm_explorer.mappings import Domain, Configuration
 
 ROUTELINKS_URL: str = (
     "https://www.hydroshare.org/resource/"
@@ -293,7 +291,7 @@ def short_range_alaska(
     prefixes_15 = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 6)]
     prefixes_45 = ["nwm.t" + str(p).zfill(2) + "z." for p in range(3, 27, 6)]
     file_type = "short_range.channel_rt."
-    suffix = "conus.nc"
+    suffix = "alaska.nc"
     time_slices_15 = ["f" + str(p).zfill(3) + "." for p in range(1, 16)]
     time_slices_45 = ["f" + str(p).zfill(3) + "." for p in range(1, 46)]
     urls_15 = build_gcs_public_urls(
@@ -399,26 +397,6 @@ def short_range_puertorico_no_da(
         suffix=suffix,
         time_slices=time_slices
     )
-
-NWM_URL_BUILDERS: dict[tuple[Domain, Configuration], Callable] = {
-    (Domain.alaska, Configuration.analysis_assim_extend_alaska_no_da): analysis_assim_extend_alaska_no_da,
-    (Domain.conus, Configuration.analysis_assim_extend_no_da): analysis_assim_extend_no_da,
-    (Domain.hawaii, Configuration.analysis_assim_hawaii_no_da): analysis_assim_hawaii_no_da,
-    (Domain.puertorico, Configuration.analysis_assim_puertorico_no_da): analysis_assim_puertorico_no_da,
-    (Domain.conus, Configuration.medium_range_mem1): medium_range_mem1,
-    (Domain.conus, Configuration.medium_range_blend): medium_range_blend,
-    (Domain.conus, Configuration.medium_range_no_da): medium_range_no_da,
-    # (Domain.alaska, Configuration.medium_range_alaska_mem1): medium_range_alaska_mem1,
-    # (Domain.alaska, Configuration.medium_range_blend_alaska): medium_range_blend_alaska,
-    # (Domain.alaska, Configuration.medium_range_alaska_no_da): medium_range_alaska_no_da,
-    # (Domain.conus, Configuration.short_range): short_range,
-    (Domain.alaska, Configuration.short_range_alaska): short_range_alaska,
-    (Domain.hawaii, Configuration.short_range_hawaii): short_range_hawaii,
-    (Domain.hawaii, Configuration.short_range_hawaii_no_da): short_range_hawaii_no_da,
-    (Domain.puertorico, Configuration.short_range_puertorico): short_range_puertorico,
-    (Domain.puertorico, Configuration.short_range_puertorico_no_da): short_range_puertorico_no_da
-}
-"""Mapping from (Domain, Configuration) to url builder function."""
 
 def generate_usgs_urls(
         site_list: list[str],

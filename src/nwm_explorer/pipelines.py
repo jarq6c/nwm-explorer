@@ -5,14 +5,14 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from nwm_explorer.urls import generate_reference_dates, NWM_URL_BUILDERS, generate_usgs_urls
+from nwm_explorer.urls import generate_reference_dates, generate_usgs_urls
 from nwm_explorer.manifests import generate_default_manifest, generate_usgs_manifest
 from nwm_explorer.downloads import download_files, download_routelinks
 from nwm_explorer.data import scan_routelinks, generate_filepath, generate_directory
 from nwm_explorer.data import (process_netcdf_parallel, process_nwis_tsv_parallel,
     delete_directory)
 from nwm_explorer.mappings import FileType, Variable, Units, Domain, Configuration
-from nwm_explorer.mappings import LEAD_TIME_FREQUENCY
+from nwm_explorer.mappings import LEAD_TIME_FREQUENCY, NWM_URL_BUILDERS
 from nwm_explorer.metrics import (resample, nash_sutcliffe_efficiency,
     mean_relative_bias, pearson_correlation_coefficient, relative_mean,
     relative_variability, kling_gupta_efficiency)
@@ -242,6 +242,8 @@ def load_pairs(
     logger = get_logger("nwm_explorer.pipelines.load_pairs")
     routelinks = scan_routelinks(*download_routelinks(root / "routelinks"))
 
+    # TODO observation dates should be set by prediction value_time
+    # i.e. the available observations should extend 10 days beyond end_date
     observations = load_USGS_observations(
         root=root,
         start_date=start_date,
@@ -333,6 +335,7 @@ def load_metrics(
         if configuration in LEAD_TIME_FREQUENCY:
             logger.info(f"Adding lead times {domain} {configuration}")
             lead_time_spec = LEAD_TIME_FREQUENCY[configuration]
+            # TODO double check time units. may need to apply a multiplier here
             data = data.with_columns(
                 (pl.col("value_time").sub(pl.col("reference_time")) /
                  lead_time_spec.duration).floor().alias(
