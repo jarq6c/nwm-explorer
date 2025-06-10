@@ -12,6 +12,16 @@ def generate_dashboard(
         title: str
         ) -> BootstrapTemplate:
     # Data
+    # NOTE
+    # It will probably be easier to split up metric results into single
+    # files that contain all the information needed.
+    # Key available configurations to domain selection
+    # Key evaluation metric retrieval to:
+    #  configuration
+    #  metric
+    #  lead time (slider)
+    #  confidence interval boundary (lower, central, upper)
+    #  period (e.g. 'FY2024 Q1')
     routelink_reader = RoutelinkReader(root)
     metrics_reader = MetricsReader(root)
     domain_list = routelink_reader.domains

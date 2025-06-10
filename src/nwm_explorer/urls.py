@@ -409,8 +409,8 @@ NWM_URL_BUILDERS: dict[tuple[Domain, Configuration], Callable] = {
     # (Domain.alaska, Configuration.short_range_alaska): short_range_alaska,
     # (Domain.hawaii, Configuration.short_range_hawaii): short_range_hawaii,
     # (Domain.hawaii, Configuration.short_range_hawaii_no_da): short_range_hawaii_no_da,
-    # (Domain.puertorico, Configuration.short_range_puertorico): short_range_puertorico,
-    # (Domain.puertorico, Configuration.short_range_puertorico_no_da): short_range_puertorico_no_da
+    (Domain.puertorico, Configuration.short_range_puertorico): short_range_puertorico,
+    (Domain.puertorico, Configuration.short_range_puertorico_no_da): short_range_puertorico_no_da
 }
 """Mapping from (Domain, Configuration) to url builder function."""
 

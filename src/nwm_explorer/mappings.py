@@ -56,15 +56,15 @@ class Configuration(StrEnum):
     medium_range_mem1 = "medium_range_mem1"
     medium_range_blend = "medium_range_blend"
     medium_range_no_da = "medium_range_no_da"
-    # medium_range_alaska_mem1 = "medium_range_alaska_mem1"
-    # medium_range_blend_alaska = "medium_range_blend_alaska"
-    # medium_range_alaska_no_da = "medium_range_alaska_no_da"
-    # short_range = "short_range"
-    # short_range_alaska = "short_range_alaska"
-    # short_range_hawaii = "short_range_hawaii"
-    # short_range_hawaii_no_da = "short_range_hawaii_no_da"
-    # short_range_puertorico = "short_range_puertorico"
-    # short_range_puertorico_no_da = "short_range_puertorico_no_da"
+    medium_range_alaska_mem1 = "medium_range_alaska_mem1"
+    medium_range_blend_alaska = "medium_range_blend_alaska"
+    medium_range_alaska_no_da = "medium_range_alaska_no_da"
+    short_range = "short_range"
+    short_range_alaska = "short_range_alaska"
+    short_range_hawaii = "short_range_hawaii"
+    short_range_hawaii_no_da = "short_range_hawaii_no_da"
+    short_range_puertorico = "short_range_puertorico"
+    short_range_puertorico_no_da = "short_range_puertorico_no_da"
     usgs = "usgs"
 
 @dataclass
@@ -78,15 +78,15 @@ LEAD_TIME_FREQUENCY: dict[Configuration, LeadTimeSpec] = {
     Configuration.medium_range_mem1: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min", "1d"),
     Configuration.medium_range_blend: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min", "1d"),
     Configuration.medium_range_no_da: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min", "1d"),
-    # Configuration.medium_range_alaska_mem1: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min", "1d"),
-    # Configuration.medium_range_blend_alaska: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min", "1d"),
-    # Configuration.medium_range_alaska_no_da: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min", "1d"),
-    # Configuration.short_range: LeadTimeSpec(pl.duration(hours=6), "lead_time_hours_min", "6h"),
-    # Configuration.short_range_alaska: LeadTimeSpec(pl.duration(hours=5), "lead_time_hours_min", "5h"),
-    # Configuration.short_range_hawaii: LeadTimeSpec(pl.duration(hours=6), "lead_time_hours_min", "6h"),
-    # Configuration.short_range_hawaii_no_da: LeadTimeSpec(pl.duration(hours=6), "lead_time_hours_min", "6h"),
-    # Configuration.short_range_puertorico: LeadTimeSpec(pl.duration(hours=6), "lead_time_hours_min", "6h"),
-    # Configuration.short_range_puertorico_no_da: LeadTimeSpec(pl.duration(hours=6), "lead_time_hours_min", "6h")
+    Configuration.medium_range_alaska_mem1: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min", "1d"),
+    Configuration.medium_range_blend_alaska: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min", "1d"),
+    Configuration.medium_range_alaska_no_da: LeadTimeSpec(pl.duration(days=1), "lead_time_days_min", "1d"),
+    Configuration.short_range: LeadTimeSpec(pl.duration(hours=6), "lead_time_hours_min", "6h"),
+    Configuration.short_range_alaska: LeadTimeSpec(pl.duration(hours=5), "lead_time_hours_min", "5h"),
+    Configuration.short_range_hawaii: LeadTimeSpec(pl.duration(hours=6), "lead_time_hours_min", "6h"),
+    Configuration.short_range_hawaii_no_da: LeadTimeSpec(pl.duration(hours=6), "lead_time_hours_min", "6h"),
+    Configuration.short_range_puertorico: LeadTimeSpec(pl.duration(hours=6), "lead_time_hours_min", "6h"),
+    Configuration.short_range_puertorico_no_da: LeadTimeSpec(pl.duration(hours=6), "lead_time_hours_min", "6h")
 }
 """Mapping used for computing lead time and sampling frequency."""
 
