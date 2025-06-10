@@ -45,7 +45,11 @@ DOMAIN_MAPPING: dict[str, Domain] = {
     "RouteLink_AK.csv": Domain.alaska,
     "RouteLink_CONUS.csv": Domain.conus,
     "RouteLink_HI.csv": Domain.hawaii,
-    "RouteLink_PRVI.csv": Domain.puertorico
+    "RouteLink_PRVI.csv": Domain.puertorico,
+    "Alaska": Domain.alaska,
+    "CONUS": Domain.conus,
+    "Hawaii": Domain.hawaii,
+    "Puerto Rico": Domain.puertorico
 }
 """Mapping from common strings to standard symbols."""
 
@@ -142,3 +146,31 @@ NWM_URL_BUILDERS: dict[tuple[Domain, Configuration], Callable] = {
     (Domain.puertorico, Configuration.short_range_puertorico_no_da): nwm_urls.short_range_puertorico_no_da
 }
 """Mapping from (Domain, Configuration) to url builder function."""
+
+DOMAIN_CONFIGURATION_MAPPING: dict[Domain, dict[str, Configuration]] = {
+    Domain.alaska: {
+        "Extended Analysis (MRMS, No-DA)": Configuration.analysis_assim_extend_alaska_no_da,
+        "Medium Range Forecast (GFS, Deterministic)": Configuration.medium_range_alaska_mem1,
+        "Medium Range Forecast (NBM, Deterministic)": Configuration.medium_range_blend_alaska,
+        "Medium Range Forecast (GFS, Deterministic, No-DA)": Configuration.medium_range_alaska_no_da,
+        "Short Range Forecast (HRRR)": Configuration.short_range_alaska
+    },
+    Domain.conus: {
+        "Extended Analysis (MRMS, No-DA)": Configuration.analysis_assim_extend_no_da,
+        "Medium Range Forecast (GFS, Deterministic)": Configuration.medium_range_mem1,
+        "Medium Range Forecast (NBM, Deterministic)": Configuration.medium_range_blend,
+        "Medium Range Forecast (GFS, Deterministic, No-DA)": Configuration.medium_range_no_da,
+        "Short Range Forecast (HRRR)": Configuration.short_range
+    },
+    Domain.hawaii: {
+        "Analysis (MRMS, No-DA)": Configuration.analysis_assim_hawaii_no_da,
+        "Short Range Forecast (WRF-ARW)": Configuration.short_range_hawaii,
+        "Short Range Forecast (WRF-ARW, No-DA)": Configuration.short_range_hawaii_no_da
+    },
+    Domain.puertorico: {
+        "Analysis (MRMS, No-DA)": Configuration.analysis_assim_puertorico_no_da,
+        "Short Range Forecast (WRF-ARW)": Configuration.short_range_puertorico,
+        "Short Range Forecast (WRF-ARW, No-DA)": Configuration.short_range_puertorico_no_da
+    }
+}
+"""Mapping from domains to pretty string representations of model configurations."""
