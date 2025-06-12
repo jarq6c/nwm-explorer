@@ -157,18 +157,18 @@ def load_USGS_observations(
     logger = get_logger("nwm_explorer.pipelines.load_USGS_observations")
     # Download and process model output
     observations = {}
+    s = start_date.strftime("%Y%m%dT%H")
+    e = end_date.strftime("%Y%m%dT%H")
     for domain, rl in routelinks.items():
         # Check for file existence
-        parquet_file = generate_filepath(
-            root, FileType.PARQUET, domain, Configuration.OBSERVATIONS,
-            Variable.STREAMFLOW, Units.CUBIC_FEET_PER_SECOND, start_date,
-            end_date
-        )
+        parquet_directory = root / FileType.parquet / Configuration.usgs
+        parquet_file = parquet_directory / f"{domain}_{s}_{e}.parquet"
         logger.info(f"Building {parquet_file}")
         if parquet_file.exists():
             logger.info(f"Found existing {parquet_file}")
             observations[domain] = pl.scan_parquet(parquet_file)
             continue
+        parquet_directory.mkdir(exist_ok=True, parents=True)
 
         # Download
         sites = rl.select(
@@ -177,9 +177,8 @@ def load_USGS_observations(
         urls = generate_usgs_urls(
             sites, start_date, end_date
         )
-        download_directory = generate_directory(
-            root, FileType.TSV, domain, Configuration.OBSERVATIONS
-        )
+        download_directory = root / FileType.tsv / domain
+        download_directory.mkdir(exist_ok=True, parents=True)
         logger.info(f"Downloading to {download_directory}")
         manifest = generate_usgs_manifest(
             sites,
@@ -242,20 +241,32 @@ def load_pairs(
     logger = get_logger("nwm_explorer.pipelines.load_pairs")
     routelinks = scan_routelinks(*download_routelinks(root / "routelinks"))
 
-    # TODO observation dates should be set by prediction value_time
-    # i.e. the available observations should extend 10 days beyond end_date
-    observations = load_USGS_observations(
-        root=root,
-        start_date=start_date,
-        end_date=end_date,
-        routelinks=routelinks
-    )
+    logger.info("Scanning predictions for date range")
     predictions = load_NWM_output(
         root=root,
         start_date=start_date,
         end_date=end_date,
         routelinks=routelinks
     )
+    first = None
+    last = None
+    for (domain, configuration), data in predictions.items():
+        start = data.select("value_time").min().collect().item(0, 0)
+        end = data.select("value_time").max().collect().item(0, 0)
+        if first is None:
+            first = start
+            last = end
+        else:
+            first = min(first, start)
+            last = max(last, end)
+    observations = load_USGS_observations(
+        root=root,
+        start_date=pd.Timestamp(first),
+        end_date=pd.Timestamp(last),
+        routelinks=routelinks
+    )
+    print(observations)
+    quit()
 
     pairs = {}
     for (domain, configuration), data in predictions.items():
