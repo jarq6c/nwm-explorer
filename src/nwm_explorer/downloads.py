@@ -15,6 +15,7 @@ import warnings
 
 from nwm_explorer.urls import ROUTELINKS_URL
 from nwm_explorer.manifests import ROUTELINKS_MANIFEST
+from nwm_explorer.logger import get_logger
 
 def default_file_validator(filepath: Path) -> None:
     """
@@ -223,12 +224,14 @@ def download_files(
     ...     ("https://numpy.org/doc/stable/index.html", "numpy_index.html")
     ...     )
     """
+    logger = get_logger("nwm_explorer.downloads.download_files")
     # SSL
     if ssl_context is None:
         ssl_context = ssl.create_default_context()
 
     # Retrieve
     for attempt in range(10):
+        logger.info(f"Downloading files, attempt {attempt}")
         try:
             asyncio.run(
                 download_files_awaitable(
@@ -242,41 +245,37 @@ def download_files(
                     timeout=timeout
                     )
                 )
-            return
         except aiohttp.client_exceptions.ServerDisconnectedError:
-            # Validate files
-            for _, dst in src_dst:
-                fp = Path(dst)
-                if fp.exists():
-                    try:
-                        file_validator(fp)
-                    except:
-                        fp.unlink()
             warnings.warn("Server error, trying again", RuntimeWarning)
-            sleep(5 * 2 ** attempt)
         except RuntimeError as e:
-            # Validate files
-            for _, dst in src_dst:
-                fp = Path(dst)
-                if fp.exists():
-                    try:
-                        file_validator(fp)
-                    except:
-                        fp.unlink()
             warnings.warn(str(e), RuntimeWarning)
             warnings.warn("Server error, trying again", RuntimeWarning)
-            sleep(5 * 2 ** attempt)
         except asyncio.TimeoutError:
-            # Validate files
-            for _, dst in src_dst:
-                fp = Path(dst)
-                if fp.exists():
-                    try:
-                        file_validator(fp)
-                    except:
-                        fp.unlink()
             warnings.warn("Timeout error, trying again", RuntimeWarning)
-            sleep(5 * 2 ** attempt)
+
+        # Validate files
+        logger.info("Validating files, this will take some time")
+        filepaths = [Path(dst) for _, dst in src_dst]
+        validated = 0
+        for fp in filepaths:
+            logger.info(f"{fp}")
+            if fp.exists():
+                try:
+                    file_validator(fp)
+                    validated += 1
+                except:
+                    fp.unlink()
+                    break
+            else:
+                break
+        if validated == 0:
+            warnings.warn("Unable to retrieve any files", RuntimeWarning)
+            return
+        if validated == len(filepaths):
+            logger.info("All files validated")
+            return
+        warnings.warn("Unable to retrieve all files, trying again", RuntimeWarning)
+        sleep(5 * 2 ** attempt)
     warnings.warn("Unable to retrieve all files", RuntimeWarning)
 
 def download_routelinks(
