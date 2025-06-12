@@ -266,7 +266,6 @@ def download_files(
             warnings.warn(str(e), RuntimeWarning)
             warnings.warn("Server error, trying again", RuntimeWarning)
             sleep(5 * 2 ** attempt)
-            sleep(5 * 2 ** attempt)
         except asyncio.TimeoutError:
             # Validate files
             for _, dst in src_dst:

@@ -1,4 +1,5 @@
 """Various standard procedures."""
+from time import sleep
 from pathlib import Path
 import warnings
 import numpy as np
@@ -23,7 +24,8 @@ def load_NWM_output(
         root: Path,
         start_date: pd.Timestamp,
         end_date: pd.Timestamp,
-        routelinks: dict[Domain, pl.LazyFrame] | None = None
+        routelinks: dict[Domain, pl.LazyFrame] | None = None,
+        low_memory: bool = False
 ) -> dict[tuple[Domain, Configuration], pl.LazyFrame]:
     """
     Download and process NWM output.
@@ -38,6 +40,8 @@ def load_NWM_output(
         Last date to retrieve data.
     routelinks: dict[Domain, LazyFrame]
         Mapping from Domain to crosswalk data.
+    low_memory: bool, default False
+        Reduce memory pressure at the expense of performance.
     
     Returns
     -------
@@ -127,7 +131,8 @@ def load_NWM_output(
         
         # Merge files
         logger.info(f"Merging parquet files")
-        model_output[(domain, configuration)] = pl.scan_parquet(day_files)
+        model_output[(domain, configuration)] = pl.scan_parquet(day_files,
+            low_memory=low_memory)
     return model_output
 
 def load_USGS_observations(
@@ -246,7 +251,8 @@ def load_pairs(
         root=root,
         start_date=start_date,
         end_date=end_date,
-        routelinks=routelinks
+        routelinks=routelinks,
+        low_memory=True
     )
     first = None
     last = None
@@ -259,14 +265,94 @@ def load_pairs(
         else:
             first = min(first, start)
             last = max(last, end)
+    logger.info("Loading observations")
     observations = load_USGS_observations(
         root=root,
         start_date=pd.Timestamp(first),
         end_date=pd.Timestamp(last),
         routelinks=routelinks
     )
-    print(observations)
-    quit()
+
+    logger.info("Resampling observations")
+    for domain in observations:
+        observations[domain] = observations[domain].with_columns(
+                pl.col("usgs_site_code").cast(pl.String)
+            ).sort(
+                ("usgs_site_code", "value_time")
+            ).group_by_dynamic(
+                "value_time",
+                every="1d",
+                group_by="usgs_site_code"
+            ).agg(
+                pl.col("value").max().alias("observed")
+            )
+
+    # Process model output
+    logger.info("Resampling predictions")
+    reference_dates = generate_reference_dates(start_date, end_date)
+    pairs = {}
+    for (domain, configuration), _ in predictions.items():
+        day_files = []
+        crosswalk = routelinks[domain].select(["nwm_feature_id",
+            "usgs_site_code"]).collect()
+        obs = observations[domain]
+        for rd in reference_dates:
+            # Check for file existence
+            ofile = generate_filepath(
+                root, FileType.parquet, configuration, Variable.streamflow_pairs,
+                Units.cubic_feet_per_second, rd
+            )
+            if ofile.exists():
+                logger.info(f"Found existing file: {ofile}")
+                day_files.append(ofile)
+                continue
+            ifile = generate_filepath(
+                root, FileType.parquet, configuration, Variable.streamflow,
+                Units.cubic_feet_per_second, rd
+            )
+            logger.info(f"Processing {ifile}")
+            if not ifile.exists():
+                logger.info(f"File not found: {ifile}")
+                day_files.append(ifile)
+                continue
+            logger.info(f"Building {ofile}")
+            if configuration in LEAD_TIME_FREQUENCY:
+                sampling_frequency = LEAD_TIME_FREQUENCY[configuration]
+                data = pl.scan_parquet(ifile).sort(
+                    ("nwm_feature_id", "reference_time", "value_time")
+                ).group_by_dynamic(
+                    "value_time",
+                    every=sampling_frequency,
+                    group_by=("nwm_feature_id", "reference_time")
+                ).agg(
+                    pl.col("value").max().alias("predicted")
+                ).with_columns(
+                usgs_site_code=pl.col("nwm_feature_id").replace_strict(
+                    crosswalk["nwm_feature_id"], crosswalk["usgs_site_code"])
+                ).join(obs, on=["usgs_site_code", "value_time"], how="left"
+                    ).drop_nulls().with_columns(
+                        pl.col("value_time").sub(
+                            pl.col("reference_time")
+                            ).dt.total_hours().alias(
+                                "lead_time_hours_min")
+                    )
+            else:
+                continue
+                data = pl.scan_parquet(ifile).sort(
+                    ("nwm_feature_id", "value_time")
+                ).group_by_dynamic(
+                    "value_time",
+                    every="1d",
+                    group_by="nwm_feature_id"
+                ).agg(
+                    pl.col("value").max().alias("predicted")
+                ).with_columns(
+                usgs_site_code=pl.col("nwm_feature_id").replace_strict(
+                    crosswalk["nwm_feature_id"], crosswalk["usgs_site_code"])
+                ).join(obs, on=["usgs_site_code", "value_time"], how="left"
+                    ).drop_nulls()
+            print(data.head().collect())
+            quit()
 
     pairs = {}
     for (domain, configuration), data in predictions.items():
