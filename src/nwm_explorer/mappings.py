@@ -209,3 +209,22 @@ CONFIDENCE_STRINGS: dict[str, Confidence] = {
     "Upper": Confidence.upper
 }
 """Mapping from pretty strings to confidence boundaries for display."""
+
+class Metric(StrEnum):
+    """Symbols used to reference different evaluation metrics."""
+    nash_sutcliffe_efficiency = "nash_sutcliffe_efficiency"
+    mean_relative_bias = "mean_relative_bias"
+    pearson_correlation_coefficient = "pearson_correlation_coefficient"
+    relative_variability = "relative_variability"
+    relative_mean = "relative_mean"
+    kling_gupta_efficiency = "kling_gupta_efficiency"
+
+METRIC_STRINGS: dict[str, Metric] = {
+    "Mean relative bias": Metric.mean_relative_bias,
+    "Pearson correlation coefficient": Metric.pearson_correlation_coefficient,
+    "Nash-Sutcliffe efficiency": Metric.nash_sutcliffe_efficiency,
+    "Relative mean": Metric.relative_mean,
+    "Relative variability": Metric.relative_variability,
+    "Kling-Gupta efficiency": Metric.kling_gupta_efficiency
+}
+"""Mapping from pretty strings to evaluation metrics for display."""

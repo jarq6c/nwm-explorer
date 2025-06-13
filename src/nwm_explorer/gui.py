@@ -6,7 +6,7 @@ from panel.template import BootstrapTemplate
 
 from nwm_explorer.mappings import (EVALUATIONS, DOMAIN_STRINGS,
     DOMAIN_CONFIGURATION_MAPPING, Domain, Configuration, LEAD_TIME_VALUES,
-    CONFIDENCE_STRINGS, Confidence)
+    CONFIDENCE_STRINGS, Confidence, METRIC_STRINGS, Metric)
 
 @dataclass
 class DashboardState:
@@ -15,7 +15,7 @@ class DashboardState:
     domain: Domain
     configuration: Configuration
     threshold: str
-    metric: str
+    metric: Metric
     confidence: Confidence
     lead_time: int
 
@@ -43,12 +43,7 @@ class FilteringWidgets:
         )
         self.metric_filter = pn.widgets.Select(
             name="Evaluation Metric",
-            options=[
-                "Mean relative bias",
-                "Nash-Sutcliffe efficiency",
-                "Pearson correlation coefficient",
-                "Kling-Gupta efficiency"
-            ]
+            options=list(METRIC_STRINGS.keys())
         )
         self.confidence_filter = pn.widgets.Select(
             name="Confidence Estimate (95%)",
@@ -95,6 +90,10 @@ class FilteringWidgets:
     def current_confidence(self) -> Confidence:
         return CONFIDENCE_STRINGS[self.confidence_filter.value]
 
+    @property
+    def current_metric(self) -> Domain:
+        return METRIC_STRINGS[self.metric_filter.value]
+
     def update_configurations(self) -> None:
         """Set configuration options"""
         self.configuration_filter.options = list(
@@ -126,7 +125,7 @@ class FilteringWidgets:
             domain=self.current_domain,
             configuration=self.current_configuration,
             threshold=self.threshold_filter.value,
-            metric=self.metric_filter.value,
+            metric=self.current_metric,
             confidence=self.current_confidence,
             lead_time=self.current_lead_time
         )
