@@ -5,17 +5,18 @@ import panel as pn
 from panel.template import BootstrapTemplate
 
 from nwm_explorer.mappings import (EVALUATIONS, DOMAIN_STRINGS,
-    DOMAIN_CONFIGURATION_MAPPING, Domain, Configuration, LEAD_TIME_VALUES)
+    DOMAIN_CONFIGURATION_MAPPING, Domain, Configuration, LEAD_TIME_VALUES,
+    CONFIDENCE_STRINGS, Confidence)
 
 @dataclass
 class DashboardState:
     """Dashboard state variables."""
     evaluation: str
     domain: Domain
-    configuration: str
+    configuration: Configuration
     threshold: str
     metric: str
-    confidence: str
+    confidence: Confidence
     lead_time: int
 
 class FilteringWidgets:
@@ -37,10 +38,7 @@ class FilteringWidgets:
         self.threshold_filter = pn.widgets.Select(
             name="Streamflow Threshold (≥)",
             options=[
-                "0th Percentile (All data)",
-                "85th Percentile",
-                "95th Percentile",
-                "99th Percentile"
+                "100% AEP-USGS (All data)"
             ]
         )
         self.metric_filter = pn.widgets.Select(
@@ -54,11 +52,7 @@ class FilteringWidgets:
         )
         self.confidence_filter = pn.widgets.Select(
             name="Confidence Estimate (95%)",
-            options=[
-                "Point",
-                "Lower",
-                "Upper"
-            ]
+            options=list(CONFIDENCE_STRINGS.keys())
         )
         if self.current_configuration in LEAD_TIME_VALUES:
             options = LEAD_TIME_VALUES[self.current_configuration]
@@ -97,6 +91,10 @@ class FilteringWidgets:
     def current_lead_time(self) -> int:
         return self.lead_time_filter[0].value
 
+    @property
+    def current_confidence(self) -> Confidence:
+        return CONFIDENCE_STRINGS[self.confidence_filter.value]
+
     def update_configurations(self) -> None:
         """Set configuration options"""
         self.configuration_filter.options = list(
@@ -129,10 +127,10 @@ class FilteringWidgets:
             configuration=self.current_configuration,
             threshold=self.threshold_filter.value,
             metric=self.metric_filter.value,
-            confidence=self.confidence_filter.value,
+            confidence=self.current_confidence,
             lead_time=self.current_lead_time
         )
-    
+
     @property
     def layout(self) -> pn.Column:
         return pn.Column(

@@ -202,3 +202,10 @@ DOMAIN_STRINGS: dict[str, Domain] = {
     "Puerto Rico": DOMAIN_MAPPING["Puerto Rico"]
 }
 """Mapping from pretty strings to domains for display."""
+
+CONFIDENCE_STRINGS: dict[str, Confidence] = {
+    "Point": Confidence.point,
+    "Lower": Confidence.lower,
+    "Upper": Confidence.upper
+}
+"""Mapping from pretty strings to confidence boundaries for display."""
