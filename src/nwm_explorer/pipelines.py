@@ -358,8 +358,6 @@ def load_pairs(
         
         # Merge files
         logger.info(f"Merging parquet files")
-        print(pl.scan_parquet(day_files).collect())
-        quit()
         pairs[(domain, configuration)] = pl.scan_parquet(day_files)
     return pairs
 
