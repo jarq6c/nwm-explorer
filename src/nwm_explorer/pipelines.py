@@ -246,7 +246,7 @@ def load_pairs(
     logger = get_logger("nwm_explorer.pipelines.load_pairs")
     routelinks = scan_routelinks(*download_routelinks(root / "routelinks"))
 
-    logger.info("Scanning predictions for date range")
+    logger.info("Scanning predictions for valid time range")
     predictions = load_NWM_output(
         root=root,
         start_date=start_date,
@@ -288,37 +288,28 @@ def load_pairs(
             )
 
     # Process model output
-    logger.info("Resampling predictions")
+    logger.info("Resampling predictions and pairing")
     reference_dates = generate_reference_dates(start_date, end_date)
     pairs = {}
-    for (domain, configuration), _ in predictions.items():
+    for (domain, configuration), data in predictions.items():
         day_files = []
         crosswalk = routelinks[domain].select(["nwm_feature_id",
             "usgs_site_code"]).collect()
         obs = observations[domain]
         for rd in reference_dates:
             # Check for file existence
-            ofile = generate_filepath(
+            parquet_file = generate_filepath(
                 root, FileType.parquet, configuration, Variable.streamflow_pairs,
                 Units.cubic_feet_per_second, rd
             )
-            if ofile.exists():
-                logger.info(f"Found existing file: {ofile}")
-                day_files.append(ofile)
+            if parquet_file.exists():
+                logger.info(f"Found existing file: {parquet_file}")
+                day_files.append(parquet_file)
                 continue
-            ifile = generate_filepath(
-                root, FileType.parquet, configuration, Variable.streamflow,
-                Units.cubic_feet_per_second, rd
-            )
-            logger.info(f"Processing {ifile}")
-            if not ifile.exists():
-                logger.info(f"File not found: {ifile}")
-                day_files.append(ifile)
-                continue
-            logger.info(f"Building {ofile}")
+            logger.info(f"Building {parquet_file}")
             if configuration in LEAD_TIME_FREQUENCY:
                 sampling_frequency = LEAD_TIME_FREQUENCY[configuration]
-                data = pl.scan_parquet(ifile).sort(
+                paired_data = data.sort(
                     ("nwm_feature_id", "reference_time", "value_time")
                 ).group_by_dynamic(
                     "value_time",
@@ -337,8 +328,7 @@ def load_pairs(
                                 "lead_time_hours_min")
                     )
             else:
-                continue
-                data = pl.scan_parquet(ifile).sort(
+                paired_data = data.sort(
                     ("nwm_feature_id", "value_time")
                 ).group_by_dynamic(
                     "value_time",
@@ -351,40 +341,26 @@ def load_pairs(
                     crosswalk["nwm_feature_id"], crosswalk["usgs_site_code"])
                 ).join(obs, on=["usgs_site_code", "value_time"], how="left"
                     ).drop_nulls()
-            print(data.head().collect())
-            quit()
 
-    pairs = {}
-    for (domain, configuration), data in predictions.items():
-        # Check for file existence
-        parquet_file = generate_filepath(
-            root, FileType.PARQUET, domain, configuration, Variable.STREAMFLOW_PAIRS,
-            Units.CUBIC_FEET_PER_SECOND, start_date, end_date
-        )
-        logger.info(f"Building {parquet_file}")
-        if parquet_file.exists():
-            logger.info(f"Found existing {parquet_file}")
-            pairs[(domain, configuration)] = pl.scan_parquet(parquet_file)
+            # Save to parquet
+            logger.info(f"Saving {parquet_file}")
+            paired_data.with_columns(
+                pl.col("observed").cast(pl.Float32)
+            ).collect().write_parquet(parquet_file)
+
+            # Add file to list
+            day_files.append(parquet_file)
+            
+        # Check for at least one file
+        if not day_files:
+            logger.info(f"Found no data for {domain} {configuration}")
             continue
-
-        # Pair data
-        logger.info(f"Pairing data {domain} {configuration}")
-        crosswalk = routelinks[domain].select(["nwm_feature_id",
-            "usgs_site_code"]).collect()
-        obs = observations[domain].with_columns(
-            pl.col("usgs_site_code").cast(pl.String)
-        )
-        paired_data = data.with_columns(
-            usgs_site_code=pl.col("nwm_feature_id").replace_strict(
-                crosswalk["nwm_feature_id"], crosswalk["usgs_site_code"])
-        ).join(obs, on=["usgs_site_code", "value_time"], how="left",
-                suffix="_obs").drop_nulls().rename(
-                    {"value": "predicted", "value_obs": "observed"})
-
-        # Save to parquet
-        logger.info(f"Saving {parquet_file}")
-        paired_data.sink_parquet(parquet_file)
-        pairs[(domain, configuration)] = pl.scan_parquet(parquet_file)
+        
+        # Merge files
+        logger.info(f"Merging parquet files")
+        print(pl.scan_parquet(day_files).collect())
+        quit()
+        pairs[(domain, configuration)] = pl.scan_parquet(day_files)
     return pairs
 
 def load_metrics(
