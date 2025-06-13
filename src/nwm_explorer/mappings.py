@@ -1,9 +1,20 @@
 """Various mappings."""
-from dataclasses import dataclass
 from enum import StrEnum
 from typing import Callable
 import polars as pl
+import pandas as pd
 import nwm_explorer.urls as nwm_urls
+
+EVALUATIONS: dict[str, tuple[pd.Timestamp, pd.Timestamp]] = {
+    "FY2024_Q1": (pd.Timestamp("2023-10-01"), pd.Timestamp("2024-01-01")),
+    "FY2024_Q2": (pd.Timestamp("2024-01-01"), pd.Timestamp("2024-04-01")),
+    "FY2024_Q3": (pd.Timestamp("2024-04-01"), pd.Timestamp("2024-07-01")),
+    "FY2024_Q4": (pd.Timestamp("2024-07-01"), pd.Timestamp("2024-10-01")),
+    "FY2025_Q1": (pd.Timestamp("2024-10-01"), pd.Timestamp("2025-01-01")),
+    "FY2025_Q2": (pd.Timestamp("2025-01-01"), pd.Timestamp("2025-04-01")),
+    "FY2025_Q3": (pd.Timestamp("2025-04-01"), pd.Timestamp("2025-07-01"))
+}
+"""Standard evaluations."""
 
 TIMEZONE_MAPPING: dict[str, str] = {
     "AKST": "America/Anchorage",
@@ -183,3 +194,11 @@ LEAD_TIME_VALUES: dict[Configuration, list[int]] = {
     Configuration.short_range_puertorico_no_da: [l for l in range(0, 48, 6)]
 }
 """Mapping used to display available lead times."""
+
+DOMAIN_STRINGS: dict[str, Domain] = {
+    "Alaska": DOMAIN_MAPPING["Alaska"],
+    "CONUS": DOMAIN_MAPPING["CONUS"],
+    "Hawaii": DOMAIN_MAPPING["Hawaii"],
+    "Puerto Rico": DOMAIN_MAPPING["Puerto Rico"]
+}
+"""Mapping from pretty strings to domains for display."""

@@ -4,41 +4,37 @@ from dataclasses import dataclass
 import panel as pn
 from panel.template import BootstrapTemplate
 
+from nwm_explorer.mappings import (EVALUATIONS, DOMAIN_STRINGS,
+    DOMAIN_CONFIGURATION_MAPPING, Domain)
+
 @dataclass
 class DashboardState:
     """Dashboard state variables."""
     evaluation: str
-    domain: str
+    domain: Domain
     configuration: str
     threshold: str
     metric: str
     confidence: str
     lead_time: int
 
-class Dashboard:
-    """Build a dashboard for exploring National Water Model output."""
-    def __init__(self, root: Path, title: str):
+class FilteringWidgets:
+    def __init__(self):
         # Filtering options
         self.evaluation_filter = pn.widgets.Select(
             name="Evaluation",
-            options=[
-                "FY2024_Q1",
-                "FY2024_Q2"
-            ]
+            options=list(EVALUATIONS.keys())
         )
         self.domain_filter = pn.widgets.Select(
             name="Model Domain",
-            options=[
-                "Alaska",
-                "CONUS",
-                "Hawaii",
-                "Puerto Rico"
-            ]
+            options=list(DOMAIN_STRINGS.keys())
         )
         self.configuration_filter = pn.widgets.Select(
             name="Model Configuration",
-            options=["Analysis", "Medium Range"]
+            options=[]
             )
+        self.update_configurations()
+
         self.threshold_filter = pn.widgets.Select(
             name="Streamflow Threshold (≥)",
             options=[
@@ -72,26 +68,77 @@ class Dashboard:
             visible_buttons=["previous", "next"],
             width=300
             )
+        
+        def handle_domain_change(domain):
+            if domain is None:
+                return
+            self.update_configurations()
+        pn.bind(handle_domain_change, self.domain_filter, watch=True)
+
+    @property
+    def current_domain(self) -> Domain:
+        return DOMAIN_STRINGS[self.domain_filter.value]
+
+    @property
+    def current_configuration(self) -> Domain:
+        return DOMAIN_CONFIGURATION_MAPPING[self.current_domain][self.configuration_filter.value]
+
+    def update_configurations(self) -> None:
+        """Set configuration options"""
+        self.configuration_filter.options = list(
+            DOMAIN_CONFIGURATION_MAPPING[self.current_domain].keys())
+
+    @property
+    def state(self) -> DashboardState:
+        """Current widget states."""
+        return DashboardState(
+            evaluation=self.evaluation_filter.value,
+            domain=self.current_domain,
+            configuration=self.current_configuration,
+            threshold=self.threshold_filter.value,
+            metric=self.metric_filter.value,
+            confidence=self.confidence_filter.value,
+            lead_time=self.lead_time_filter.value
+        )
+    
+    @property
+    def layout(self) -> pn.Column:
+        return pn.Column(
+            self.evaluation_filter,
+            self.domain_filter,
+            self.configuration_filter,
+            self.threshold_filter,
+            self.metric_filter,
+            self.confidence_filter,
+            self.lead_time_filter
+        )
+
+class Dashboard:
+    """Build a dashboard for exploring National Water Model output."""
+    def __init__(self, root: Path, title: str):
+        # Get widgets
+        self.filter_widgets = FilteringWidgets()
 
         # Layout filtering options
         self.filter_card = pn.Card(
-            pn.Column(
-                self.evaluation_filter,
-                self.domain_filter,
-                self.configuration_filter,
-                self.threshold_filter,
-                self.metric_filter,
-                self.confidence_filter,
-                self.lead_time_filter
-                ),
+            self.filter_widgets.layout,
             title="Filters",
             collapsible=False
             )
+        
+        def callback(event):
+            print(self.state)
+        pn.bind(callback, self.filter_widgets.evaluation_filter, watch=True)
 
         # Layout cards
         layout = pn.Row(self.filter_card)
         self.template = BootstrapTemplate(title=title)
         self.template.main.append(layout)
+
+    @property
+    def state(self) -> DashboardState:
+        """Current dashboard state."""
+        return self.filter_widgets.state
 
 def generate_dashboard(
         root: Path,
