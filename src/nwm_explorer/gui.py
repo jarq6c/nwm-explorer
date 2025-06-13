@@ -1,6 +1,7 @@
 """Generate and serve exploratory applications."""
 from pathlib import Path
 from dataclasses import dataclass
+from typing import Callable
 import panel as pn
 from panel.template import BootstrapTemplate
 
@@ -22,6 +23,7 @@ class DashboardState:
 class FilteringWidgets:
     def __init__(self):
         # Filtering options
+        self.callbacks: list[Callable] = []
         self.evaluation_filter = pn.widgets.Select(
             name="Evaluation",
             options=list(EVALUATIONS.keys())
@@ -116,6 +118,8 @@ class FilteringWidgets:
                 width=300
                 )
         ]
+        for func in self.callbacks:
+            pn.bind(func, self.lead_time_filter[0], watch=True)
 
     @property
     def state(self) -> DashboardState:
@@ -141,6 +145,17 @@ class FilteringWidgets:
             self.confidence_filter,
             self.lead_time_filter
         )
+    
+    def register_callback(self, func: Callable) -> None:
+        """Register callback function."""
+        pn.bind(func, self.evaluation_filter, watch=True)
+        pn.bind(func, self.domain_filter, watch=True)
+        pn.bind(func, self.configuration_filter, watch=True)
+        pn.bind(func, self.threshold_filter, watch=True)
+        pn.bind(func, self.metric_filter, watch=True)
+        pn.bind(func, self.confidence_filter, watch=True)
+        pn.bind(func, self.lead_time_filter[0], watch=True)
+        self.callbacks.append(func)
 
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
@@ -155,9 +170,10 @@ class Dashboard:
             collapsible=False
             )
         
-        def callback(event):
+        def update_map(event):
+            print(event)
             print(self.state)
-        pn.bind(callback, self.filter_widgets.evaluation_filter, watch=True)
+        self.filter_widgets.register_callback(update_map)
 
         # Layout cards
         layout = pn.Row(self.filter_card)
