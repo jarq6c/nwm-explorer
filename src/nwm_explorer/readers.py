@@ -2,83 +2,26 @@
 from pathlib import Path
 from dataclasses import dataclass
 import pandas as pd
-import geopandas as gpd
-from nwm_explorer.mappings import Domain, Configuration
-from nwm_explorer.downloads import download_routelinks
-from nwm_explorer.data import scan_routelinks
+
+from nwm_explorer.mappings import Domain, Configuration, Metric, Confidence
 
 @dataclass
-class RoutelinkReader:
-    """
-    Manages retrieval of crosswalk data from a collection of routelinks files.
-
-    Attributes
-    ----------
-    root: Path
-        Indicates root directory associated with nwm-explorer application.
-    routelinks: dict[Domain, pl.LazyFrame]
-        Dataframes will only have columns found in schema. Keys are model
-        Domain. Domain mapping uses schemas.DOMAIN_MAPPING by default.
-        For example: ./parent/csv/RouteLink_HI.csv will be loaded and
-        accessible using the key Domain.hawaii
-    """
-    root: Path
-
-    def __post_init__(self) -> None:
-        """
-        Lazily open routelink files as polars dataframes.
-        """
-        self.routelinks = scan_routelinks(*download_routelinks(
-            directory=self.root / "routelinks",
-            read_only=True
-        ))
-    
-    @property
-    def domains(self) -> list[Domain]:
-        """List of available model domains."""
-        return list(self.routelinks.keys())
-    
-    def select_columns(
-            self,
-            domain: Domain,
-            columns: list[str]
-            ) -> pd.DataFrame:
-        """List of available USGS sites codes for given domain."""
-        return self.routelinks[domain].select(columns
-            ).collect().to_pandas()
-    
-    def geometry(self, domain: Domain) -> gpd.GeoSeries:
-        """Geometry of points for given domain."""
-        data = self.routelinks[domain].select(["latitude", "longitude"]
-            ).collect()
-        return gpd.GeoSeries.from_xy(
-            x=data["longitude"],
-            y=data["latitude"],
-            crs="EPSG:4326"
-        )
+class DashboardState:
+    """Dashboard state variables."""
+    start_date: pd.Timestamp
+    end_date: pd.Timestamp
+    domain: Domain
+    configuration: Configuration
+    threshold: str
+    metric: Metric
+    confidence: Confidence
+    lead_time: int
 
 @dataclass
-class MetricsReader:
+class MetricReader:
+    """Intermediate metric reader to query and return data to dashboards."""
     root: Path
 
-    @property
-    def configurations(self):
-        return list(Configuration)[:-1]
-
-    @property
-    def domains(self):
-        return list(Domain)
-
-    @property
-    def periods(self):
-        return [
-            "FY2024 Q1",
-            "FY2024 Q2",
-            "FY2024 Q3",
-            "FY2024 Q4",
-            "FY2025 Q1"
-        ]
-    
-    @property
-    def metrics(self):
-        return ["Mean relative bias", "Nash-Sutcliffe Efficiency"]
+    def query(self, state: DashboardState) -> int:
+        """Return data matching dashboard state."""
+        return str(state).replace(",", "<br>")

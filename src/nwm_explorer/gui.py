@@ -2,23 +2,14 @@
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Callable
+import pandas as pd
 import panel as pn
 from panel.template import BootstrapTemplate
 
 from nwm_explorer.mappings import (EVALUATIONS, DOMAIN_STRINGS,
     DOMAIN_CONFIGURATION_MAPPING, Domain, Configuration, LEAD_TIME_VALUES,
     CONFIDENCE_STRINGS, Confidence, METRIC_STRINGS, Metric)
-
-@dataclass
-class DashboardState:
-    """Dashboard state variables."""
-    evaluation: str
-    domain: Domain
-    configuration: Configuration
-    threshold: str
-    metric: Metric
-    confidence: Confidence
-    lead_time: int
+from nwm_explorer.readers import MetricReader, DashboardState
 
 class FilteringWidgets:
     def __init__(self):
@@ -75,6 +66,14 @@ class FilteringWidgets:
             self.update_lead_times()
         pn.bind(handle_configuration_change, self.configuration_filter,
             watch=True)
+        
+    @property
+    def current_start_date(self) -> pd.Timestamp:
+        return EVALUATIONS[self.evaluation_filter.value][0]
+        
+    @property
+    def current_end_date(self) -> pd.Timestamp:
+        return EVALUATIONS[self.evaluation_filter.value][1]
 
     @property
     def current_domain(self) -> Domain:
@@ -93,7 +92,7 @@ class FilteringWidgets:
         return CONFIDENCE_STRINGS[self.confidence_filter.value]
 
     @property
-    def current_metric(self) -> Domain:
+    def current_metric(self) -> Metric:
         return METRIC_STRINGS[self.metric_filter.value]
 
     def update_configurations(self) -> None:
@@ -125,7 +124,8 @@ class FilteringWidgets:
     def state(self) -> DashboardState:
         """Current widget states."""
         return DashboardState(
-            evaluation=self.evaluation_filter.value,
+            start_date=self.current_start_date,
+            end_date=self.current_end_date,
             domain=self.current_domain,
             configuration=self.current_configuration,
             threshold=self.threshold_filter.value,
@@ -160,6 +160,9 @@ class FilteringWidgets:
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
     def __init__(self, root: Path, title: str):
+        # Data reader
+        self.reader = MetricReader(root)
+    
         # Get widgets
         self.filter_widgets = FilteringWidgets()
 
@@ -170,13 +173,18 @@ class Dashboard:
             collapsible=False
             )
         
+        # Setup map
+        self.site_map = pn.pane.Markdown("No Data")
+        
         def update_map(event):
-            print(event)
-            print(self.state)
+            if event is None:
+                return
+            data = self.reader.query(self.state)
+            self.site_map.object = data
         self.filter_widgets.register_callback(update_map)
 
         # Layout cards
-        layout = pn.Row(self.filter_card)
+        layout = pn.Row(self.filter_card, self.site_map)
         self.template = BootstrapTemplate(title=title)
         self.template.main.append(layout)
 
