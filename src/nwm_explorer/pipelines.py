@@ -291,7 +291,7 @@ def load_pairs(
     logger.info("Resampling predictions and pairing")
     reference_dates = generate_reference_dates(start_date, end_date)
     pairs = {}
-    for (domain, configuration), data in predictions.items():
+    for (domain, configuration), _ in predictions.items():
         day_files = []
         crosswalk = routelinks[domain].select(["nwm_feature_id",
             "usgs_site_code"]).collect()
@@ -306,6 +306,12 @@ def load_pairs(
                 logger.info(f"Found existing file: {parquet_file}")
                 day_files.append(parquet_file)
                 continue
+            # Check for file existence
+            ifile = generate_filepath(
+                root, FileType.parquet, configuration, Variable.streamflow,
+                Units.cubic_feet_per_second, rd
+            )
+            data = pl.scan_parquet(ifile)
             logger.info(f"Building {parquet_file}")
             if configuration in LEAD_TIME_FREQUENCY:
                 sampling_frequency = LEAD_TIME_FREQUENCY[configuration]
