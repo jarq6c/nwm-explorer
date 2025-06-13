@@ -252,6 +252,8 @@ def download_files(
             warnings.warn("Server error, trying again", RuntimeWarning)
         except asyncio.TimeoutError:
             warnings.warn("Timeout error, trying again", RuntimeWarning)
+        except aiohttp.client_exceptions.ClientPayloadError:
+            warnings.warn("Failed to write file, trying again", RuntimeWarning)
 
         # Validate files
         logger.info("Validating files, this will take some time")
