@@ -5,7 +5,7 @@ import panel as pn
 from panel.template import BootstrapTemplate
 
 from nwm_explorer.mappings import (EVALUATIONS, DOMAIN_STRINGS,
-    DOMAIN_CONFIGURATION_MAPPING, Domain)
+    DOMAIN_CONFIGURATION_MAPPING, Domain, Configuration, LEAD_TIME_VALUES)
 
 @dataclass
 class DashboardState:
@@ -31,10 +31,9 @@ class FilteringWidgets:
         )
         self.configuration_filter = pn.widgets.Select(
             name="Model Configuration",
-            options=[]
-            )
-        self.update_configurations()
-
+            options=list(
+            DOMAIN_CONFIGURATION_MAPPING[self.current_domain].keys()
+            ))
         self.threshold_filter = pn.widgets.Select(
             name="Streamflow Threshold (≥)",
             options=[
@@ -61,32 +60,65 @@ class FilteringWidgets:
                 "Upper"
             ]
         )
-        self.lead_time_filter = pn.widgets.DiscretePlayer(
+        if self.current_configuration in LEAD_TIME_VALUES:
+            options = LEAD_TIME_VALUES[self.current_configuration]
+        else:
+            options = [0]
+        self.lead_time_filter = pn.Row(pn.widgets.DiscretePlayer(
             name="Minimum lead time (hours)",
-            options=[2, 3, 4, 5],
+            options=options,
             show_loop_controls=False,
             visible_buttons=["previous", "next"],
             width=300
-            )
-        
+            ))
+
         def handle_domain_change(domain):
             if domain is None:
                 return
             self.update_configurations()
         pn.bind(handle_domain_change, self.domain_filter, watch=True)
 
+        def handle_configuration_change(domain):
+            if domain is None:
+                return
+            self.update_lead_times()
+        pn.bind(handle_configuration_change, self.configuration_filter,
+            watch=True)
+
     @property
     def current_domain(self) -> Domain:
         return DOMAIN_STRINGS[self.domain_filter.value]
 
     @property
-    def current_configuration(self) -> Domain:
+    def current_configuration(self) -> Configuration:
         return DOMAIN_CONFIGURATION_MAPPING[self.current_domain][self.configuration_filter.value]
+    
+    @property
+    def current_lead_time(self) -> int:
+        return self.lead_time_filter[0].value
 
     def update_configurations(self) -> None:
         """Set configuration options"""
         self.configuration_filter.options = list(
             DOMAIN_CONFIGURATION_MAPPING[self.current_domain].keys())
+
+    def update_lead_times(self) -> None:
+        """Set lead time options"""
+        c = self.current_configuration
+        if c in LEAD_TIME_VALUES:
+            options = LEAD_TIME_VALUES[c]
+        else:
+            options = [0]
+        
+        self.lead_time_filter.objects = [
+            pn.widgets.DiscretePlayer(
+                name="Minimum lead time (hours)",
+                options=options,
+                show_loop_controls=False,
+                visible_buttons=["previous", "next"],
+                width=300
+                )
+        ]
 
     @property
     def state(self) -> DashboardState:
@@ -98,7 +130,7 @@ class FilteringWidgets:
             threshold=self.threshold_filter.value,
             metric=self.metric_filter.value,
             confidence=self.confidence_filter.value,
-            lead_time=self.lead_time_filter.value
+            lead_time=self.current_lead_time
         )
     
     @property
