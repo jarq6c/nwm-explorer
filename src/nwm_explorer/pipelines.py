@@ -276,7 +276,8 @@ def load_pairs(
     logger.info("Resampling observations")
     for domain in observations:
         observations[domain] = observations[domain].with_columns(
-                pl.col("usgs_site_code").cast(pl.String)
+                pl.col("usgs_site_code").cast(pl.String),
+                pl.col("value").cast(pl.Float32)
             ).sort(
                 ("usgs_site_code", "value_time")
             ).group_by_dynamic(
@@ -285,7 +286,7 @@ def load_pairs(
                 group_by="usgs_site_code"
             ).agg(
                 pl.col("value").max().alias("observed")
-            )
+            ).collect()
 
     # Process model output
     logger.info("Resampling predictions and pairing")
@@ -306,12 +307,16 @@ def load_pairs(
                 logger.info(f"Found existing file: {parquet_file}")
                 day_files.append(parquet_file)
                 continue
-            # Check for file existence
+
+            # Load input data
             ifile = generate_filepath(
                 root, FileType.parquet, configuration, Variable.streamflow,
                 Units.cubic_feet_per_second, rd
             )
-            data = pl.scan_parquet(ifile)
+            if not ifile.exists():
+                logger.info(f"File does not exist, skipping: {ifile}")
+                continue
+            data = pl.scan_parquet(ifile).collect()
             logger.info(f"Building {parquet_file}")
             if configuration in LEAD_TIME_FREQUENCY:
                 sampling_frequency = LEAD_TIME_FREQUENCY[configuration]
@@ -350,9 +355,7 @@ def load_pairs(
 
             # Save to parquet
             logger.info(f"Saving {parquet_file}")
-            paired_data.with_columns(
-                pl.col("observed").cast(pl.Float32)
-            ).collect().write_parquet(parquet_file)
+            paired_data.write_parquet(parquet_file)
 
             # Add file to list
             day_files.append(parquet_file)
