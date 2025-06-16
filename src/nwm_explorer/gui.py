@@ -1,6 +1,5 @@
 """Generate and serve exploratory applications."""
 from pathlib import Path
-from dataclasses import dataclass
 from typing import Callable
 import pandas as pd
 import panel as pn
@@ -10,6 +9,8 @@ from nwm_explorer.mappings import (EVALUATIONS, DOMAIN_STRINGS,
     DOMAIN_CONFIGURATION_MAPPING, Domain, Configuration, LEAD_TIME_VALUES,
     CONFIDENCE_STRINGS, Confidence, METRIC_STRINGS, Metric)
 from nwm_explorer.readers import MetricReader, DashboardState
+
+pn.extension("plotly")
 
 class FilteringWidgets:
     def __init__(self):
@@ -174,17 +175,22 @@ class Dashboard:
             )
         
         # Setup map
-        self.site_map = pn.pane.Markdown("No Data")
+        self.site_map = pn.pane.Plotly(
+            self.reader.get_plotly_patch(self.state))
+        self.map_card = pn.Card(
+            self.site_map,
+            collapsible=False,
+            hide_header=True
+            )
         
         def update_map(event):
             if event is None:
                 return
-            data = self.reader.query(self.state)
-            self.site_map.object = data
+            self.site_map.object = self.reader.get_plotly_patch(self.state)
         self.filter_widgets.register_callback(update_map)
 
         # Layout cards
-        layout = pn.Row(self.filter_card, self.site_map)
+        layout = pn.Row(self.filter_card, self.map_card)
         self.template = BootstrapTemplate(title=title)
         self.template.main.append(layout)
 
