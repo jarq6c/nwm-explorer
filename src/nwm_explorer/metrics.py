@@ -4,24 +4,17 @@
 import numpy as np
 import numpy.typing as npt
 from arch.bootstrap import StationaryBootstrap, optimal_block_length
-# from numba import float64, guvectorize
-# import polars as pl
+from numba import jit
+import warnings
+warnings.filterwarnings("error")
 
-def compute_metrics(data) -> float:
-    y_true = data[0]
-    y_pred = data[1]
-    return np.mean(y_true)
-    variance = np.sum((y_true - np.mean(y_true)) ** 2.0)
-    if variance == 0:
-        return np.nan
-    return 1.0 - np.sum((y_true - y_pred) ** 2.0) / variance
-
+@jit
 def nash_sutcliffe_efficiency(
-    y_true: npt.NDArray[np.float64],
-    y_pred: npt.NDArray[np.float64]
-    ) -> float:
+    pairs: npt.NDArray[np.float64]
+    ) -> np.float64:
     """
-    Compute the Nash-Sutcliffe Model Efficiency score.
+    Numba and polars compatible implementation of the Nash-Sutcliffe Model
+    Efficiency score.
         
     Parameters
     ----------
@@ -29,10 +22,12 @@ def nash_sutcliffe_efficiency(
         Ground truth (correct) target values, also called observations, measurements, or observed values.
     y_pred: NDArray[np.float64], required
         Estimated target values, also called simulations or modeled values.
+    result: NDArray[np.float64], required
+        Stores scalar result.
         
     Returns
     -------
-    float
+    None
         
     References
     ----------
@@ -45,53 +40,31 @@ def nash_sutcliffe_efficiency(
         Abstracts (p. 237).
     
     """
-    point_estimate = compute_metrics(np.asarray([y_true, y_pred]))
-    block_length = optimal_block_length(y_true)["stationary"]
-    bs = StationaryBootstrap(block_length, np.asarray([y_true, y_pred]),
-        seed=2025)
-    results = np.quantile(bs.apply(compute_metrics), [0.025, 0.975])
-    print(results, point_estimate)
-    quit()
+    y_true = pairs[0]
+    y_pred = pairs[1]
+    variance = np.sum((y_true - np.mean(y_true)) ** 2.0)
+    if variance == 0:
+        return np.nan
+    return 1.0 - np.sum((y_true - y_pred) ** 2.0) / variance
 
-# @guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
-# def nash_sutcliffe_efficiency(
-#     y_true: npt.NDArray[np.float64],
-#     y_pred: npt.NDArray[np.float64],
-#     result: npt.NDArray[np.float64]
-#     ) -> None:
-#     """
-#     Numba and polars compatible implementation of the Nash-Sutcliffe Model
-#     Efficiency score.
-        
-#     Parameters
-#     ----------
-#     y_true: NDArray[np.float64], required
-#         Ground truth (correct) target values, also called observations, measurements, or observed values.
-#     y_pred: NDArray[np.float64], required
-#         Estimated target values, also called simulations or modeled values.
-#     result: NDArray[np.float64], required
-#         Stores scalar result.
-        
-#     Returns
-#     -------
-#     None
-        
-#     References
-#     ----------
-#     Nash, J. E., & Sutcliffe, J. V. (1970). River flow forecasting through 
-#         conceptual models part I—A discussion of principles. Journal of 
-#         hydrology, 10(3), 282-290.
-#     Nossent, J., & Bauwens, W. (2012, April). Application of a normalized 
-#         Nash-Sutcliffe efficiency to improve the accuracy of the Sobol'sensitivity 
-#         analysis of a hydrological model. In EGU General Assembly Conference 
-#         Abstracts (p. 237).
-    
-#     """
-#     variance = np.sum((y_true - np.mean(y_true)) ** 2.0)
-#     if variance == 0:
-#         result[0] = np.nan
-#         return
-#     result[0] = 1.0 - np.sum((y_true - y_pred) ** 2.0) / variance
+def compute_metrics(
+    y_true: npt.NDArray[np.float64],
+    y_pred: npt.NDArray[np.float64]
+    ) -> npt.NDArray[np.float64]:
+    try:
+        block_size = optimal_block_length(y_true)["stationary"][0]
+        bs = StationaryBootstrap(
+            max(1, int(block_size)),
+            np.asarray([y_true, y_pred]),
+            seed=2025
+            )
+        point_estimate = nash_sutcliffe_efficiency(np.asarray([y_true, y_pred]))
+        ci = np.quantile(bs.apply(nash_sutcliffe_efficiency), [0.025, 0.975])
+        return np.concatenate(([point_estimate], ci))
+    except:
+        print(y_true)
+        point_estimate = nash_sutcliffe_efficiency(np.asarray([y_true, y_pred]))
+        return np.asarray([point_estimate, point_estimate, point_estimate])
 
 # @guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
 # def mean_relative_bias(

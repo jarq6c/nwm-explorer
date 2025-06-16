@@ -1,8 +1,6 @@
 """Various standard procedures."""
-from time import sleep
 from pathlib import Path
 import warnings
-import numpy as np
 import pandas as pd
 import polars as pl
 
@@ -14,10 +12,7 @@ from nwm_explorer.data import (process_netcdf_parallel, process_nwis_tsv_paralle
     delete_directory)
 from nwm_explorer.mappings import FileType, Variable, Units, Domain, Configuration
 from nwm_explorer.mappings import LEAD_TIME_FREQUENCY, NWM_URL_BUILDERS
-# from nwm_explorer.metrics import (resample, nash_sutcliffe_efficiency,
-#     mean_relative_bias, pearson_correlation_coefficient, relative_mean,
-#     relative_variability, kling_gupta_efficiency)
-from nwm_explorer.metrics import nash_sutcliffe_efficiency
+from nwm_explorer.metrics import compute_metrics
 from nwm_explorer.data import netcdf_validator, csv_gz_validator
 from nwm_explorer.logger import get_logger
 from nwm_explorer.readers import read_pairs
@@ -437,30 +432,52 @@ def load_metrics(
         parquet_directory.mkdir(exist_ok=True, parents=True)
 
         logger.info("Processing pairs")
-        sites = paired.select("usgs_site_code").unique().collect()["usgs_site_code"]
-        site_results = []
-        for site in sites:
-            logger.info(f"Processing site: {site}")
-            data = paired.filter(
-                pl.col("usgs_site_code") == site
-                ).collect().to_pandas()
-            if configuration in LEAD_TIME_FREQUENCY:
-                data = data.drop_duplicates(subset=["usgs_site_code",
-                    "value_time", "lead_time_hours_min"]).sort_values(
-                        by=["lead_time_hours_min", "value_time"],
-                        ignore_index=True)
-                data.loc[data["lead_time_hours_min"] < 0, "lead_time_hours_min"] = 0
-            else:
-                data = data.drop_duplicates(subset=["usgs_site_code",
-                    "value_time"]).sort_values(by="value_time",
-                        ignore_index=True)
-                nse = nash_sutcliffe_efficiency(
-                    y_pred=data["predicted"].to_numpy(),
-                    y_true=data["observed"].to_numpy()
+        if configuration in LEAD_TIME_FREQUENCY:
+            groups = ["usgs_site_code", "lead_time_hours_min"]
+        else:
+            groups = ["usgs_site_code"]
+        metric_results = paired.group_by(
+            groups).agg(
+            pl.struct(["observed", "predicted"])
+            .map_batches(
+                lambda combined: compute_metrics(
+                    combined.struct.field("observed"),
+                    combined.struct.field("predicted")
                 )
-                print(nse)
-            print(data)
-            quit()
+            )
+            .alias("metric_values"),
+            pl.col("observed").count().alias("sample_size"),
+            pl.col("value_time").min().alias("start_date"),
+            pl.col("value_time").max().alias("end_date")
+        ).with_columns(
+            pl.col("metric_values").list.to_struct(
+                fields=["nse_point", "nse_lower", "nse_upper"])).unnest("metric_values")
+        print(metric_results.collect())
+    quit()
+        # sites = paired.select("usgs_site_code").unique().collect()["usgs_site_code"]
+        # site_results = []
+        # for site in sites:
+        #     logger.info(f"Processing site: {site}")
+        #     data = paired.filter(
+        #         pl.col("usgs_site_code") == site
+        #         ).collect().to_pandas()
+        #     if configuration in LEAD_TIME_FREQUENCY:
+        #         data = data.drop_duplicates(subset=["usgs_site_code",
+        #             "value_time", "lead_time_hours_min"]).sort_values(
+        #                 by=["lead_time_hours_min", "value_time"],
+        #                 ignore_index=True)
+        #         data.loc[data["lead_time_hours_min"] < 0, "lead_time_hours_min"] = 0
+        #     else:
+        #         data = data.drop_duplicates(subset=["usgs_site_code",
+        #             "value_time"]).sort_values(by="value_time",
+        #                 ignore_index=True)
+        #         nse = nash_sutcliffe_efficiency(
+        #             y_pred=data["predicted"].to_numpy(),
+        #             y_true=data["observed"].to_numpy()
+        #         )
+        #         print(nse)
+        #     print(data)
+        #     quit()
         # if configuration in LEAD_TIME_FREQUENCY:
         #     data = paired.unique(subset=["nwm_feature_id", "value_time",
         #             "lead_time_hours_min"],
@@ -536,5 +553,4 @@ def load_metrics(
         # logger.info(f"Saving {parquet_file}")
         # metric_results.collect().write_parquet(parquet_file)
         # results[(domain, configuration)] = pl.scan_parquet(parquet_file)
-    quit()
     return results
