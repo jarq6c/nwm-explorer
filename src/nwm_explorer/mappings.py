@@ -84,19 +84,19 @@ class Configuration(StrEnum):
     short_range_puertorico_no_da = "short_range_puertorico_no_da"
     usgs = "usgs"
 
-LEAD_TIME_FREQUENCY: dict[Configuration, str] = {
-    Configuration.medium_range_mem1: "24h",
-    Configuration.medium_range_blend: "24h",
-    Configuration.medium_range_no_da: "24h",
-    Configuration.medium_range_alaska_mem1: "24h",
-    Configuration.medium_range_blend_alaska: "24h",
-    Configuration.medium_range_alaska_no_da: "24h",
-    Configuration.short_range: "6h",
-    Configuration.short_range_alaska: "5h",
-    Configuration.short_range_hawaii: "6h",
-    Configuration.short_range_hawaii_no_da: "6h",
-    Configuration.short_range_puertorico: "6h",
-    Configuration.short_range_puertorico_no_da: "6h"
+LEAD_TIME_FREQUENCY: dict[Configuration, pl.Duration] = {
+    Configuration.medium_range_mem1: (pl.duration(hours=24), "1d"),
+    Configuration.medium_range_blend: (pl.duration(hours=24), "1d"),
+    Configuration.medium_range_no_da: (pl.duration(hours=24), "1d"),
+    Configuration.medium_range_alaska_mem1: (pl.duration(hours=24), "1d"),
+    Configuration.medium_range_blend_alaska: (pl.duration(hours=24), "1d"),
+    Configuration.medium_range_alaska_no_da: (pl.duration(hours=24), "1d"),
+    Configuration.short_range: (pl.duration(hours=6), "6h"),
+    Configuration.short_range_alaska: (pl.duration(hours=5), "5h"),
+    Configuration.short_range_hawaii: (pl.duration(hours=6), "6h"),
+    Configuration.short_range_hawaii_no_da: (pl.duration(hours=6), "6h"),
+    Configuration.short_range_puertorico: (pl.duration(hours=6), "6h"),
+    Configuration.short_range_puertorico_no_da: (pl.duration(hours=6), "6h")
 }
 """Mapping used for computing lead time and sampling frequency."""
 

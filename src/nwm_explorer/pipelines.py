@@ -14,11 +14,13 @@ from nwm_explorer.data import (process_netcdf_parallel, process_nwis_tsv_paralle
     delete_directory)
 from nwm_explorer.mappings import FileType, Variable, Units, Domain, Configuration
 from nwm_explorer.mappings import LEAD_TIME_FREQUENCY, NWM_URL_BUILDERS
-from nwm_explorer.metrics import (resample, nash_sutcliffe_efficiency,
-    mean_relative_bias, pearson_correlation_coefficient, relative_mean,
-    relative_variability, kling_gupta_efficiency)
+# from nwm_explorer.metrics import (resample, nash_sutcliffe_efficiency,
+#     mean_relative_bias, pearson_correlation_coefficient, relative_mean,
+#     relative_variability, kling_gupta_efficiency)
+from nwm_explorer.metrics import nash_sutcliffe_efficiency
 from nwm_explorer.data import netcdf_validator, csv_gz_validator
 from nwm_explorer.logger import get_logger
+from nwm_explorer.readers import read_pairs
 
 def load_NWM_output(
         root: Path,
@@ -273,30 +275,15 @@ def load_pairs(
         routelinks=routelinks
     )
 
-    logger.info("Resampling observations")
-    for domain in observations:
-        observations[domain] = observations[domain].with_columns(
-                pl.col("usgs_site_code").cast(pl.String),
-                pl.col("value").cast(pl.Float32)
-            ).sort(
-                ("usgs_site_code", "value_time")
-            ).group_by_dynamic(
-                "value_time",
-                every="1d",
-                group_by="usgs_site_code"
-            ).agg(
-                pl.col("value").max().alias("observed")
-            ).collect()
-
     # Process model output
     logger.info("Resampling predictions and pairing")
     reference_dates = generate_reference_dates(start_date, end_date)
     pairs = {}
+    resampled_obs = {}
     for (domain, configuration), _ in predictions.items():
         day_files = []
         crosswalk = routelinks[domain].select(["nwm_feature_id",
             "usgs_site_code"]).collect()
-        obs = observations[domain]
         for rd in reference_dates:
             # Check for file existence
             parquet_file = generate_filepath(
@@ -306,6 +293,7 @@ def load_pairs(
             if parquet_file.exists():
                 logger.info(f"Found existing file: {parquet_file}")
                 day_files.append(parquet_file)
+                # parquet_file.unlink()
                 continue
 
             # Load input data
@@ -319,26 +307,61 @@ def load_pairs(
             data = pl.scan_parquet(ifile).collect()
             logger.info(f"Building {parquet_file}")
             if configuration in LEAD_TIME_FREQUENCY:
-                sampling_frequency = LEAD_TIME_FREQUENCY[configuration]
+                sampling_duration = LEAD_TIME_FREQUENCY[configuration][0]
+                resampling_frequency = LEAD_TIME_FREQUENCY[configuration][1]
+                hours = sampling_duration / pl.duration(hours=1)
+                if (domain, resampling_frequency) in resampled_obs:
+                    obs = resampled_obs[(domain, resampling_frequency)]
+                else:
+                    logger.info("Resampling observations")
+                    obs = observations[domain].sort(
+                        ("usgs_site_code", "value_time")
+                    ).group_by_dynamic(
+                        "value_time",
+                        every=resampling_frequency,
+                        group_by="usgs_site_code"
+                    ).agg(
+                        pl.col("value").max().alias("observed")
+                    ).with_columns(
+                        pl.col("usgs_site_code").cast(pl.String)
+                    ).collect()
+                    resampled_obs[(domain, resampling_frequency)] = obs
                 paired_data = data.sort(
                     ("nwm_feature_id", "reference_time", "value_time")
+                ).with_columns(
+                    ((pl.col("value_time").sub(
+                        pl.col("reference_time")
+                        ) / sampling_duration).floor() *
+                            hours).alias("lead_time_hours_min")
                 ).group_by_dynamic(
                     "value_time",
-                    every=sampling_frequency,
+                    every=resampling_frequency,
                     group_by=("nwm_feature_id", "reference_time")
                 ).agg(
-                    pl.col("value").max().alias("predicted")
+                    pl.col("value").max().alias("predicted"),
+                    pl.col("lead_time_hours_min").min()
                 ).with_columns(
                 usgs_site_code=pl.col("nwm_feature_id").replace_strict(
                     crosswalk["nwm_feature_id"], crosswalk["usgs_site_code"])
                 ).join(obs, on=["usgs_site_code", "value_time"], how="left"
-                    ).drop_nulls().with_columns(
-                        pl.col("value_time").sub(
-                            pl.col("reference_time")
-                            ).dt.total_hours().alias(
-                                "lead_time_hours_min")
-                    )
+                    ).drop_nulls()
             else:
+                if (domain, "1d") in resampled_obs:
+                    obs = resampled_obs[(domain, "1d")]
+                else:
+                    logger.info("Resampling observations")
+                    obs = observations[domain].sort(
+                        ("usgs_site_code", "value_time")
+                    ).group_by_dynamic(
+                        "value_time",
+                        every="1d",
+                        group_by="usgs_site_code"
+                    ).agg(
+                        pl.col("value").max().alias("observed")
+                    ).with_columns(
+                        pl.col("usgs_site_code").cast(pl.String)
+                    ).collect()
+                    resampled_obs[(domain, "1d")] = obs
                 paired_data = data.sort(
                     ("nwm_feature_id", "value_time")
                 ).group_by_dynamic(
@@ -392,109 +415,126 @@ def load_metrics(
     dict[tuple[Domain, Configuration], pl.LazyFrame]
     """
     logger = get_logger("nwm_explorer.pipelines.load_metrics")
-    pairs = load_pairs(
+    logger.info("Reading pairs")
+    pairs = read_pairs(
         root=root,
         start_date=start_date,
         end_date=end_date
         )
 
     results = {}
-    for (domain, configuration), data in pairs.items():
+    s = start_date.strftime("%Y%m%dT%H")
+    e = end_date.strftime("%Y%m%dT%H")
+    for (domain, configuration), paired in pairs.items():
         # Check for file existence
-        parquet_file = generate_filepath(
-            root, FileType.PARQUET, domain, configuration, Variable.STREAMFLOW_METRICS,
-            Units.METRICS, start_date, end_date
-        )
+        parquet_directory = root / FileType.parquet / "metrics"
+        parquet_file = parquet_directory / f"{domain}_{configuration}_{s}_{e}.parquet"
         logger.info(f"Building {parquet_file}")
         if parquet_file.exists():
             logger.info(f"Found existing {parquet_file}")
             results[(domain, configuration)] = pl.scan_parquet(parquet_file)
             continue
+        parquet_directory.mkdir(exist_ok=True, parents=True)
 
-        logger.info(f"Resampling {domain} {configuration}")
-        if configuration in LEAD_TIME_FREQUENCY:
-            logger.info(f"Adding lead times {domain} {configuration}")
-            lead_time_spec = LEAD_TIME_FREQUENCY[configuration]
-            # TODO double check time units. may need to apply a multiplier here
-            data = data.with_columns(
-                (pl.col("value_time").sub(pl.col("reference_time")) /
-                 lead_time_spec.duration).floor().alias(
-                     lead_time_spec.label
-                 )
-            )
-            daily_max = resample(
-                data,
-                sort_by=("usgs_site_code", "reference_time", "value_time"),
-                group_by=("usgs_site_code", "reference_time"),
-                sampling=(
-                    pl.col("observed").max(),
-                    pl.col("predicted").max(),
-                    pl.col(lead_time_spec.label).min()
-                ),
-                sampling_frequency=lead_time_spec.sampling_frequency
+        logger.info("Processing pairs")
+        sites = paired.select("usgs_site_code").unique().collect()["usgs_site_code"]
+        site_results = []
+        for site in sites:
+            logger.info(f"Processing site: {site}")
+            data = paired.filter(
+                pl.col("usgs_site_code") == site
+                ).collect().to_pandas()
+            if configuration in LEAD_TIME_FREQUENCY:
+                data = data.drop_duplicates(subset=["usgs_site_code",
+                    "value_time", "lead_time_hours_min"]).sort_values(
+                        by=["lead_time_hours_min", "value_time"],
+                        ignore_index=True)
+                data.loc[data["lead_time_hours_min"] < 0, "lead_time_hours_min"] = 0
+            else:
+                data = data.drop_duplicates(subset=["usgs_site_code",
+                    "value_time"]).sort_values(by="value_time",
+                        ignore_index=True)
+                nse = nash_sutcliffe_efficiency(
+                    y_pred=data["predicted"].to_numpy(),
+                    y_true=data["observed"].to_numpy()
                 )
-            metric_groups = ["usgs_site_code", lead_time_spec.label]
-        else:
-            daily_max = resample(data)
-            metric_groups = ["usgs_site_code"]
+                print(nse)
+            print(data)
+            quit()
+        # if configuration in LEAD_TIME_FREQUENCY:
+        #     data = paired.unique(subset=["nwm_feature_id", "value_time",
+        #             "lead_time_hours_min"],
+        #         keep="first").with_columns(
+        #         pl.when(pl.col("lead_time_hours_min")<0).then(0).otherwise(
+        #             pl.col("lead_time_hours_min"))
+        #         .name.keep()
+        #     ).collect()
+        #     metric_groups = ["usgs_site_code", "lead_time_hours_min"]
+        # else:
+        #     data = paired.unique(subset=["nwm_feature_id", "value_time"],
+        #         keep="first").collect()
+        #     metric_groups = "usgs_site_code"
 
-        logger.info(f"Computing metrics {domain} {configuration}")
-        metric_results = daily_max.group_by(
-            metric_groups).agg(
-            pl.struct(["observed", "predicted"])
-            .map_batches(
-                lambda combined: nash_sutcliffe_efficiency(
-                    combined.struct.field("observed"),
-                    combined.struct.field("predicted")
-                ),
-                returns_scalar=True
-            )
-            .alias("nash_sutcliffe_efficiency"),
-            pl.struct(["observed", "predicted"])
-            .map_batches(
-                lambda combined: pearson_correlation_coefficient(
-                    combined.struct.field("observed"),
-                    combined.struct.field("predicted")
-                ),
-                returns_scalar=True
-            )
-            .alias("pearson_correlation_coefficient"),
-            pl.struct(["observed", "predicted"])
-            .map_batches(
-                lambda combined: mean_relative_bias(
-                    combined.struct.field("observed"),
-                    combined.struct.field("predicted")
-                ),
-                returns_scalar=True
-            )
-            .alias("mean_relative_bias"),
-            pl.struct(["observed", "predicted"])
-            .map_batches(
-                lambda combined: relative_variability(
-                    combined.struct.field("observed"),
-                    combined.struct.field("predicted")
-                ),
-                returns_scalar=True
-            )
-            .alias("relative_variability"),
-            pl.struct(["observed", "predicted"])
-            .map_batches(
-                lambda combined: relative_mean(
-                    combined.struct.field("observed"),
-                    combined.struct.field("predicted")
-                ),
-                returns_scalar=True
-            )
-            .alias("relative_mean"),
-            pl.col("observed").count().alias("sample_size"),
-            pl.col("value_time").min().alias("start_date"),
-            pl.col("value_time").max().alias("end_date")
-        ).with_columns(
-            kling_gupta_efficiency()
-        ).sort(metric_groups)
+        # logger.info(f"Computing metrics {domain} {configuration}")
+        # metric_results = data.group_by(
+        #     metric_groups).agg(
+        #     pl.struct(["observed", "predicted"])
+        #     .map_batches(
+        #         lambda combined: nash_sutcliffe_efficiency(
+        #             combined.struct.field("observed"),
+        #             combined.struct.field("predicted")
+        #         ),
+        #         returns_scalar=True
+        #     )
+        #     .alias("nash_sutcliffe_efficiency"),
+        #     pl.struct(["observed", "predicted"])
+        #     .map_batches(
+        #         lambda combined: pearson_correlation_coefficient(
+        #             combined.struct.field("observed"),
+        #             combined.struct.field("predicted")
+        #         ),
+        #         returns_scalar=True
+        #     )
+        #     .alias("pearson_correlation_coefficient"),
+        #     pl.struct(["observed", "predicted"])
+        #     .map_batches(
+        #         lambda combined: mean_relative_bias(
+        #             combined.struct.field("observed"),
+        #             combined.struct.field("predicted")
+        #         ),
+        #         returns_scalar=True
+        #     )
+        #     .alias("mean_relative_bias"),
+        #     pl.struct(["observed", "predicted"])
+        #     .map_batches(
+        #         lambda combined: relative_variability(
+        #             combined.struct.field("observed"),
+        #             combined.struct.field("predicted")
+        #         ),
+        #         returns_scalar=True
+        #     )
+        #     .alias("relative_variability"),
+        #     pl.struct(["observed", "predicted"])
+        #     .map_batches(
+        #         lambda combined: relative_mean(
+        #             combined.struct.field("observed"),
+        #             combined.struct.field("predicted")
+        #         ),
+        #         returns_scalar=True
+        #     )
+        #     .alias("relative_mean"),
+        #     pl.col("observed").count().alias("sample_size"),
+        #     pl.col("value_time").min().alias("start_date"),
+        #     pl.col("value_time").max().alias("end_date")
+        # ).with_columns(
+        #     kling_gupta_efficiency()
+        # )
 
         # Save to parquet
-        logger.info(f"Saving {parquet_file}")
-        metric_results.collect().write_parquet(parquet_file)
-        results[(domain, configuration)] = pl.scan_parquet(parquet_file)
+        # print(metric_results.head())
+        # quit()
+        # logger.info(f"Saving {parquet_file}")
+        # metric_results.collect().write_parquet(parquet_file)
+        # results[(domain, configuration)] = pl.scan_parquet(parquet_file)
+    quit()
     return results
