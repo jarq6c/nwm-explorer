@@ -486,5 +486,6 @@ def load_metrics(
             pl.col("metric_values").list.to_struct(
                 fields=METRIC_FIELDS)).unnest("metric_values")
         print(metric_results.head())
-    quit()
+        quit()
+        # TODO write results to file
     return results

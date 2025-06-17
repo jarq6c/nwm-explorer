@@ -197,6 +197,8 @@ def compute_metrics(
     ) -> npt.NDArray[np.float64]:
     results = []
     for _, func in METRIC_FUNCTIONS.items():
+        # TODO check for nan?
+
         # Point estimates
         point_estimate = func(
             y_true.to_numpy(), 
@@ -238,6 +240,7 @@ def compute_metrics(
             )
         posterior = []
         for samples in bs.bootstrap(1000):
+            # Certain functions may need additional error checks
             idx = samples[0][0]
             posterior.append(func(obs[idx], pred[idx]))
         ci = np.quantile(posterior, [0.025, 0.975])
