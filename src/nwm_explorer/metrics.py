@@ -58,6 +58,9 @@ def relative_mean_bias(
     -------
     None
     """
+    total = np.sum(y_true)
+    if total == 0.0:
+        return np.nan
     result[0] = np.sum(y_pred - y_true) / np.sum(y_true)
 
 @guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
