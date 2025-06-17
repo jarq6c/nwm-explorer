@@ -451,6 +451,7 @@ def load_metrics(
         parquet_directory.mkdir(exist_ok=True, parents=True)
 
         logger.info(f"Processing pairs {domain} {configuration}")
+        logger.info(f"Building {parquet_file}")
         if configuration in LEAD_TIME_FREQUENCY:
             groups = ["usgs_site_code", "lead_time_hours_min"]
             data = paired.collect()
@@ -485,7 +486,9 @@ def load_metrics(
         ).with_columns(
             pl.col("metric_values").list.to_struct(
                 fields=METRIC_FIELDS)).unnest("metric_values")
-        print(metric_results.head())
-        quit()
-        # TODO write results to file
+
+        # Write results
+        logger.info(f"Saving {parquet_file}")
+        metric_results.write_parquet(parquet_file)
+        results[(domain, configuration)] = pl.scan_parquet(parquet_file)
     return results
