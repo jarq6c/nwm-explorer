@@ -36,7 +36,8 @@ dependencies = [
     "panel",
     "geopandas",
     "plotly",
-    "colorcet"
+    "colorcet",
+    "arch"
 ]
 dynamic = ["version"]
 
