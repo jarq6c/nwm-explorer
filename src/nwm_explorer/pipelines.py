@@ -450,8 +450,7 @@ def load_metrics(
             continue
         parquet_directory.mkdir(exist_ok=True, parents=True)
 
-        logger.info(f"Processing pairs {domain} {configuration}")
-        logger.info(f"Building {parquet_file}")
+        logger.info(f"Reading pairs {domain} {configuration}")
         if configuration in LEAD_TIME_FREQUENCY:
             groups = ["usgs_site_code", "lead_time_hours_min"]
             data = paired.collect()
@@ -482,7 +481,8 @@ def load_metrics(
             .alias("metric_values"),
             pl.col("observed").count().alias("sample_size"),
             pl.col("value_time").min().alias("start_date"),
-            pl.col("value_time").max().alias("end_date")
+            pl.col("value_time").max().alias("end_date"),
+            pl.col("nwm_feature_id").first()
         ).with_columns(
             pl.col("metric_values").list.to_struct(
                 fields=METRIC_FIELDS)).unnest("metric_values")
