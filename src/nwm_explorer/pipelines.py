@@ -493,7 +493,7 @@ def load_metrics(
         chunks = []
         for grp, chunk in df.groupby(groups, observed=True):
             chunks.append(chunk)
-        chunk_size = int(len(chunks) / 18)
+        chunk_size = max(1, int(len(chunks) / 18))
         jobs = list(pool.map(compute_metrics_pandas, chunks, chunksize=chunk_size))
         metric_results = pd.DataFrame(jobs)
 
