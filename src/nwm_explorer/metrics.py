@@ -1,5 +1,6 @@
 """Various methods used to compute model evaluation metrics."""
 from typing import Callable
+import pandas as pd
 import polars as pl
 import numpy as np
 import numpy.typing as npt
@@ -250,3 +251,73 @@ def compute_metrics(
         ci = np.quantile(posterior, [0.025, 0.975])
         results.append(np.concatenate(([point_estimate], ci)))
     return np.concatenate(results)
+
+def compute_metrics_pandas(
+    data: pd.DataFrame,
+    minimum_sample_size: int = 30,
+    minimum_mean: float = 0.01,
+    minimum_variance: float = 0.000025
+    ) -> pd.Series:
+    y_true = data["observed"].to_numpy(dtype=np.float64)
+    y_pred = data["predicted"].to_numpy(dtype=np.float64)
+    sample_size = data["observed"].count()
+    start_date = data["value_time"].min()
+    end_date = data["value_time"].max()
+    nwm_feature_id = data["nwm_feature_id"].iloc[0]
+    results = []
+    for _, func in METRIC_FUNCTIONS.items():
+        # TODO check for nan?
+
+        # Point estimates
+        point_estimate = func(
+            y_true, 
+            y_pred
+            )
+
+        # Low sample size
+        if sample_size < minimum_sample_size:
+            results.append(np.asarray([point_estimate, np.nan, np.nan]))
+            continue
+        
+        # Mostly zero values
+        if np.mean(y_true) < minimum_mean:
+            results.append(np.asarray([point_estimate, np.nan, np.nan]))
+            continue
+        
+        # Nearly constant values
+        if np.var(y_true) < minimum_variance:
+            results.append(np.asarray([point_estimate, np.nan, np.nan]))
+            continue
+        
+        # Optimal block size
+        max_value = np.max(y_true) * 1.01
+        normalized = y_true / max_value
+        block_size = optimal_block_length(normalized)["stationary"][0]
+        if np.isnan(block_size):
+            block_size = 1
+        else:
+            block_size = max(1, int(block_size))
+        
+        # Bootstrap confidence interval for each metric
+        indices = np.arange(y_true.size)
+        bs = StationaryBootstrap(
+            block_size,
+            indices,
+            seed=2025
+            )
+        posterior = []
+        for samples in bs.bootstrap(1000):
+            # Certain functions may need additional error checks
+            idx = samples[0][0]
+            posterior.append(func(y_true[idx], y_pred[idx]))
+        ci = np.quantile(posterior, [0.025, 0.975])
+        results.append(np.concatenate(([point_estimate], ci)))
+    s = pd.Series(
+        np.concatenate(results),
+        index=METRIC_FIELDS
+    )
+    s["sample_size"] = sample_size
+    s["start_date"] = start_date
+    s["end_date"] = end_date
+    s["nwm_feature_id"] = nwm_feature_id
+    return s

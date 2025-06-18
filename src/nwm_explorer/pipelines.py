@@ -1,4 +1,5 @@
 """Various standard procedures."""
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 import warnings
 import pandas as pd
@@ -12,7 +13,7 @@ from nwm_explorer.data import (process_netcdf_parallel, process_nwis_tsv_paralle
     delete_directory)
 from nwm_explorer.mappings import FileType, Variable, Units, Domain, Configuration
 from nwm_explorer.mappings import LEAD_TIME_FREQUENCY, NWM_URL_BUILDERS
-from nwm_explorer.metrics import compute_metrics, METRIC_FIELDS
+from nwm_explorer.metrics import compute_metrics, METRIC_FIELDS, compute_metrics_pandas
 from nwm_explorer.data import netcdf_validator, csv_gz_validator
 from nwm_explorer.logger import get_logger
 from nwm_explorer.readers import read_pairs
@@ -439,6 +440,7 @@ def load_metrics(
     results = {}
     s = start_date.strftime("%Y%m%dT%H")
     e = end_date.strftime("%Y%m%dT%H")
+    pool = ProcessPoolExecutor(max_workers=18)
     for (domain, configuration), paired in pairs.items():
         # Check for file existence
         parquet_directory = root / FileType.parquet / "metrics"
@@ -453,7 +455,22 @@ def load_metrics(
         logger.info(f"Reading pairs {domain} {configuration}")
         if configuration in LEAD_TIME_FREQUENCY:
             groups = ["usgs_site_code", "lead_time_hours_min"]
-            data = paired.collect()
+            data = paired.sort(
+                    ("nwm_feature_id", "reference_time", "value_time")
+                ).group_by_dynamic(
+                    "value_time",
+                    every="1d",
+                    group_by=["nwm_feature_id", "reference_time"]
+                ).agg(
+                    pl.col("observed").max(),
+                    pl.col("predicted").max(),
+                    pl.col("usgs_site_code").first(),
+                    pl.col("lead_time_hours_min").min()
+                ).with_columns(
+                    pl.col("observed").cast(pl.Float32),
+                    pl.col("usgs_site_code").cast(pl.Categorical),
+                    pl.col("lead_time_hours_min").cast(pl.Int32)
+                ).collect()
         else:
             groups = ["usgs_site_code"]
             data = paired.sort(
@@ -466,29 +483,42 @@ def load_metrics(
                     pl.col("observed").max(),
                     pl.col("predicted").max(),
                     pl.col("usgs_site_code").first()
+                ).with_columns(
+                    pl.col("observed").cast(pl.Float32),
+                    pl.col("usgs_site_code").cast(pl.Categorical)
                 ).collect()
 
         logger.info(f"Computing metrics {domain} {configuration}")
-        metric_results = data.group_by(
-            groups).agg(
-            pl.struct(["observed", "predicted"])
-            .map_batches(
-                lambda combined: compute_metrics(
-                    combined.struct.field("observed"),
-                    combined.struct.field("predicted")
-                )
-            )
-            .alias("metric_values"),
-            pl.col("observed").count().alias("sample_size"),
-            pl.col("value_time").min().alias("start_date"),
-            pl.col("value_time").max().alias("end_date"),
-            pl.col("nwm_feature_id").first()
-        ).with_columns(
-            pl.col("metric_values").list.to_struct(
-                fields=METRIC_FIELDS)).unnest("metric_values")
+        df = data.to_pandas()
+        chunks = []
+        indices = []
+        for grp, chunk in df.groupby(groups, observed=True):
+            chunks.append(chunk)
+            indices.append(grp)
+        chunk_size = int(len(chunks) / 18)
+        jobs = list(pool.map(compute_metrics_pandas, chunks, chunksize=chunk_size))
+        metric_results = pd.DataFrame(jobs)
+        # metric_results = data.group_by(
+        #     groups).agg(
+        #     pl.struct(["observed", "predicted"])
+        #     .map_batches(
+        #         lambda combined: compute_metrics(
+        #             combined.struct.field("observed"),
+        #             combined.struct.field("predicted")
+        #         )
+        #     )
+        #     .alias("metric_values"),
+        #     pl.col("observed").count().alias("sample_size"),
+        #     pl.col("value_time").min().alias("start_date"),
+        #     pl.col("value_time").max().alias("end_date"),
+        #     pl.col("nwm_feature_id").first()
+        # ).with_columns(
+        #     pl.col("metric_values").list.to_struct(
+        #         fields=METRIC_FIELDS)).unnest("metric_values")
 
         # Write results
         logger.info(f"Saving {parquet_file}")
-        metric_results.write_parquet(parquet_file)
+        pl.DataFrame(metric_results).write_parquet(parquet_file)
         results[(domain, configuration)] = pl.scan_parquet(parquet_file)
+    pool.shutdown()
     return results
