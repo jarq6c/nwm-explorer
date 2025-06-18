@@ -67,6 +67,45 @@ def read_NWM_output(
             low_memory=low_memory)
     return model_output
 
+def read_USGS_observations(
+        root: Path,
+        start_date: pd.Timestamp,
+        end_date: pd.Timestamp,
+        routelinks: dict[Domain, pl.LazyFrame]
+) -> dict[Domain, pl.LazyFrame]:
+    """
+    Download and process USGS observations.
+
+    Parameters
+    ----------
+    root: Path, required
+        Root directory to save downloaded and processed files.
+    start_date: pd.Timestamp
+        First date to start retrieving data.
+    end_date: pd.Timestamp
+        Last date to retrieve data.
+    routelinks: dict[Domain, LazyFrame]
+        Mapping from Domain to crosswalk data.
+    
+    Returns
+    -------
+    dict[Domain, pl.LazyFrame]
+    """
+    logger = get_logger("nwm_explorer.pipelines.load_USGS_observations")
+    # Download and process model output
+    observations = {}
+    s = start_date.strftime("%Y%m%dT%H")
+    e = end_date.strftime("%Y%m%dT%H")
+    for domain, _ in routelinks.items():
+        # Check for file existence
+        parquet_directory = root / FileType.parquet / Configuration.usgs
+        parquet_file = parquet_directory / f"{domain}_{s}_{e}.parquet"
+        logger.info(f"Building {parquet_file}")
+        if parquet_file.exists():
+            logger.info(f"Found existing {parquet_file}")
+            observations[domain] = pl.scan_parquet(parquet_file)
+    return observations
+
 def read_pairs(
         root: Path,
         start_date: pd.Timestamp,
