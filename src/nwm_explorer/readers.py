@@ -70,8 +70,7 @@ def read_NWM_output(
 def read_USGS_observations(
         root: Path,
         start_date: pd.Timestamp,
-        end_date: pd.Timestamp,
-        routelinks: dict[Domain, pl.LazyFrame]
+        end_date: pd.Timestamp
 ) -> dict[Domain, pl.LazyFrame]:
     """
     Download and process USGS observations.
@@ -84,8 +83,6 @@ def read_USGS_observations(
         First date to start retrieving data.
     end_date: pd.Timestamp
         Last date to retrieve data.
-    routelinks: dict[Domain, LazyFrame]
-        Mapping from Domain to crosswalk data.
     
     Returns
     -------
@@ -96,7 +93,7 @@ def read_USGS_observations(
     observations = {}
     s = start_date.strftime("%Y%m%dT%H")
     e = end_date.strftime("%Y%m%dT%H")
-    for domain, _ in routelinks.items():
+    for domain in list(Domain):
         # Check for file existence
         parquet_directory = root / FileType.parquet / Configuration.usgs
         parquet_file = parquet_directory / f"{domain}_{s}_{e}.parquet"
@@ -105,6 +102,22 @@ def read_USGS_observations(
             logger.info(f"Found existing {parquet_file}")
             observations[domain] = pl.scan_parquet(parquet_file)
     return observations
+
+def scan_date_range(
+        predictions: dict[tuple[Domain, Configuration], pl.LazyFrame]
+) -> tuple[pd.Timestamp, pd.Timestamp]:
+    first = None
+    last = None
+    for (domain, _), data in predictions.items():
+        start = data.select("value_time").min().collect().item(0, 0)
+        end = data.select("value_time").max().collect().item(0, 0)
+        if first is None:
+            first = start
+            last = end
+        else:
+            first = min(first, start)
+            last = max(last, end)
+    return pd.Timestamp(first), pd.Timestamp(last)
 
 def read_pairs(
         root: Path,
