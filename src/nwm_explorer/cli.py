@@ -10,6 +10,8 @@ from nwm_explorer.downloads import download_routelinks
 from nwm_explorer.data import scan_routelinks
 from nwm_explorer.logger import get_logger
 from nwm_explorer.gui import serve_dashboard
+from nwm_explorer.readers import (read_pairs, read_NWM_output,
+    read_USGS_observations, scan_date_range, read_metrics)
 
 CSV_HEADERS: dict[str, str] = {
     "value_time": "Datetime of measurement or forecast valid time (UTC) (datetime string)",
@@ -111,21 +113,23 @@ def export(
     
     nwm-explorer export alaska analysis_assim_extend_alaska_no_da -s 20231001 -e 20240101 -o alaska_analysis_data.csv
     """
-    routelinks = scan_routelinks(*download_routelinks(directory / "routelinks"))
-
     if configuration == Configuration.usgs:
-        data = load_USGS_observations(
+        predictions = read_NWM_output(
             root=directory,
             start_date=startDT,
-            end_date=endDT,
-            routelinks=routelinks
+            end_date=endDT
+        )
+        first, last = scan_date_range(predictions)
+        data = read_USGS_observations(
+            root=directory,
+            start_date=first,
+            end_date=last
             )[domain]
     else:
-        data = load_NWM_output(
+        data = read_NWM_output(
             root=directory,
             start_date=startDT,
-            end_date=endDT,
-            routelinks=routelinks
+            end_date=endDT
         )[(domain, configuration)]
     
     # Write to CSV

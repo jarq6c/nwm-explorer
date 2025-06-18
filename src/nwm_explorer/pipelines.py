@@ -16,7 +16,7 @@ from nwm_explorer.mappings import LEAD_TIME_FREQUENCY, NWM_URL_BUILDERS
 from nwm_explorer.metrics import compute_metrics, METRIC_FIELDS, compute_metrics_pandas
 from nwm_explorer.data import netcdf_validator, csv_gz_validator
 from nwm_explorer.logger import get_logger
-from nwm_explorer.readers import read_pairs
+from nwm_explorer.readers import read_pairs, read_NWM_output, read_USGS_observations, scan_date_range
 
 def load_NWM_output(
         root: Path,
@@ -245,30 +245,18 @@ def load_pairs(
     routelinks = scan_routelinks(*download_routelinks(root / "routelinks"))
 
     logger.info("Scanning predictions for valid time range")
-    predictions = load_NWM_output(
+    predictions = read_NWM_output(
         root=root,
         start_date=start_date,
         end_date=end_date,
-        routelinks=routelinks,
         low_memory=True
     )
-    first = None
-    last = None
-    for (domain, configuration), data in predictions.items():
-        start = data.select("value_time").min().collect().item(0, 0)
-        end = data.select("value_time").max().collect().item(0, 0)
-        if first is None:
-            first = start
-            last = end
-        else:
-            first = min(first, start)
-            last = max(last, end)
+    first, last = scan_date_range(predictions)
     logger.info("Loading observations")
-    observations = load_USGS_observations(
+    observations = read_USGS_observations(
         root=root,
-        start_date=pd.Timestamp(first),
-        end_date=pd.Timestamp(last),
-        routelinks=routelinks
+        start_date=first,
+        end_date=last
     )
 
     # Resample obs
