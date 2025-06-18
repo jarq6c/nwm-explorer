@@ -261,9 +261,7 @@ def compute_metrics_pandas(
     y_true = data["observed"].to_numpy(dtype=np.float64)
     y_pred = data["predicted"].to_numpy(dtype=np.float64)
     sample_size = data["observed"].count()
-    start_date = data["value_time"].min()
-    end_date = data["value_time"].max()
-    nwm_feature_id = data["nwm_feature_id"].iloc[0]
+
     results = []
     for _, func in METRIC_FUNCTIONS.items():
         # TODO check for nan?
@@ -317,7 +315,10 @@ def compute_metrics_pandas(
         index=METRIC_FIELDS
     )
     s["sample_size"] = sample_size
-    s["start_date"] = start_date
-    s["end_date"] = end_date
-    s["nwm_feature_id"] = nwm_feature_id
+    s["start_date"] = data["value_time"].min()
+    s["end_date"] = data["value_time"].max()
+    s["nwm_feature_id"] = data["nwm_feature_id"].iloc[0]
+    s["usgs_site_code"] = data["usgs_site_code"].iloc[0]
+    if "lead_time_hours_min" in data:
+        s["lead_time_hours_min"] = data["lead_time_hours_min"].min()
     return s

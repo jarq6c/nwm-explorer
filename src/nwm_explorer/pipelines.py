@@ -498,23 +498,6 @@ def load_metrics(
         chunk_size = int(len(chunks) / 18)
         jobs = list(pool.map(compute_metrics_pandas, chunks, chunksize=chunk_size))
         metric_results = pd.DataFrame(jobs)
-        # metric_results = data.group_by(
-        #     groups).agg(
-        #     pl.struct(["observed", "predicted"])
-        #     .map_batches(
-        #         lambda combined: compute_metrics(
-        #             combined.struct.field("observed"),
-        #             combined.struct.field("predicted")
-        #         )
-        #     )
-        #     .alias("metric_values"),
-        #     pl.col("observed").count().alias("sample_size"),
-        #     pl.col("value_time").min().alias("start_date"),
-        #     pl.col("value_time").max().alias("end_date"),
-        #     pl.col("nwm_feature_id").first()
-        # ).with_columns(
-        #     pl.col("metric_values").list.to_struct(
-        #         fields=METRIC_FIELDS)).unnest("metric_values")
 
         # Write results
         logger.info(f"Saving {parquet_file}")
