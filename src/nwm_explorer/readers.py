@@ -168,6 +168,48 @@ def read_pairs(
         pairs[(domain, configuration)] = pl.scan_parquet(day_files)
     return pairs
 
+def read_metrics(
+        root: Path,
+        start_date: pd.Timestamp,
+        end_date: pd.Timestamp
+) -> dict[tuple[Domain, Configuration], pl.LazyFrame]:
+    """
+    Scan and lazily load metrics.
+
+    Parameters
+    ----------
+    root: Path, required
+        Root directory to save downloaded and processed files.
+    start_date: pd.Timestamp
+        First date to start retrieving data.
+    end_date: pd.Timestamp
+        Last date to retrieve data.
+    
+    Returns
+    -------
+    dict[tuple[Domain, Configuration], pl.LazyFrame]
+    """
+    logger = get_logger("nwm_explorer.pipelines.load_metrics")
+    logger.info("Reading pairs")
+    pairs = read_pairs(
+        root=root,
+        start_date=start_date,
+        end_date=end_date
+        )
+
+    results = {}
+    s = start_date.strftime("%Y%m%dT%H")
+    e = end_date.strftime("%Y%m%dT%H")
+    for (domain, configuration), paired in pairs.items():
+        # Check for file existence
+        parquet_directory = root / FileType.parquet / "metrics"
+        parquet_file = parquet_directory / f"{domain}_{configuration}_{s}_{e}.parquet"
+        logger.info(f"Building {parquet_file}")
+        if parquet_file.exists():
+            logger.info(f"Found existing {parquet_file}")
+            results[(domain, configuration)] = pl.scan_parquet(parquet_file)
+    return results
+
 class FigurePatch(TypedDict):
     """
     A plotly figure patch.
