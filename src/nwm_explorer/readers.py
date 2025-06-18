@@ -13,6 +13,60 @@ from nwm_explorer.urls import generate_reference_dates
 from nwm_explorer.data import generate_filepath
 from nwm_explorer.logger import get_logger
 
+def read_NWM_output(
+        root: Path,
+        start_date: pd.Timestamp,
+        end_date: pd.Timestamp,
+        low_memory: bool = False
+) -> dict[tuple[Domain, Configuration], pl.LazyFrame]:
+    """
+    Find and lazily load NWM output.
+
+    Parameters
+    ----------
+    root: Path, required
+        Root directory to save downloaded and processed files.
+    start_date: pd.Timestamp
+        First date to start retrieving data.
+    end_date: pd.Timestamp
+        Last date to retrieve data.
+    low_memory: bool, default False
+        Reduce memory pressure at the expense of performance.
+    
+    Returns
+    -------
+    dict[tuple[Domain, Configuration], pl.LazyFrame]
+    """
+    logger = get_logger("nwm_explorer.readers.read_NWM_output")
+    reference_dates = generate_reference_dates(start_date, end_date)
+
+    # Download and process model output
+    model_output = {}
+    for (domain, configuration), _ in NWM_URL_BUILDERS.items():
+        day_files = []
+        for rd in reference_dates:
+            # Check for file existence
+            parquet_file = generate_filepath(
+                root, FileType.parquet, configuration, Variable.streamflow,
+                Units.cubic_feet_per_second, rd
+            )
+            logger.info(f"Building {parquet_file}")
+            if parquet_file.exists():
+                logger.info(f"Found existing {parquet_file}")
+                day_files.append(parquet_file)
+                continue
+            
+        # Check for at least one file
+        if not day_files:
+            logger.info(f"Found no data for {domain} {configuration}")
+            continue
+        
+        # Merge files
+        logger.info(f"Merging parquet files")
+        model_output[(domain, configuration)] = pl.scan_parquet(day_files,
+            low_memory=low_memory)
+    return model_output
+
 def read_pairs(
         root: Path,
         start_date: pd.Timestamp,
