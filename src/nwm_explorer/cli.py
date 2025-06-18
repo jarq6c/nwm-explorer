@@ -33,7 +33,25 @@ CSV_HEADERS: dict[str, str] = {
     "end_date": "Latest valid time in evaluation pairs",
     "kling_gupta_efficiency": "Kling-Gupta Model Efficiency Score",
     "lead_time_days_min": "Minimum lead time in days.",
-    "lead_time_hours_min": "Minimum lead time in hours."
+    "lead_time_hours_min": "Minimum lead time in hours.",
+    "nse": "Nash-Sutcliffe model efficiency",
+    "nse_lower": "Nash-Sutcliffe model efficiency (Lower boundary of 95% confidence interval)",
+    "nse_upper": "Nash-Sutcliffe model efficiency (Upper boundary of 95% confidence interval)",
+    "rmb": "Relative mean bias",
+    "rmb_lower": "Relative mean bias (Lower boundary of 95% confidence interval)",
+    "rmb_upper": "Relative mean bias (Upper boundary of 95% confidence interval)",
+    "pearson": "Pearson correlation coefficient",
+    "pearson_lower": "Pearson correlation coefficient (Lower boundary of 95% confidence interval)",
+    "pearson_upper": "Pearson correlation coefficient (Upper boundary of 95% confidence interval)",
+    "rel_mean": "Relative mean (KGE component)",
+    "rel_mean_lower": "Relative mean (Lower boundary of 95% confidence interval)",
+    "rel_mean_upper": "Relative mean (Upper boundary of 95% confidence interval)",
+    "rel_var": "Relative variability (KGE component)",
+    "rel_var_lower": "Relative variability (Lower boundary of 95% confidence interval)",
+    "rel_var_upper": "Relative variability (Upper boundary of 95% confidence interval)",
+    "kge": "Kling-Gupta model efficiency",
+    "kge_lower": "Kling-Gupta model efficiency (Lower boundary of 95% confidence interval)",
+    "kge_upper": "Kling-Gupta model efficiency (Upper boundary of 95% confidence interval)"
 }
 """Column header descriptions."""
 
@@ -51,7 +69,7 @@ def write_to_csv(
         output = title
         
         for col in data.collect_schema().names():
-            output += f"# {col}: {CSV_HEADERS[col]}\n"
+            output += f"# {col}: {CSV_HEADERS.get(col, "UNKNOWN")}\n"
 
         # Add version, link, and write time
         now = pd.Timestamp.utcnow()
@@ -160,7 +178,7 @@ def metrics(
     
     nwm-explorer metrics alaska analysis_assim_extend_alaska_no_da -s 20231001 -e 20240101 -o alaska_analysis_metrics.csv
     """
-    data = load_metrics(
+    data = read_metrics(
         root=directory,
         start_date=startDT,
         end_date=endDT
