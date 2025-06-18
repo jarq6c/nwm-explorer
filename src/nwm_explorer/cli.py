@@ -5,7 +5,7 @@ import polars as pl
 from nwm_explorer._version import __version__
 from nwm_explorer.mappings import Domain, Configuration
 from nwm_explorer.pipelines import (load_NWM_output, load_USGS_observations,
-    load_metrics)
+    load_metrics, load_pairs)
 from nwm_explorer.downloads import download_routelinks
 from nwm_explorer.data import scan_routelinks
 from nwm_explorer.logger import get_logger
@@ -203,6 +203,25 @@ def evaluate(
     
     nwm-explorer evaluate -s 20231001 -e 20240101
     """
+    routelinks = scan_routelinks(*download_routelinks(directory / "routelinks"))
+    predictions = load_NWM_output(
+        root=directory,
+        start_date=startDT,
+        end_date=endDT,
+        routelinks=routelinks
+    )
+    first, last = scan_date_range(predictions)
+    load_USGS_observations(
+        root=directory,
+        start_date=first,
+        end_date=last,
+        routelinks=routelinks
+    )
+    load_pairs(
+        root=directory,
+        start_date=startDT,
+        end_date=endDT
+    )
     load_metrics(
         root=directory,
         start_date=startDT,
@@ -211,10 +230,10 @@ def evaluate(
 
 @display_group.command()
 @click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
-@click.option("-t", "--title", "title", nargs=1, type=click.STRING, default="National Water Model Explorer", help="Dashboard title header")
+@click.option("-t", "--title", "title", nargs=1, type=click.STRING, default="National Water Model Evaluations", help="Dashboard title header")
 def display(
     directory: Path = Path("data"),
-    title: str = "National Water Model Explorer"
+    title: str = "National Water Model Evaluations"
     ) -> None:
     """Visualize and explore evaluation data.
 

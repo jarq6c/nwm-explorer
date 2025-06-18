@@ -13,7 +13,7 @@ from nwm_explorer.data import (process_netcdf_parallel, process_nwis_tsv_paralle
     delete_directory)
 from nwm_explorer.mappings import FileType, Variable, Units, Domain, Configuration
 from nwm_explorer.mappings import LEAD_TIME_FREQUENCY, NWM_URL_BUILDERS
-from nwm_explorer.metrics import compute_metrics, METRIC_FIELDS, compute_metrics_pandas
+from nwm_explorer.metrics import compute_metrics_pandas
 from nwm_explorer.data import netcdf_validator, csv_gz_validator
 from nwm_explorer.logger import get_logger
 from nwm_explorer.readers import read_pairs, read_NWM_output, read_USGS_observations, scan_date_range
