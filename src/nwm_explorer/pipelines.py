@@ -491,10 +491,8 @@ def load_metrics(
         logger.info(f"Computing metrics {domain} {configuration}")
         df = data.to_pandas()
         chunks = []
-        indices = []
         for grp, chunk in df.groupby(groups, observed=True):
             chunks.append(chunk)
-            indices.append(grp)
         chunk_size = int(len(chunks) / 18)
         jobs = list(pool.map(compute_metrics_pandas, chunks, chunksize=chunk_size))
         metric_results = pd.DataFrame(jobs)
