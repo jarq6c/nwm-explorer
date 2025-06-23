@@ -1,20 +1,16 @@
 """Read-only methods."""
 from pathlib import Path
 from dataclasses import dataclass
-from typing import TypedDict, Any
-import numpy as np
 import pandas as pd
 import polars as pl
-import plotly.graph_objects as go
 
 from nwm_explorer.mappings import (Domain, Configuration, Metric, Confidence,
     NWM_URL_BUILDERS, FileType, Variable, Units, EVALUATIONS, METRIC_SHORTHAND,
-    CONFIDENCE_SHORTHAND, LEAD_TIME_FREQUENCY, DEFAULT_ZOOM)
+    CONFIDENCE_SHORTHAND, LEAD_TIME_FREQUENCY)
 from nwm_explorer.urls import generate_reference_dates
 from nwm_explorer.data import generate_filepath, scan_routelinks
 from nwm_explorer.logger import get_logger
 from nwm_explorer.downloads import download_routelinks
-from nwm_explorer.plotters import SiteMapPlotter
 
 def read_NWM_output(
         root: Path,
@@ -213,20 +209,6 @@ def read_metrics(
             results[(domain, configuration)] = pl.scan_parquet(parquet_file)
     return results
 
-class FigurePatch(TypedDict):
-    """
-    A plotly figure patch.
-
-    Keys
-    ----
-    data: list[go.Trace]
-        A list of plotly traces.
-    layout: go.Layout
-        Plotly layout.
-    """
-    data: list[go.Trace]
-    layout: go.Layout
-
 @dataclass
 class DashboardState:
     """Dashboard state variables."""
@@ -245,20 +227,16 @@ class DashboardState:
 class MetricReader:
     """Intermediate metric reader to query and return data to dashboards."""
     root: Path
-    last_domain: Domain | None = None
 
     def __post_init__(self) -> None:
-        # Routelinks
+        # Scan routelinks
         self.routelinks = scan_routelinks(*download_routelinks(
             self.root / "routelinks"))
 
-        # Load metrics
+        # Scan metrics
         self.metrics: dict[str, dict[tuple[Domain, Configuration], pl.LazyFrame]] = {}
         for k, (s, e) in EVALUATIONS.items():
             self.metrics[k] = read_metrics(self.root, s, e)
-
-        # Plot
-        self.plotter = SiteMapPlotter()
 
     def query(self, state: DashboardState) -> pl.DataFrame | None:
         """Return data matching dashboard state."""
@@ -281,31 +259,3 @@ class MetricReader:
                 crosswalk, on=["nwm_feature_id"], how="left"
             ).drop_nulls().rename({col: "value"})
         return data.collect()
-    
-    def get_plotly_patch(
-            self,
-            state: DashboardState,
-            relayout_data: dict[str, Any] | None = None
-            ) -> FigurePatch | None:
-        """Return map of sites matching dashboard state."""
-        data = self.query(state)
-        if data is None:
-            return data
-
-        if state.domain == self.last_domain and relayout_data is not None:
-            self.plotter.update_colors(
-                values=data["value"].to_numpy(),
-                label=state.metric_label,
-                relayout_data=relayout_data
-            )
-        else:
-            self.plotter.update_points(
-                values=data["value"].to_numpy(),
-                latitude=data["latitude"].to_numpy(),
-                longitude=data["longitude"].to_numpy(),
-                metric_label=state.metric_label,
-                zoom=DEFAULT_ZOOM[state.domain],
-                custom_data=data.select(["usgs_site_code", "nwm_feature_id"])
-            )
-            self.last_domain = state.domain
-        return self.plotter.figure

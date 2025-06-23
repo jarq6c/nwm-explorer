@@ -7,8 +7,9 @@ from panel.template import BootstrapTemplate
 
 from nwm_explorer.mappings import (EVALUATIONS, DOMAIN_STRINGS,
     DOMAIN_CONFIGURATION_MAPPING, Domain, Configuration, LEAD_TIME_VALUES,
-    CONFIDENCE_STRINGS, Confidence, METRIC_STRINGS, Metric)
+    CONFIDENCE_STRINGS, Confidence, METRIC_STRINGS, Metric, DEFAULT_ZOOM)
 from nwm_explorer.readers import MetricReader, DashboardState
+from nwm_explorer.plotters import SiteMapPlotter
 
 pn.extension("plotly")
 
@@ -180,7 +181,7 @@ class Dashboard:
         
         # Status
         self.status_feed = pn.Feed(
-            pn.pane.Alert("Initializing", alert_type="secondary"),
+            pn.pane.Alert("Initialized", alert_type="secondary"),
             width=300,
             height=200,
             view_latest=False
@@ -192,8 +193,10 @@ class Dashboard:
             )
         
         # Setup map
+        self.last_domain = None
+        self.site_plotter = SiteMapPlotter()
         self.site_map = pn.pane.Plotly(
-            self.reader.get_plotly_patch(self.state))
+            self.site_plotter.figure)
         self.map_card = pn.Card(
             self.site_map,
             collapsible=False,
@@ -203,15 +206,33 @@ class Dashboard:
         def update_map(event):
             if event is None:
                 return
-            patch = self.reader.get_plotly_patch(
-                self.state,
-                self.site_map.relayout_data
-                )
-            if patch is None:
+            current_state = self.state
+            data = self.reader.query(current_state)
+            if data is None:
                 self.status_feed.insert(0,
                     pn.pane.Alert("No data found", alert_type="warning"))
-            else:
-                self.site_map.object = patch
+                return
+            relayout_data = self.site_map.relayout_data
+            
+            if current_state.domain == self.last_domain and relayout_data is not None:
+                self.site_plotter.update_colors(
+                    values=data["value"].to_numpy(),
+                    label=self.state.metric_label,
+                    relayout_data=relayout_data
+                )
+                self.site_map.object = self.site_plotter.figure
+                return
+
+            self.site_plotter.update_points(
+                values=data["value"].to_numpy(),
+                latitude=data["latitude"].to_numpy(),
+                longitude=data["longitude"].to_numpy(),
+                metric_label=current_state.metric_label,
+                zoom=DEFAULT_ZOOM[current_state.domain],
+                custom_data=data.select(["usgs_site_code", "nwm_feature_id"])
+            )
+            self.last_domain = current_state.domain
+            self.site_map.object = self.site_plotter.figure
         self.filter_widgets.register_callback(update_map)
 
         # Layout cards

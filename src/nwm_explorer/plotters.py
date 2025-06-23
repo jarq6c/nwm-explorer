@@ -1,6 +1,6 @@
 """Plot managers."""
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypedDict
 import plotly.graph_objects as go
 import colorcet as cc
 import numpy as np
@@ -21,6 +21,20 @@ SITE_MAP_HOVER_TEMPLATE: str = (
 )
 """Plotly compatible hover template for site maps."""
 
+class FigurePatch(TypedDict):
+    """
+    A plotly figure patch.
+
+    Keys
+    ----
+    data: list[go.Trace]
+        A list of plotly traces.
+    layout: go.Layout
+        Plotly layout.
+    """
+    data: list[go.Trace]
+    layout: go.Layout
+
 @dataclass
 class SiteMapPlotter:
     scatter: go.Scattermap | None = None
@@ -40,8 +54,8 @@ class SiteMapPlotter:
         if self.layout is None:
             self.layout = go.Layout(
                 showlegend=False,
-                height=720,
-                width=1280,
+                height=600,
+                width=900,
                 margin=dict(l=0, r=0, t=50, b=0),
                 map=dict(
                     style="satellite-streets",
@@ -53,7 +67,9 @@ class SiteMapPlotter:
                 dragmode="zoom"
             )
 
-        self.figure = {
+    @property
+    def figure(self) -> FigurePatch:
+        return {
             "data": [self.scatter],
             "layout": self.layout
         }
