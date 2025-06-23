@@ -144,3 +144,23 @@ class SiteMapPlotter:
             self.layout["map"].update({
                 "zoom": relayout_data["map.zoom"]
             })
+
+def generate_histogram(x: npt.ArrayLike) -> FigurePatch:
+    """Generate a histogram."""
+    return {
+        "data": [go.Histogram(
+            x=x,
+            xbins=dict(
+                start=np.min(x),
+                end=np.max(x),
+                size=(np.max(x) - np.min(x)) / 20
+            ),
+            autobinx=False,
+            histnorm="probability"
+            )],
+        "layout": go.Layout(
+            height=250,
+            width=300,
+            margin=dict(l=0, r=0, t=50, b=0)
+            )
+    }

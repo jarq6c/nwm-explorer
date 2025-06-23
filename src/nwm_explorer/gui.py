@@ -9,7 +9,7 @@ from nwm_explorer.mappings import (EVALUATIONS, DOMAIN_STRINGS,
     DOMAIN_CONFIGURATION_MAPPING, Domain, Configuration, LEAD_TIME_VALUES,
     CONFIDENCE_STRINGS, Confidence, METRIC_STRINGS, Metric, DEFAULT_ZOOM)
 from nwm_explorer.readers import MetricReader, DashboardState
-from nwm_explorer.plotters import SiteMapPlotter
+from nwm_explorer.plotters import SiteMapPlotter, generate_histogram
 
 pn.extension("plotly")
 
@@ -193,7 +193,7 @@ class Dashboard:
             )
         
         # Setup map
-        self.last_domain = None
+        self.last_domain = self.state.domain
         self.site_plotter = SiteMapPlotter()
         self.site_map = pn.pane.Plotly(
             self.site_plotter.figure)
@@ -203,12 +203,23 @@ class Dashboard:
             hide_header=True
             )
         
+        # Histogram
+        self.histogram_plot = pn.pane.Plotly()
+        self.histogram_card = pn.Card(
+            self.histogram_plot,
+            collapsible=False,
+            hide_header=True
+        )
+        
+        # Update data
+        self.data = self.reader.query(self.state)
+
         def update_map(event):
             if event is None:
                 return
             current_state = self.state
-            data = self.reader.query(current_state)
-            if data is None:
+            self.data = self.reader.query(current_state)
+            if self.data is None:
                 self.status_feed.insert(0,
                     pn.pane.Alert("No data found", alert_type="warning"))
                 return
@@ -216,23 +227,24 @@ class Dashboard:
             
             if current_state.domain == self.last_domain and relayout_data is not None:
                 self.site_plotter.update_colors(
-                    values=data["value"].to_numpy(),
+                    values=self.data["value"].to_numpy(),
                     label=self.state.metric_label,
                     relayout_data=relayout_data
                 )
-                self.site_map.object = self.site_plotter.figure
-                return
-
-            self.site_plotter.update_points(
-                values=data["value"].to_numpy(),
-                latitude=data["latitude"].to_numpy(),
-                longitude=data["longitude"].to_numpy(),
-                metric_label=current_state.metric_label,
-                zoom=DEFAULT_ZOOM[current_state.domain],
-                custom_data=data.select(["usgs_site_code", "nwm_feature_id"])
-            )
-            self.last_domain = current_state.domain
+            else:
+                self.site_plotter.update_points(
+                    values=self.data["value"].to_numpy(),
+                    latitude=self.data["latitude"].to_numpy(),
+                    longitude=self.data["longitude"].to_numpy(),
+                    metric_label=current_state.metric_label,
+                    zoom=DEFAULT_ZOOM[current_state.domain],
+                    custom_data=self.data.select(["usgs_site_code", "nwm_feature_id"])
+                )
+                self.last_domain = current_state.domain
             self.site_map.object = self.site_plotter.figure
+            self.histogram_plot.object = generate_histogram(
+                self.data["value"].to_numpy()
+            )
         self.filter_widgets.register_callback(update_map)
 
         # Layout cards
@@ -240,7 +252,8 @@ class Dashboard:
             self.filter_card,
             status_card
             ),
-        self.map_card
+        self.map_card,
+        self.histogram_card
         )
         self.template = BootstrapTemplate(title=title)
         self.template.main.append(layout)
