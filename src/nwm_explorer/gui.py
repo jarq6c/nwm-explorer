@@ -109,13 +109,15 @@ class FilteringWidgets:
         else:
             options = [0]
         
+        v = self.lead_time_filter[0].value
         self.lead_time_filter.objects = [
             pn.widgets.DiscretePlayer(
                 name="Minimum lead time (hours)",
                 options=options,
                 show_loop_controls=False,
                 visible_buttons=["previous", "next"],
-                width=300
+                width=300,
+                value=v if v in options else 0
                 )
         ]
         for func in self.callbacks:

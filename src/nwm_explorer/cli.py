@@ -10,7 +10,7 @@ from nwm_explorer.downloads import download_routelinks
 from nwm_explorer.data import scan_routelinks
 from nwm_explorer.logger import get_logger
 from nwm_explorer.gui import serve_dashboard
-from nwm_explorer.readers import (read_pairs, read_NWM_output,
+from nwm_explorer.readers import (read_NWM_output,
     read_USGS_observations, scan_date_range, read_metrics)
 
 CSV_HEADERS: dict[str, str] = {
