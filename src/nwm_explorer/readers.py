@@ -1,17 +1,20 @@
 """Read-only methods."""
 from pathlib import Path
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import TypedDict, Any
 import numpy as np
 import pandas as pd
 import polars as pl
 import plotly.graph_objects as go
 
 from nwm_explorer.mappings import (Domain, Configuration, Metric, Confidence,
-    NWM_URL_BUILDERS, FileType, Variable, Units)
+    NWM_URL_BUILDERS, FileType, Variable, Units, EVALUATIONS, METRIC_SHORTHAND,
+    CONFIDENCE_SHORTHAND, LEAD_TIME_FREQUENCY, DEFAULT_ZOOM)
 from nwm_explorer.urls import generate_reference_dates
-from nwm_explorer.data import generate_filepath
+from nwm_explorer.data import generate_filepath, scan_routelinks
 from nwm_explorer.logger import get_logger
+from nwm_explorer.downloads import download_routelinks
+from nwm_explorer.plotters import SiteMapPlotter
 
 def read_NWM_output(
         root: Path,
@@ -25,7 +28,7 @@ def read_NWM_output(
     Parameters
     ----------
     root: Path, required
-        Root directory to save downloaded and processed files.
+        Root directory storing downloaded and processed files.
     start_date: pd.Timestamp
         First date to start retrieving data.
     end_date: pd.Timestamp
@@ -40,7 +43,7 @@ def read_NWM_output(
     logger = get_logger("nwm_explorer.readers.read_NWM_output")
     reference_dates = generate_reference_dates(start_date, end_date)
 
-    # Download and process model output
+    # Read model output
     model_output = {}
     for (domain, configuration), _ in NWM_URL_BUILDERS.items():
         day_files = []
@@ -73,12 +76,12 @@ def read_USGS_observations(
         end_date: pd.Timestamp
 ) -> dict[Domain, pl.LazyFrame]:
     """
-    Download and process USGS observations.
+    Scan and lazily load USGS observations.
 
     Parameters
     ----------
     root: Path, required
-        Root directory to save downloaded and processed files.
+        Root directory storing downloaded and processed files.
     start_date: pd.Timestamp
         First date to start retrieving data.
     end_date: pd.Timestamp
@@ -88,8 +91,8 @@ def read_USGS_observations(
     -------
     dict[Domain, pl.LazyFrame]
     """
-    logger = get_logger("nwm_explorer.pipelines.load_USGS_observations")
-    # Download and process model output
+    logger = get_logger("nwm_explorer.pipelines.read_USGS_observations")
+    # Read model output
     observations = {}
     s = start_date.strftime("%Y%m%dT%H")
     e = end_date.strftime("%Y%m%dT%H")
@@ -130,7 +133,7 @@ def read_pairs(
     Parameters
     ----------
     root: Path, required
-        Root directory to save downloaded and processed files.
+        Root directory storing downloaded and processed files.
     start_date: pd.Timestamp
         First date to start retrieving data.
     end_date: pd.Timestamp
@@ -179,7 +182,7 @@ def read_metrics(
     Parameters
     ----------
     root: Path, required
-        Root directory to save downloaded and processed files.
+        Root directory storing downloaded and processed files.
     start_date: pd.Timestamp
         First date to start retrieving data.
     end_date: pd.Timestamp
@@ -189,7 +192,7 @@ def read_metrics(
     -------
     dict[tuple[Domain, Configuration], pl.LazyFrame]
     """
-    logger = get_logger("nwm_explorer.pipelines.load_metrics")
+    logger = get_logger("nwm_explorer.pipelines.read_metrics")
     logger.info("Reading pairs")
     pairs = read_pairs(
         root=root,
@@ -227,12 +230,14 @@ class FigurePatch(TypedDict):
 @dataclass
 class DashboardState:
     """Dashboard state variables."""
+    evaluation: str
     start_date: pd.Timestamp
     end_date: pd.Timestamp
     domain: Domain
     configuration: Configuration
     threshold: str
     metric: Metric
+    metric_label: str
     confidence: Confidence
     lead_time: int
 
@@ -240,25 +245,67 @@ class DashboardState:
 class MetricReader:
     """Intermediate metric reader to query and return data to dashboards."""
     root: Path
+    last_domain: Domain | None = None
 
-    def query(self, state: DashboardState) -> int:
+    def __post_init__(self) -> None:
+        # Routelinks
+        self.routelinks = scan_routelinks(*download_routelinks(
+            self.root / "routelinks"))
+
+        # Load metrics
+        self.metrics: dict[str, dict[tuple[Domain, Configuration], pl.LazyFrame]] = {}
+        for k, (s, e) in EVALUATIONS.items():
+            self.metrics[k] = read_metrics(self.root, s, e)
+
+        # Plot
+        self.plotter = SiteMapPlotter()
+
+    def query(self, state: DashboardState) -> pl.DataFrame | None:
         """Return data matching dashboard state."""
-        return str(state).replace(",", "<br>")
-    
-    def get_plotly_patch(self, state: DashboardState) -> FigurePatch:
-        """Return map of sites matching dashboard state."""
-        xx = np.linspace(-3.5, 3.5, 100)
-        yy = np.linspace(-3.5, 3.5, 100)
-        x, y = np.meshgrid(xx, yy)
-        z = np.exp(-((x - 1) ** 2) - y**2) - (x**3 + y**4 - x / 5) * np.exp(-(x**2 + y**2))
-
-        surface = go.Surface(z=z)
-        layout = go.Layout(
-            title=str(state.domain),
-            autosize=False,
-            width=500,
-            height=500,
-            margin=dict(t=50, b=50, r=50, l=50)
+        try:
+            data = self.metrics[state.evaluation][
+                (state.domain, state.configuration)]
+        except KeyError:
+            return None
+        crosswalk = self.routelinks[state.domain].select(
+            ["usgs_site_code", "nwm_feature_id", "latitude", "longitude"]
         )
+        col = METRIC_SHORTHAND[state.metric] + CONFIDENCE_SHORTHAND[state.confidence]
+        if state.configuration in LEAD_TIME_FREQUENCY:
+            data = data.filter(
+                pl.col("lead_time_hours_min") == state.lead_time)
 
-        return dict(data=[surface], layout=layout)
+        data = data.select(
+                [col, "nwm_feature_id"]
+            ).join(
+                crosswalk, on=["nwm_feature_id"], how="left"
+            ).drop_nulls().rename({col: "value"})
+        return data.collect()
+    
+    def get_plotly_patch(
+            self,
+            state: DashboardState,
+            relayout_data: dict[str, Any] | None = None
+            ) -> FigurePatch | None:
+        """Return map of sites matching dashboard state."""
+        data = self.query(state)
+        if data is None:
+            return data
+
+        if state.domain == self.last_domain and relayout_data is not None:
+            self.plotter.update_colors(
+                values=data["value"].to_numpy(),
+                label=state.metric_label,
+                relayout_data=relayout_data
+            )
+        else:
+            self.plotter.update_points(
+                values=data["value"].to_numpy(),
+                latitude=data["latitude"].to_numpy(),
+                longitude=data["longitude"].to_numpy(),
+                metric_label=state.metric_label,
+                zoom=DEFAULT_ZOOM[state.domain],
+                custom_data=data.select(["usgs_site_code", "nwm_feature_id"])
+            )
+            self.last_domain = state.domain
+        return self.plotter.figure

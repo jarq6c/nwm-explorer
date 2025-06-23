@@ -3,10 +3,9 @@ from dataclasses import dataclass
 from typing import Any
 import plotly.graph_objects as go
 import colorcet as cc
+import numpy as np
 import numpy.typing as npt
-
-from nwm_explorer.mappings import DEFAULT_ZOOM, Domain
-from nwm_explorer.readers import RoutelinkReader
+import polars as pl
 
 SITE_MAP_CUSTOM_DATA_COLUMNS: list[str] = [
     "usgs_site_code",
@@ -61,19 +60,17 @@ class SiteMapPlotter:
 
     def update_points(
             self,
-            domain: Domain,
             values: npt.ArrayLike,
+            latitude: npt.ArrayLike,
+            longitude: npt.ArrayLike,
             metric_label: str,
-            routelink_reader: RoutelinkReader
-            ) -> tuple[float, float, float]:
-        geometry = routelink_reader.geometry(domain)
+            zoom: int,
+            custom_data: pl.DataFrame
+            ) -> None:
         self.scatter.update(dict(
-            lat=geometry.y,
-            lon=geometry.x,
-            customdata=routelink_reader.select_columns(
-                domain,
-                SITE_MAP_CUSTOM_DATA_COLUMNS
-            ),
+            lat=latitude,
+            lon=longitude,
+            customdata=custom_data,
             hovertemplate=(
                 SITE_MAP_HOVER_TEMPLATE +
                 f"<br>{metric_label}: " +
@@ -91,28 +88,24 @@ class SiteMapPlotter:
                 cmin=-1.0,
                 cmax=1.0
         ))
-        lat = geometry.y.mean()
-        lon = geometry.x.mean()
-        zoom = DEFAULT_ZOOM[domain]
         self.layout["map"].update(dict(
             center={
-                "lat": lat,
-                "lon": lon
+                "lat": np.mean(latitude),
+                "lon": np.mean(longitude)
                 },
             zoom=zoom
         ))
-        return lat, lon, zoom
 
     def update_colors(
             self,
             values: npt.ArrayLike,
-            metric_label: str,
+            label: str,
             relayout_data: dict[str, Any]
             ) -> None:
         self.scatter.update(dict(
             hovertemplate=(
                 SITE_MAP_HOVER_TEMPLATE +
-                f"<br>{metric_label}: " +
+                f"<br>{label}: " +
                 "%{marker.color:.2f}"
             )
         ))
@@ -120,7 +113,7 @@ class SiteMapPlotter:
             color=values,
             colorbar=dict(
                 title=dict(
-                    text=metric_label,
+                    text=label,
                     side="right"
                     )
                 ),

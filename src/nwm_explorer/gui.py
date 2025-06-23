@@ -127,12 +127,14 @@ class FilteringWidgets:
     def state(self) -> DashboardState:
         """Current widget states."""
         return DashboardState(
+            evaluation=self.evaluation_filter.value,
             start_date=self.current_start_date,
             end_date=self.current_end_date,
             domain=self.current_domain,
             configuration=self.current_configuration,
             threshold=self.threshold_filter.value,
             metric=self.current_metric,
+            metric_label=self.metric_filter.value,
             confidence=self.current_confidence,
             lead_time=self.current_lead_time
         )
@@ -176,6 +178,19 @@ class Dashboard:
             collapsible=False
             )
         
+        # Status
+        self.status_feed = pn.Feed(
+            pn.pane.Alert("Initializing", alert_type="secondary"),
+            width=300,
+            height=200,
+            view_latest=False
+            )
+        status_card = pn.Card(
+            self.status_feed,
+            title="Status",
+            collapsible=False
+            )
+        
         # Setup map
         self.site_map = pn.pane.Plotly(
             self.reader.get_plotly_patch(self.state))
@@ -188,11 +203,24 @@ class Dashboard:
         def update_map(event):
             if event is None:
                 return
-            self.site_map.object = self.reader.get_plotly_patch(self.state)
+            patch = self.reader.get_plotly_patch(
+                self.state,
+                self.site_map.relayout_data
+                )
+            if patch is None:
+                self.status_feed.insert(0,
+                    pn.pane.Alert("No data found", alert_type="warning"))
+            else:
+                self.site_map.object = patch
         self.filter_widgets.register_callback(update_map)
 
         # Layout cards
-        layout = pn.Row(self.filter_card, self.map_card)
+        layout = pn.Row(pn.Column(
+            self.filter_card,
+            status_card
+            ),
+        self.map_card
+        )
         self.template = BootstrapTemplate(title=title)
         self.template.main.append(layout)
 

@@ -228,3 +228,20 @@ METRIC_STRINGS: dict[str, Metric] = {
     "Kling-Gupta efficiency": Metric.kling_gupta_efficiency
 }
 """Mapping from pretty strings to evaluation metrics for display."""
+
+METRIC_SHORTHAND: dict[Metric, str] = {
+    Metric.mean_relative_bias: "rmb",
+    Metric.pearson_correlation_coefficient: "pearson",
+    Metric.nash_sutcliffe_efficiency: "nse",
+    Metric.relative_mean: "rel_mean",
+    Metric.relative_variability: "rel_var",
+    Metric.kling_gupta_efficiency: "kge"
+}
+"""Mapping from Metrics to short column names."""
+
+CONFIDENCE_SHORTHAND: dict[Confidence, str] = {
+    Confidence.point: "",
+    Confidence.lower: "_lower",
+    Confidence.upper: "_upper"
+}
+"""Mapping from pretty strings to confidence boundaries for display."""
