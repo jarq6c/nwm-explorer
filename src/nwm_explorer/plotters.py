@@ -185,7 +185,7 @@ class HistogramPlotter:
     layout: go.Layout | None = None
 
     def __post_init__(self) -> None:
-        # config={displayModeBar: false}
+        # config={"displayModeBar": False}
         if self.histogram is None:
             self.histogram = go.Bar(
                 showlegend=False,
@@ -196,7 +196,7 @@ class HistogramPlotter:
                 showlegend=False,
                 height=250,
                 width=300,
-                margin=dict(l=0, r=0, t=50, b=0),
+                margin=dict(l=0, r=0, t=0, b=0),
                 yaxis=dict(
                     title=dict(
                             text="Relative Frequency (95% Confidence)"

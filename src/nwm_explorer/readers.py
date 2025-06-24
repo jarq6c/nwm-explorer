@@ -238,7 +238,11 @@ class MetricReader:
         for k, (s, e) in EVALUATIONS.items():
             self.metrics[k] = read_metrics(self.root, s, e)
 
-    def query(self, state: DashboardState) -> pl.DataFrame | None:
+    def query(
+            self,
+            state: DashboardState,
+            column_override: str | None = None
+        ) -> pl.DataFrame | None:
         """Return data matching dashboard state."""
         try:
             data = self.metrics[state.evaluation][
@@ -248,7 +252,10 @@ class MetricReader:
         crosswalk = self.routelinks[state.domain].select(
             ["usgs_site_code", "nwm_feature_id", "latitude", "longitude"]
         )
-        col = METRIC_SHORTHAND[state.metric] + CONFIDENCE_SHORTHAND[state.confidence]
+        if column_override is None:
+            col = METRIC_SHORTHAND[state.metric] + CONFIDENCE_SHORTHAND[state.confidence]
+        else:
+            col = column_override
         if state.configuration in LEAD_TIME_FREQUENCY:
             data = data.filter(
                 pl.col("lead_time_hours_min") == state.lead_time)

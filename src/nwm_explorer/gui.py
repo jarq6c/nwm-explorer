@@ -210,7 +210,7 @@ class Dashboard:
             HistogramPlotter(),
             HistogramPlotter()
         ]
-        self.histograms = [pn.pane.Plotly(hp.figure) for hp in self.hist_plotters]
+        self.histograms = [pn.pane.Plotly(hp.figure, config={"displayModeBar": False}) for hp in self.hist_plotters]
         self.histogram_cards = [pn.Card(
             hp,
             collapsible=False,
@@ -250,6 +250,24 @@ class Dashboard:
                 self.last_domain = current_state.domain
             self.site_map.object = self.site_plotter.figure
         self.filter_widgets.register_callback(update_map)
+
+        def update_histograms(event):
+            if event is None:
+                return
+            if self.data is None:
+                return
+            current_state = self.state
+            kge = self.reader.query(current_state, column_override="kge")
+            kge_lower = self.reader.query(current_state, column_override="kge_lower")
+            kge_upper = self.reader.query(current_state, column_override="kge_upper")
+            self.hist_plotters[0].update_bars(
+                values=kge["value"].to_numpy(),
+                values_lower=kge_lower["value"].to_numpy(),
+                values_upper=kge_upper["value"].to_numpy(),
+                vmin=-1.0, vmax=1.0, bin_width=0.2, xtitle="KGE"
+            )
+            self.histograms[0].object = self.hist_plotters[0].figure
+        self.filter_widgets.register_callback(update_histograms)
 
         # Layout cards
         layout = pn.Row(pn.Column(
