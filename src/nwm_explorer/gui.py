@@ -254,6 +254,8 @@ class Dashboard:
         self.filter_widgets.register_callback(update_map)
 
         def update_histograms(event, event_type: str = "normal"):
+            # TODO Start splitting out this functionality into smaller dashboards
+            # NOTE The app is starting to look like a dashboard of dashboards
             if event is None:
                 return
             current_state = self.state

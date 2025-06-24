@@ -192,7 +192,7 @@ class HistogramPlotter:
                 margin=dict(l=0, r=0, t=0, b=0),
                 yaxis=dict(
                     title=dict(
-                            text="No. Sites (95% CI)"
+                            text="Sites (95% CI)"
                         )
             ))
 
