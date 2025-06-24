@@ -145,22 +145,107 @@ class SiteMapPlotter:
                 "zoom": relayout_data["map.zoom"]
             })
 
-def generate_histogram(x: npt.ArrayLike) -> FigurePatch:
-    """Generate a histogram."""
-    return {
-        "data": [go.Histogram(
-            x=x,
-            xbins=dict(
-                start=np.min(x),
-                end=np.max(x),
-                size=(np.max(x) - np.min(x)) / 20
-            ),
-            autobinx=False,
-            histnorm="probability"
-            )],
-        "layout": go.Layout(
-            height=250,
-            width=300,
-            margin=dict(l=0, r=0, t=50, b=0)
-            )
-    }
+def generate_histogram(
+        x: npt.ArrayLike,
+        xmin: float,
+        xmax: float,
+        bin_width: float
+    ) -> tuple[npt.NDArray[np.float64], list[str]]:
+    nbins = int((xmax - xmin) / bin_width)
+    counts, bin_edges = np.histogram(
+        a=x,
+        bins=nbins,
+        range=(xmin, xmax),
+        density=False
+    )
+    bin_centers = np.linspace(xmin + bin_width / 2, xmax - bin_width / 2, nbins)
+
+    below_minimum = x[x < xmin].size
+    counts = np.insert(counts, 0, below_minimum)
+    bin_centers = np.insert(bin_centers, 0, xmin - bin_width / 2)
+
+    above_maximum = x[x > xmax].size
+    counts = np.append(counts, above_maximum)
+    bin_centers = np.append(bin_centers, xmax + bin_width / 2)
+
+    probabilities = counts / np.sum(counts)
+
+    xlabels = [f"< {xmin:.1f}"]
+    for i in range(len(bin_edges) - 1):
+        left = f"{bin_edges[i]:.1f}"
+        right = f"{bin_edges[i+1]:.1f}"
+        xlabels.append(left + " to " + right)
+    xlabels.append(f"> {xmax:.1f}")
+
+    return xlabels, probabilities
+
+@dataclass
+class HistogramPlotter:
+    histogram: go.Bar | None = None
+    layout: go.Layout | None = None
+
+    def __post_init__(self) -> None:
+        # config={displayModeBar: false}
+        if self.histogram is None:
+            self.histogram = go.Bar(
+                showlegend=False,
+                name=""
+                )
+        if self.layout is None:
+            self.layout = go.Layout(
+                showlegend=False,
+                height=250,
+                width=300,
+                margin=dict(l=0, r=0, t=50, b=0),
+                yaxis=dict(
+                    title=dict(
+                            text="Relative Frequency (95% Confidence)"
+                        )
+            ))
+
+    @property
+    def figure(self) -> FigurePatch:
+        return {
+            "data": [self.histogram],
+            "layout": self.layout
+        }
+
+    def update_bars(
+            self,
+            values: npt.ArrayLike,
+            values_lower: npt.ArrayLike,
+            values_upper: npt.ArrayLike,
+            vmin: float,
+            vmax: float,
+            bin_width: float,
+            xtitle: str
+            ) -> None:
+        labels, vprobs = generate_histogram(
+            values, vmin, vmax, bin_width
+        )
+        _, vprobs_lower = generate_histogram(
+            values_lower, vmin, vmax, bin_width
+        )
+        _, vprobs_upper = generate_histogram(
+            values_upper, vmin, vmax, bin_width
+        )
+        estimates = np.vstack((vprobs, vprobs_lower, vprobs_upper))
+        point = np.median(estimates, axis=0)
+        upper = np.max(estimates, axis=0) - point
+        lower = point - np.min(estimates, axis=0)
+
+        # Update
+        self.histogram.update(dict(
+            x=labels,
+            y=point,
+            error_y=dict(
+                type="data",
+                symmetric=False,
+                array=upper,
+                arrayminus=lower
+            )))
+        self.layout.update(dict(
+            xaxis=dict(
+                title=dict(
+                    text=xtitle
+            ))))

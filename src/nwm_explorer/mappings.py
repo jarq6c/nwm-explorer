@@ -1,4 +1,5 @@
 """Various mappings."""
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Callable
 import polars as pl
@@ -245,3 +246,20 @@ CONFIDENCE_SHORTHAND: dict[Confidence, str] = {
     Confidence.upper: "_upper"
 }
 """Mapping from pretty strings to confidence boundaries for display."""
+
+@dataclass
+class HistogramSpec:
+    """Histogram parameters."""
+    bin_width: float
+    xmin: float
+    xmax: float
+
+METRIC_HISTOGRAMS: dict[Metric, HistogramSpec] = {
+    Metric.nash_sutcliffe_efficiency: HistogramSpec(0.2, -1.0, 1.0),
+    Metric.mean_relative_bias: HistogramSpec(0.2, -1.0, 1.0),
+    Metric.pearson_correlation_coefficient: HistogramSpec(0.2, -1.0, 1.0),
+    Metric.relative_variability: HistogramSpec(0.2, -1.0, 1.0),
+    Metric.relative_mean: HistogramSpec(0.2, -1.0, 1.0),
+    Metric.kling_gupta_efficiency: HistogramSpec(0.2, -1.0, 1.0)
+}
+"""Mapping from Metrics to histogram parameters."""

@@ -9,7 +9,7 @@ from nwm_explorer.mappings import (EVALUATIONS, DOMAIN_STRINGS,
     DOMAIN_CONFIGURATION_MAPPING, Domain, Configuration, LEAD_TIME_VALUES,
     CONFIDENCE_STRINGS, Confidence, METRIC_STRINGS, Metric, DEFAULT_ZOOM)
 from nwm_explorer.readers import MetricReader, DashboardState
-from nwm_explorer.plotters import SiteMapPlotter, generate_histogram
+from nwm_explorer.plotters import SiteMapPlotter, HistogramPlotter
 
 pn.extension("plotly")
 
@@ -204,12 +204,19 @@ class Dashboard:
             )
         
         # Histogram
-        self.histogram_plot = pn.pane.Plotly()
-        self.histogram_card = pn.Card(
-            self.histogram_plot,
+        self.hist_plotters = [
+            HistogramPlotter(),
+            HistogramPlotter(),
+            HistogramPlotter(),
+            HistogramPlotter()
+        ]
+        self.histograms = [pn.pane.Plotly(hp.figure) for hp in self.hist_plotters]
+        self.histogram_cards = [pn.Card(
+            hp,
             collapsible=False,
             hide_header=True
-        )
+        ) for hp in self.histograms]
+        self.hist_box = pn.GridBox(*self.histogram_cards, ncols=2)
         
         # Update data
         self.data = self.reader.query(self.state)
@@ -242,9 +249,6 @@ class Dashboard:
                 )
                 self.last_domain = current_state.domain
             self.site_map.object = self.site_plotter.figure
-            self.histogram_plot.object = generate_histogram(
-                self.data["value"].to_numpy()
-            )
         self.filter_widgets.register_callback(update_map)
 
         # Layout cards
@@ -253,7 +257,7 @@ class Dashboard:
             status_card
             ),
         self.map_card,
-        self.histogram_card
+        self.hist_box
         )
         self.template = BootstrapTemplate(title=title)
         self.template.main.append(layout)
