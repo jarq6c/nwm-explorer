@@ -1,7 +1,9 @@
 """Generate and serve exploratory applications."""
 from pathlib import Path
 from typing import Callable
+import numpy as np
 import pandas as pd
+import polars as pl
 import panel as pn
 from panel.template import BootstrapTemplate
 
@@ -251,15 +253,29 @@ class Dashboard:
             self.site_map.object = self.site_plotter.figure
         self.filter_widgets.register_callback(update_map)
 
-        def update_histograms(event):
+        def update_histograms(event, event_type: str = "normal"):
             if event is None:
-                return
-            if self.data is None:
                 return
             current_state = self.state
             kge = self.reader.query(current_state, column_override="kge")
             kge_lower = self.reader.query(current_state, column_override="kge_lower")
             kge_upper = self.reader.query(current_state, column_override="kge_upper")
+            if event_type == "relayout":
+                if "map._derived" in event:
+                    bbox = event["map._derived"]["coordinates"]
+                    lon_min = bbox[0][0]
+                    lon_max = bbox[1][0]
+                    lat_min = bbox[2][1]
+                    lat_max = bbox[0][1]
+                    expression = (
+                        pl.col("latitude") >= lat_min,
+                        pl.col("latitude") <= lat_max,
+                        pl.col("longitude") >= lon_min,
+                        pl.col("longitude") <= lon_max
+                        )
+                    kge = kge.filter(*expression)
+                    kge_lower = kge_lower.filter(*expression)
+                    kge_upper = kge_upper.filter(*expression)
             self.hist_plotters[0].update_bars(
                 values=kge["value"].to_numpy(),
                 values_lower=kge_lower["value"].to_numpy(),
@@ -268,6 +284,8 @@ class Dashboard:
             )
             self.histograms[0].object = self.hist_plotters[0].figure
         self.filter_widgets.register_callback(update_histograms)
+        pn.bind(update_histograms, self.site_map.param.relayout_data,
+            watch=True, event_type="relayout")
 
         # Layout cards
         layout = pn.Row(pn.Column(

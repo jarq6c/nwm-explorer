@@ -152,13 +152,15 @@ def generate_histogram(
         bin_width: float
     ) -> tuple[npt.NDArray[np.float64], list[str]]:
     nbins = int((xmax - xmin) / bin_width)
-    counts, bin_edges = np.histogram(
-        a=x,
-        bins=nbins,
-        range=(xmin, xmax),
-        density=False
-    )
     bin_centers = np.linspace(xmin + bin_width / 2, xmax - bin_width / 2, nbins)
+    counts = []
+    xlabels = [f"< {xmin:.1f}"]
+    for bc in bin_centers:
+        left = bc - bin_width / 2
+        right = bc + bin_width / 2
+        counts.append(x[(left <= x) & (x <= right)].size)
+        xlabels.append(f"{left:.1f} to {right:.1f}")
+    xlabels.append(f"> {xmax:.1f}")
 
     below_minimum = x[x < xmin].size
     counts = np.insert(counts, 0, below_minimum)
@@ -168,16 +170,7 @@ def generate_histogram(
     counts = np.append(counts, above_maximum)
     bin_centers = np.append(bin_centers, xmax + bin_width / 2)
 
-    probabilities = counts / np.sum(counts)
-
-    xlabels = [f"< {xmin:.1f}"]
-    for i in range(len(bin_edges) - 1):
-        left = f"{bin_edges[i]:.1f}"
-        right = f"{bin_edges[i+1]:.1f}"
-        xlabels.append(left + " to " + right)
-    xlabels.append(f"> {xmax:.1f}")
-
-    return xlabels, probabilities
+    return xlabels, counts
 
 @dataclass
 class HistogramPlotter:
@@ -199,7 +192,7 @@ class HistogramPlotter:
                 margin=dict(l=0, r=0, t=0, b=0),
                 yaxis=dict(
                     title=dict(
-                            text="Relative Frequency (95% Confidence)"
+                            text="No. Sites (95% CI)"
                         )
             ))
 
@@ -230,14 +223,13 @@ class HistogramPlotter:
             values_upper, vmin, vmax, bin_width
         )
         estimates = np.vstack((vprobs, vprobs_lower, vprobs_upper))
-        point = np.median(estimates, axis=0)
-        upper = np.max(estimates, axis=0) - point
-        lower = point - np.min(estimates, axis=0)
+        upper = np.max(estimates, axis=0) - vprobs
+        lower = vprobs - np.min(estimates, axis=0)
 
         # Update
         self.histogram.update(dict(
             x=labels,
-            y=point,
+            y=vprobs,
             error_y=dict(
                 type="data",
                 symmetric=False,
