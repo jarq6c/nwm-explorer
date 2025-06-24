@@ -1,4 +1,6 @@
+"""Command line interface utility."""
 from pathlib import Path
+import tarfile
 import click
 import pandas as pd
 import polars as pl
@@ -105,6 +107,7 @@ export_group = click.Group()
 metrics_group = click.Group()
 evaluate_group = click.Group()
 display_group = click.Group()
+archive_group = click.Group()
 
 @export_group.command()
 @click.argument("domain", nargs=1, required=True, type=click.Choice(Domain))
@@ -243,11 +246,40 @@ def display(
     """
     serve_dashboard(directory, title)
 
+@archive_group.command()
+@click.option("-s", "--startDT", "startDT", nargs=1, required=True, type=TimestampParamType(), help="Start datetime")
+@click.option("-e", "--endDT", "endDT", nargs=1, required=True, type=TimestampParamType(), help="End datetime")
+@click.option("-o", "--output", "output", nargs=1, type=click.Path(path_type=Path), default="data.tar.gz", help="Output file (./data.tar.gz)")
+@click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
+def archive(
+    startDT: pd.Timestamp,
+    endDT: pd.Timestamp,
+    output: Path = Path("data.tar.gz"),
+    directory: Path = Path("data")
+    ) -> None:
+    """Gather parquet files into a single tar ball.
+
+    Example:
+    
+    nwm-explorer archive -s 20231001 -e 20240101 -o NWM_evaluation_20231001_20240101.tar.gz
+    """
+    logger = get_logger("nwm_explorer.cli.archive")
+    logger.info("Scanning directories")
+    dates = pd.date_range(startDT, endDT, freq="1d").strftime("%Y%m%d")
+    directories = [directory / "parquet" / ("nwm." + d) for d in dates]
+
+    logger.info("Archiving")
+    with tarfile.open(output, "w:gz") as tar:
+        for d in directories:
+            logger.info(f"{d}")
+            tar.add(d)
+
 cli = click.CommandCollection(sources=[
     export_group,
     metrics_group,
     evaluate_group,
-    display_group
+    display_group,
+    archive_group
     ])
 
 if __name__ == "__main__":
