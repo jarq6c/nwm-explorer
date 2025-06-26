@@ -109,14 +109,14 @@ class PlotlyCard:
 class HydrographCard:
     def __init__(
             self,
-            x: npt.ArrayLike,
+            x: list[npt.ArrayLike],
             y: list[npt.ArrayLike],
             names: list[str],
             y_title: str
             ):
         # Assume first trace is special
         data = [go.Scatter(
-            x=x,
+            x=x[0],
             y=y[0],
             mode="lines",
             line=dict(color="#3C00FF", width=2),
@@ -127,7 +127,7 @@ class HydrographCard:
         color_index = 0
         for idx in range(1, len(y)):
             data.append(go.Scatter(
-                x=x,
+                x=x[idx],
                 y=y[idx],
                 mode="lines",
                 name=names[idx],
@@ -191,8 +191,9 @@ class HydrographCard:
         return self.card.servable()
 
 def main():
-    x = np.linspace(0.0, 10*np.pi, 100)
-    y = [np.sin(x+idx) for idx in range(10)]
+    N = 100
+    x = [np.linspace(0, 10, 50)+idx for idx in range(N)]
+    y = [0.5 * x[idx] + idx for idx in range(N)]
     card = HydrographCard(
         x=x,
         y=y,
