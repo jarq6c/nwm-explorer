@@ -260,16 +260,33 @@ class Dashboard:
         ]
         self.hgrid = HistogramGrid(datasets, specs, labels, 2)
 
-        def update_histograms(event):
+        def update_histograms(event, event_type: str = "normal"):
             if not event:
                 return
-            if event in METRIC_STRINGS:
-                return
-            if event in CONFIDENCE_STRINGS:
-                return
+            if event_type == "normal":
+                if event in METRIC_STRINGS:
+                    return
+                if event in CONFIDENCE_STRINGS:
+                    return
+            bbox = None
+            relayout_data = self.site_map.relayout_data
+            if "map._derived" in relayout_data:
+                bbox = {
+                    "lat_max": relayout_data["map._derived"]["coordinates"][0][1],
+                    "lat_min": relayout_data["map._derived"]["coordinates"][2][1],
+                    "lon_max": relayout_data["map._derived"]["coordinates"][1][0],
+                    "lon_min": relayout_data["map._derived"]["coordinates"][0][0],
+                }
             datasets = []
             for c in self.hcolumns:
                 d = self.reader.query(self.state, [c, f"{c}_lower", f"{c}_upper"])
+                if bbox is not None:
+                    d = d.filter(
+                        pl.col("latitude") <= bbox["lat_max"],
+                        pl.col("latitude") >= bbox["lat_min"],
+                        pl.col("longitude") <= bbox["lon_max"],
+                        pl.col("longitude") >= bbox["lon_min"],
+                    )
                 datasets.append((
                     d[c].to_numpy(),
                     d[f"{c}_lower"].to_numpy(),
@@ -277,6 +294,8 @@ class Dashboard:
                 ))
             self.hgrid.update_data(datasets)
         self.filter_widgets.register_callback(update_histograms)
+        pn.bind(update_histograms, self.site_map.param.relayout_data, watch=True,
+            event_type="relayout")
 
         # Layout cards
         layout = pn.Row(pn.Column(
