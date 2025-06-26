@@ -200,7 +200,7 @@ class Dashboard:
         self.last_domain = self.state.domain
         self.site_plotter = SiteMapPlotter()
         self.site_map = pn.pane.Plotly(
-            self.site_plotter.figure)
+            self.site_plotter.figure, config={"displaylogo": False})
         self.map_card = pn.Card(
             self.site_map,
             collapsible=False,
@@ -267,7 +267,6 @@ class Dashboard:
                 return
             if event in CONFIDENCE_STRINGS:
                 return
-            print(event)
             datasets = []
             for c in self.hcolumns:
                 d = self.reader.query(self.state, [c, f"{c}_lower", f"{c}_upper"])

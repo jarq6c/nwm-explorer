@@ -55,16 +55,17 @@ class SiteMapPlotter:
             self.layout = go.Layout(
                 showlegend=False,
                 height=600,
-                width=800,
-                margin=dict(l=0, r=0, t=50, b=0),
+                width=825,
+                margin=dict(l=0, r=0, t=0, b=0),
                 map=dict(
                     style="satellite-streets",
                 ),
                 clickmode="event",
                 modebar=dict(
-                    remove=["lasso", "select"]
+                    remove=["lasso", "select"],
+                    orientation="v"
                 ),
-                dragmode="zoom"
+                dragmode="zoom",
             )
 
     @property
