@@ -44,35 +44,24 @@ class PlotlyCard:
             hide_header=True
         )
     
-    def update_layout(self, parameters: dict[str, Any]) -> None:
-        # Update layout
-        self.layout.update(parameters)
-
+    def refresh(self) -> None:
         # Update pane
         self.pane.object = {
             "data": self.data,
             "layout": self.layout
         }
     
+    def update_layout(self, parameters: dict[str, Any]) -> None:
+        # Update layout
+        self.layout.update(parameters)
+    
     def update_data(self, parameters: dict[str, Any], index: int = 0) -> None:
         # Update trace
         self.data[index].update(parameters)
 
-        # Update pane
-        self.pane.object = {
-            "data": self.data,
-            "layout": self.layout
-        }
-
     def replace_data(self, data: list[BaseTraceType]) -> None:
         # Update trace
         self.data = data
-
-        # Update pane
-        self.pane.object = {
-            "data": self.data,
-            "layout": self.layout
-        }
 
     def update_config(self, parameters: dict[str, Any]) -> None:
         # Assign config is non-existent
@@ -86,47 +75,71 @@ class PlotlyCard:
     def update_xaxis_title_text(self, title: str) -> None:
         # Update layout
         self.layout["xaxis"]["title"].update({"text": title})
-
-        # Update pane
-        self.pane.object = {
-            "data": self.data,
-            "layout": self.layout
-        }
     
     def update_yaxis_title_text(self, title: str) -> None:
         # Update layout
         self.layout["yaxis"]["title"].update({"text": title})
-
-        # Update pane
-        self.pane.object = {
-            "data": self.data,
-            "layout": self.layout
-        }
+    
+    def update_xaxis_range(self, xrange: list[float]) -> None:
+        # Update layout
+        self.layout["xaxis"].update({"range": xrange})
+    
+    def update_yaxis_range(self, yrange: list[float]) -> None:
+        # Update layout
+        self.layout["yaxis"].update({"range": yrange})
     
     def update_line(self, parameters: dict[str, Any], index: int = 0) -> None:
         # Update trace
         self.data[index]["line"].update(parameters)
 
-        # Update pane
-        self.pane.object = {
-            "data": self.data,
-            "layout": self.layout
-        }
+        # Retain layout
+        if "xaxis.range[0]" in self.pane.relayout_data:
+            rdata = self.pane.relayout_data
+            xrange = [rdata["xaxis.range[0]"], rdata["xaxis.range[1]"]]
+            yrange = [rdata["yaxis.range[0]"], rdata["yaxis.range[1]"]]
+            self.update_xaxis_range(xrange)
+            self.update_yaxis_range(yrange)
+        else:
+            self.update_xaxis_range(None)
+            self.update_yaxis_range(None)
     
     def servable(self) -> pn.Card:
         return self.card
 
 class HydrographCard:
-    def __init__(self):
-        x = np.linspace(0.0, 10*np.pi, 100)
-        y = np.sin(x)
-        self.data = [go.Scatter(
+    def __init__(
+            self,
+            x: npt.ArrayLike,
+            y: list[npt.ArrayLike],
+            names: list[str],
+            y_title: str
+            ):
+        # Assume first trace is special
+        data = [go.Scatter(
             x=x,
-            y=y,
-            mode="lines"
+            y=y[0],
+            mode="lines",
+            line=dict(color="#3C00FF", width=2),
+            name=names[0]
         )]
+
+        # Generate remaining traces
+        color_index = 0
+        for idx in range(1, len(y)):
+            data.append(go.Scatter(
+                x=x,
+                y=y[idx],
+                mode="lines",
+                name=names[idx],
+                line=dict(color=cc.CET_L8[color_index], width=1)
+                ))
+            color_index += 1
+            if color_index == len(cc.CET_L8):
+                color_index = 0
+
+        # Create card
         self.card = PlotlyCard(
-            data=self.data,
+            data=data,
             layout=go.Layout(
                 height=300,
                 width=800,
@@ -134,27 +147,10 @@ class HydrographCard:
                 clickmode="event"
                 )
         )
-        self.card.update_yaxis_title_text("Streamflow (CFS)")
-        self.data = [go.Scatter(
-            x=x,
-            y=np.sin(x),
-            mode="lines",
-            name="USGS-01013500",
-            line=dict(color="#000000", width=1)
-            )]
-        color_index = 0
-        for idx in range(1, 100):
-            self.data.append(go.Scatter(
-                x=x,
-                y=np.sin(x+idx)/idx,
-                mode="lines",
-                name=f"Forecast {idx}",
-                line=dict(color=cc.CET_L8[color_index], width=1)
-                ))
-            color_index += 1
-            if color_index == len(cc.CET_L8):
-                color_index = 0
-        self.card.replace_data(self.data)
+
+        # Set y-label
+        self.card.update_yaxis_title_text(y_title)
+        self.card.refresh()
 
         self.curve_number = None
         self.curve_color = None
@@ -163,7 +159,7 @@ class HydrographCard:
             if not event:
                 return
             if event["points"][0]["curveNumber"] == self.curve_number:
-                    return
+                return
             
             # Restore color of old line
             if self.curve_number is not None:
@@ -188,13 +184,21 @@ class HydrographCard:
                     ),
                 self.curve_number
             )
+            self.card.refresh()
         pn.bind(highlight_trace, self.card.pane.param.click_data, watch=True)
     
     def servable(self) -> pn.Card:
         return self.card.servable()
 
 def main():
-    card = HydrographCard()
+    x = np.linspace(0.0, 10*np.pi, 100)
+    y = [np.sin(x+idx) for idx in range(10)]
+    card = HydrographCard(
+        x=x,
+        y=y,
+        names=["USGS-01013500"]+[f"Forecast {idx}" for idx in range(len(y))],
+        y_title="STREAMFLOW (CFS)"
+    )
     pn.serve(card.servable())
 
 if __name__ == "__main__":
