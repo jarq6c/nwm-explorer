@@ -54,8 +54,8 @@ class SiteMapPlotter:
         if self.layout is None:
             self.layout = go.Layout(
                 showlegend=False,
-                height=600,
-                width=825,
+                height=540,
+                width=850,
                 margin=dict(l=0, r=0, t=0, b=0),
                 map=dict(
                     style="satellite-streets",
