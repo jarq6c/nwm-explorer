@@ -55,7 +55,7 @@ class SiteMapPlotter:
             self.layout = go.Layout(
                 showlegend=False,
                 height=600,
-                width=900,
+                width=800,
                 margin=dict(l=0, r=0, t=50, b=0),
                 map=dict(
                     style="satellite-streets",
@@ -144,100 +144,3 @@ class SiteMapPlotter:
             self.layout["map"].update({
                 "zoom": relayout_data["map.zoom"]
             })
-
-def generate_histogram(
-        x: npt.ArrayLike,
-        xmin: float,
-        xmax: float,
-        bin_width: float
-    ) -> tuple[npt.NDArray[np.float64], list[str]]:
-    nbins = int((xmax - xmin) / bin_width)
-    bin_centers = np.linspace(xmin + bin_width / 2, xmax - bin_width / 2, nbins)
-    counts = []
-    xlabels = [f"< {xmin:.1f}"]
-    for bc in bin_centers:
-        left = bc - bin_width / 2
-        right = bc + bin_width / 2
-        counts.append(x[(left <= x) & (x <= right)].size)
-        xlabels.append(f"{left:.1f} to {right:.1f}")
-    xlabels.append(f"> {xmax:.1f}")
-
-    below_minimum = x[x < xmin].size
-    counts = np.insert(counts, 0, below_minimum)
-    bin_centers = np.insert(bin_centers, 0, xmin - bin_width / 2)
-
-    above_maximum = x[x > xmax].size
-    counts = np.append(counts, above_maximum)
-    bin_centers = np.append(bin_centers, xmax + bin_width / 2)
-
-    return xlabels, counts
-
-@dataclass
-class HistogramPlotter:
-    histogram: go.Bar | None = None
-    layout: go.Layout | None = None
-
-    def __post_init__(self) -> None:
-        # config={"displayModeBar": False}
-        if self.histogram is None:
-            self.histogram = go.Bar(
-                showlegend=False,
-                name=""
-                )
-        if self.layout is None:
-            self.layout = go.Layout(
-                showlegend=False,
-                height=250,
-                width=300,
-                margin=dict(l=0, r=0, t=0, b=0),
-                yaxis=dict(
-                    title=dict(
-                            text="Sites (95% CI)"
-                        )
-            ))
-
-    @property
-    def figure(self) -> FigurePatch:
-        return {
-            "data": [self.histogram],
-            "layout": self.layout
-        }
-
-    def update_bars(
-            self,
-            values: npt.ArrayLike,
-            values_lower: npt.ArrayLike,
-            values_upper: npt.ArrayLike,
-            vmin: float,
-            vmax: float,
-            bin_width: float,
-            xtitle: str
-            ) -> None:
-        labels, vprobs = generate_histogram(
-            values, vmin, vmax, bin_width
-        )
-        _, vprobs_lower = generate_histogram(
-            values_lower, vmin, vmax, bin_width
-        )
-        _, vprobs_upper = generate_histogram(
-            values_upper, vmin, vmax, bin_width
-        )
-        estimates = np.vstack((vprobs, vprobs_lower, vprobs_upper))
-        upper = np.max(estimates, axis=0) - vprobs
-        lower = vprobs - np.min(estimates, axis=0)
-
-        # Update
-        self.histogram.update(dict(
-            x=labels,
-            y=vprobs,
-            error_y=dict(
-                type="data",
-                symmetric=False,
-                array=upper,
-                arrayminus=lower
-            )))
-        self.layout.update(dict(
-            xaxis=dict(
-                title=dict(
-                    text=xtitle
-            ))))

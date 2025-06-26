@@ -280,13 +280,14 @@ class HistogramCard:
 @dataclass
 class HistogramGrid:
     data: list[tuple[npt.ArrayLike, npt.ArrayLike, npt.ArrayLike]]
+    specs: list[tuple[float, float, float]]
     labels: list[str]
     columns: int
 
     def __post_init__(self) -> None:
         self.cards: list[HistogramCard] = []
-        for d, l in zip(self.data, self.labels):
-            self.cards.append(HistogramCard(*d, l))
+        for d, l, s in zip(self.data, self.labels, self.specs):
+            self.cards.append(HistogramCard(*d, l, *s))
 
         self.grid = pn.GridBox(*[c.servable() for c in self.cards],
             ncols=self.columns)

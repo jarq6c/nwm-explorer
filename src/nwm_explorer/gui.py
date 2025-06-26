@@ -13,6 +13,7 @@ from nwm_explorer.mappings import (EVALUATIONS, DOMAIN_STRINGS,
     METRIC_SHORTHAND, CONFIDENCE_SHORTHAND)
 from nwm_explorer.readers import MetricReader, DashboardState
 from nwm_explorer.plotters import SiteMapPlotter
+from nwm_explorer.histogram import HistogramGrid
 
 pn.extension("plotly")
 
@@ -240,12 +241,32 @@ class Dashboard:
             self.site_map.object = self.site_plotter.figure
         self.filter_widgets.register_callback(update_map)
 
+        # Setup histogram
+        columns = ["kge", "pearson", "rel_mean", "rel_var"]
+        datasets = []
+        for c in columns:
+            d = self.reader.query(self.state, [c, f"{c}_lower", f"{c}_upper"])
+            datasets.append((
+                d[c].to_numpy(),
+                d[f"{c}_lower"].to_numpy(),
+                d[f"{c}_upper"].to_numpy()
+            ))
+        labels = ["KGE", "Pearson", "Relative Mean", "Relative Variance"]
+        specs = [
+            (-1.0, 1.0, 0.2),
+            (-1.0, 1.0, 0.2),
+            (0.0, 2.0, 0.2),
+            (0.0, 2.0, 0.2),
+        ]
+        self.hgrid = HistogramGrid(datasets, specs, labels, 2)
+
         # Layout cards
         layout = pn.Row(pn.Column(
             self.filter_card,
             status_card
             ),
-        self.map_card
+        self.map_card,
+        self.hgrid.servable()
         )
         self.template = BootstrapTemplate(title=title)
         self.template.main.append(layout)
