@@ -186,7 +186,7 @@ class Dashboard:
         # Status
         self.status_feed = pn.Feed(
             pn.pane.Alert("Initialized", alert_type="secondary"),
-            width=300,
+            width=320,
             height=200,
             view_latest=False
             )
@@ -242,9 +242,9 @@ class Dashboard:
         self.filter_widgets.register_callback(update_map)
 
         # Setup histogram
-        columns = ["kge", "pearson", "rel_mean", "rel_var"]
+        self.hcolumns = ["kge", "pearson", "rel_mean", "rel_var"]
         datasets = []
-        for c in columns:
+        for c in self.hcolumns:
             d = self.reader.query(self.state, [c, f"{c}_lower", f"{c}_upper"])
             datasets.append((
                 d[c].to_numpy(),
@@ -259,6 +259,25 @@ class Dashboard:
             (0.0, 2.0, 0.2),
         ]
         self.hgrid = HistogramGrid(datasets, specs, labels, 2)
+
+        def update_histograms(event):
+            if not event:
+                return
+            if event in METRIC_STRINGS:
+                return
+            if event in CONFIDENCE_STRINGS:
+                return
+            print(event)
+            datasets = []
+            for c in self.hcolumns:
+                d = self.reader.query(self.state, [c, f"{c}_lower", f"{c}_upper"])
+                datasets.append((
+                    d[c].to_numpy(),
+                    d[f"{c}_lower"].to_numpy(),
+                    d[f"{c}_upper"].to_numpy()
+                ))
+            self.hgrid.update_data(datasets)
+        self.filter_widgets.register_callback(update_histograms)
 
         # Layout cards
         layout = pn.Row(pn.Column(
