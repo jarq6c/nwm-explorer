@@ -241,7 +241,7 @@ class MetricReader:
     def query(
             self,
             state: DashboardState,
-            column_override: str | None = None
+            column_override: list[str] | None = None
         ) -> pl.DataFrame | None:
         """Return data matching dashboard state."""
         try:
@@ -253,16 +253,16 @@ class MetricReader:
             ["usgs_site_code", "nwm_feature_id", "latitude", "longitude"]
         )
         if column_override is None:
-            col = METRIC_SHORTHAND[state.metric] + CONFIDENCE_SHORTHAND[state.confidence]
+            cols = [METRIC_SHORTHAND[state.metric] + CONFIDENCE_SHORTHAND[state.confidence]]
         else:
-            col = column_override
+            cols = column_override
         if state.configuration in LEAD_TIME_FREQUENCY:
             data = data.filter(
                 pl.col("lead_time_hours_min") == state.lead_time)
 
         data = data.select(
-                [col, "nwm_feature_id"]
+                cols+["nwm_feature_id"]
             ).join(
                 crosswalk, on=["nwm_feature_id"], how="left"
-            ).drop_nulls().rename({col: "value"})
+            ).drop_nulls()
         return data.collect()
