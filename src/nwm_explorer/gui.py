@@ -9,9 +9,10 @@ from panel.template import BootstrapTemplate
 
 from nwm_explorer.mappings import (EVALUATIONS, DOMAIN_STRINGS,
     DOMAIN_CONFIGURATION_MAPPING, Domain, Configuration, LEAD_TIME_VALUES,
-    CONFIDENCE_STRINGS, Confidence, METRIC_STRINGS, Metric, DEFAULT_ZOOM)
+    CONFIDENCE_STRINGS, Confidence, METRIC_STRINGS, Metric, DEFAULT_ZOOM,
+    METRIC_SHORTHAND, CONFIDENCE_SHORTHAND)
 from nwm_explorer.readers import MetricReader, DashboardState
-from nwm_explorer.plotters import SiteMapPlotter, HistogramPlotter
+from nwm_explorer.plotters import SiteMapPlotter
 
 pn.extension("plotly")
 
@@ -205,21 +206,6 @@ class Dashboard:
             hide_header=True
             )
         
-        # Histogram
-        self.hist_plotters = [
-            HistogramPlotter(),
-            HistogramPlotter(),
-            HistogramPlotter(),
-            HistogramPlotter()
-        ]
-        self.histograms = [pn.pane.Plotly(hp.figure, config={"displayModeBar": False}) for hp in self.hist_plotters]
-        self.histogram_cards = [pn.Card(
-            hp,
-            collapsible=False,
-            hide_header=True
-        ) for hp in self.histograms]
-        self.hist_box = pn.GridBox(*self.histogram_cards, ncols=2)
-        
         # Update data
         self.data = self.reader.query(self.state)
 
@@ -233,16 +219,17 @@ class Dashboard:
                     pn.pane.Alert("No data found", alert_type="warning"))
                 return
             relayout_data = self.site_map.relayout_data
+            col = METRIC_SHORTHAND[current_state.metric] + CONFIDENCE_SHORTHAND[current_state.confidence]
             
             if current_state.domain == self.last_domain and relayout_data is not None:
                 self.site_plotter.update_colors(
-                    values=self.data["value"].to_numpy(),
+                    values=self.data[col].to_numpy(),
                     label=self.state.metric_label,
                     relayout_data=relayout_data
                 )
             else:
                 self.site_plotter.update_points(
-                    values=self.data["value"].to_numpy(),
+                    values=self.data[col].to_numpy(),
                     latitude=self.data["latitude"].to_numpy(),
                     longitude=self.data["longitude"].to_numpy(),
                     metric_label=current_state.metric_label,
@@ -253,49 +240,12 @@ class Dashboard:
             self.site_map.object = self.site_plotter.figure
         self.filter_widgets.register_callback(update_map)
 
-        def update_histograms(event, event_type: str = "normal"):
-            # TODO Start splitting out this functionality into smaller dashboards
-            # NOTE The app is starting to look like a dashboard of dashboards
-            if event is None:
-                return
-            current_state = self.state
-            kge = self.reader.query(current_state, column_override="kge")
-            kge_lower = self.reader.query(current_state, column_override="kge_lower")
-            kge_upper = self.reader.query(current_state, column_override="kge_upper")
-            if event_type == "relayout":
-                if "map._derived" in event:
-                    bbox = event["map._derived"]["coordinates"]
-                    lon_min = bbox[0][0]
-                    lon_max = bbox[1][0]
-                    lat_min = bbox[2][1]
-                    lat_max = bbox[0][1]
-                    expression = (
-                        pl.col("latitude") >= lat_min,
-                        pl.col("latitude") <= lat_max,
-                        pl.col("longitude") >= lon_min,
-                        pl.col("longitude") <= lon_max
-                        )
-                    kge = kge.filter(*expression)
-                    kge_lower = kge_lower.filter(*expression)
-                    kge_upper = kge_upper.filter(*expression)
-            self.hist_plotters[0].update_bars(
-                values=kge["value"].to_numpy(),
-                values_lower=kge_lower["value"].to_numpy(),
-                values_upper=kge_upper["value"].to_numpy(),
-                vmin=-1.0, vmax=1.0, bin_width=0.2, xtitle="KGE"
-            )
-            self.histograms[0].object = self.hist_plotters[0].figure
-        self.filter_widgets.register_callback(update_histograms)
-        pn.bind(update_histograms, self.site_map.param.relayout_data,
-            watch=True, event_type="relayout")
-
         # Layout cards
         layout = pn.Row(pn.Column(
             self.filter_card,
             status_card
             ),
-        self.map_card,
-        self.hist_box
+        self.map_card
         )
         self.template = BootstrapTemplate(title=title)
         self.template.main.append(layout)
