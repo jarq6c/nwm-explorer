@@ -14,6 +14,7 @@ from nwm_explorer.mappings import (EVALUATIONS, DOMAIN_STRINGS,
 from nwm_explorer.readers import MetricReader, DashboardState
 from nwm_explorer.plotters import SiteMapPlotter
 from nwm_explorer.histogram import HistogramGrid
+from nwm_explorer.hydrographer import HydrographCard
 
 pn.extension("plotly")
 
@@ -296,14 +297,53 @@ class Dashboard:
         self.filter_widgets.register_callback(update_histograms)
         pn.bind(update_histograms, self.site_map.param.relayout_data, watch=True,
             event_type="relayout")
+        
+        # Setup hydrograph
+        self.hydrograph: HydrographCard = None
+        self.hydrograph_card = pn.pane.Placeholder(pn.Card(
+            pn.pane.Markdown(
+                "# Click a site on the map to view its hydrograph.",
+                align="center"
+                ),
+            collapsible=False,
+            hide_header=True,
+            height=265,
+            width=1045
+        ))
+
+        def update_hydrograph(event):
+            if not event:
+                return
+            if event not in DOMAIN_CONFIGURATION_MAPPING[self.state.domain]:
+                return
+            if self.hydrograph is None:
+                N = 100
+                x = [np.linspace(0, 10, 50)+idx for idx in range(N)]
+                y = [0.5 * x[idx] + idx for idx in range(N)]
+                t = [pd.date_range(
+                    start=pd.Timestamp("2025-01-01")+pd.Timedelta(idx, unit="h"),
+                    freq="1h",
+                    periods=50
+                ) for idx in range(N)]
+                names = ["USGS-01013500"]+[s[0].strftime("%Y%m%d %HZ") for s in t[1:]]
+
+                self.hydrograph = HydrographCard(
+                    x=t,
+                    y=y,
+                    names=names,
+                    y_title="STREAMFLOW (CFS)"
+                )
+                self.hydrograph_card.object = self.hydrograph.servable()
+            print(event)
+        self.filter_widgets.register_callback(update_hydrograph)
 
         # Layout cards
-        layout = pn.Row(pn.Column(
-            self.filter_card,
-            status_card
-            ),
-        self.map_card,
-        self.hgrid.servable()
+        controls = pn.Column(self.filter_card, status_card)
+        over_view = pn.Row(self.map_card, self.hgrid.servable())
+        site_view = pn.Row(self.hydrograph_card)
+        layout = pn.Row(
+            controls,
+            pn.Column(over_view, site_view)
         )
         self.template = BootstrapTemplate(title=title)
         self.template.main.append(layout)
