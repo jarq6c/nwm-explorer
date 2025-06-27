@@ -266,3 +266,29 @@ class MetricReader:
                 crosswalk, on=["nwm_feature_id"], how="left"
             ).drop_nulls()
         return data.collect()
+
+@dataclass
+class NWMReader:
+    """Intermediate reader to query and return NWM data to dashboards."""
+    root: Path
+
+    def __post_init__(self) -> None:
+        # Scan data
+        self.nwm_data: dict[str, dict[tuple[Domain, Configuration], pl.LazyFrame]] = {}
+        for k, (s, e) in EVALUATIONS.items():
+            self.nwm_data[k] = read_NWM_output(self.root, s, e)
+
+    def query(
+            self,
+            state: DashboardState,
+            nwm_feature_id: int
+        ) -> pl.DataFrame | None:
+        """Return data matching dashboard state."""
+        try:
+            data = self.nwm_data[state.evaluation][
+                (state.domain, state.configuration)]
+        except KeyError:
+            return None
+        return data.filter(
+            pl.col("nwm_feature_id") == nwm_feature_id
+            ).collect()

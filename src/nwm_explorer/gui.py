@@ -11,7 +11,7 @@ from nwm_explorer.mappings import (EVALUATIONS, DOMAIN_STRINGS,
     DOMAIN_CONFIGURATION_MAPPING, Domain, Configuration, LEAD_TIME_VALUES,
     CONFIDENCE_STRINGS, Confidence, METRIC_STRINGS, Metric, DEFAULT_ZOOM,
     METRIC_SHORTHAND, CONFIDENCE_SHORTHAND)
-from nwm_explorer.readers import MetricReader, DashboardState
+from nwm_explorer.readers import MetricReader, DashboardState, NWMReader
 from nwm_explorer.plotters import SiteMapPlotter
 from nwm_explorer.histogram import HistogramGrid
 from nwm_explorer.hydrographer import HydrographCard
@@ -171,8 +171,9 @@ class FilteringWidgets:
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
     def __init__(self, root: Path, title: str):
-        # Data reader
-        self.reader = MetricReader(root)
+        # Data readers
+        self.metrics_reader = MetricReader(root)
+        self.nwm_reader = NWMReader(root)
     
         # Get widgets
         self.filter_widgets = FilteringWidgets()
@@ -209,13 +210,13 @@ class Dashboard:
             )
         
         # Update data
-        self.data = self.reader.query(self.state)
+        self.data = self.metrics_reader.query(self.state)
 
         def update_map(event):
             if event is None:
                 return
             current_state = self.state
-            self.data = self.reader.query(current_state)
+            self.data = self.metrics_reader.query(current_state)
             if self.data is None:
                 self.status_feed.insert(0,
                     pn.pane.Alert("No data found", alert_type="warning"))
@@ -246,7 +247,7 @@ class Dashboard:
         self.hcolumns = ["kge", "pearson", "rel_mean", "rel_var"]
         datasets = []
         for c in self.hcolumns:
-            d = self.reader.query(self.state, [c, f"{c}_lower", f"{c}_upper"])
+            d = self.metrics_reader.query(self.state, [c, f"{c}_lower", f"{c}_upper"])
             datasets.append((
                 d[c].to_numpy(),
                 d[f"{c}_lower"].to_numpy(),
@@ -280,7 +281,7 @@ class Dashboard:
                 }
             datasets = []
             for c in self.hcolumns:
-                d = self.reader.query(self.state, [c, f"{c}_lower", f"{c}_upper"])
+                d = self.metrics_reader.query(self.state, [c, f"{c}_lower", f"{c}_upper"])
                 if bbox is not None:
                     d = d.filter(
                         pl.col("latitude") <= bbox["lat_max"],
@@ -299,6 +300,8 @@ class Dashboard:
             event_type="relayout")
         
         # Setup hydrograph
+        self.usgs_site_code = None
+        self.nwm_feature_id = None
         self.hydrograph: HydrographCard = None
         self.hydrograph_card = pn.pane.Placeholder(pn.Card(
             pn.pane.Markdown(
@@ -311,31 +314,52 @@ class Dashboard:
             width=1045
         ))
 
-        def update_hydrograph(event):
+        def update_hydrograph(event, event_type: str = "normal"):
             if not event:
                 return
-            if event not in DOMAIN_CONFIGURATION_MAPPING[self.state.domain]:
-                return
-            if self.hydrograph is None:
-                N = 100
-                x = [np.linspace(0, 10, 50)+idx for idx in range(N)]
-                y = [0.5 * x[idx] + idx for idx in range(N)]
-                t = [pd.date_range(
-                    start=pd.Timestamp("2025-01-01")+pd.Timedelta(idx, unit="h"),
-                    freq="1h",
-                    periods=50
-                ) for idx in range(N)]
-                names = ["USGS-01013500"]+[s[0].strftime("%Y%m%d %HZ") for s in t[1:]]
 
+            if event_type == "click":
+                self.usgs_site_code = event["points"][0]["customdata"][0]
+                self.nwm_feature_id = event["points"][0]["customdata"][1]
+            elif event in DOMAIN_STRINGS:
+                self.usgs_site_code = None
+                self.nwm_feature_id = None
+                return
+            elif event not in DOMAIN_CONFIGURATION_MAPPING[self.state.domain]:
+                return
+
+            if self.usgs_site_code is None:
+                return
+            data = self.nwm_reader.query(self.state, self.nwm_feature_id)
+
+            if data is None or data.is_empty():
+                return
+            xdata = []
+            ydata = []
+            names = []
+            
+            if self.state.configuration in LEAD_TIME_VALUES:
+                for rt in data["reference_time"].unique().to_list():
+                    forecast = data.filter(pl.col("reference_time") == rt)
+                    xdata.append(forecast["value_time"])
+                    ydata.append(forecast["value"])
+                    names.append(str(rt))
+            else:
+                xdata.append(data["value_time"])
+                ydata.append(data["value"])
+                names.append("Analysis")
+
+            if self.hydrograph is None:
                 self.hydrograph = HydrographCard(
-                    x=t,
-                    y=y,
+                    x=xdata,
+                    y=ydata,
                     names=names,
-                    y_title="STREAMFLOW (CFS)"
+                    y_title="Streamflow (cfs)"
                 )
                 self.hydrograph_card.object = self.hydrograph.servable()
-            print(event)
         self.filter_widgets.register_callback(update_hydrograph)
+        pn.bind(update_hydrograph, self.site_map.param.click_data, watch=True,
+            event_type="click")
 
         # Layout cards
         controls = pn.Column(self.filter_card, status_card)
