@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
 import panel as pn
 import colorcet as cc
 import plotly.graph_objects as go
@@ -187,6 +188,39 @@ class HydrographCard:
             self.card.refresh()
         pn.bind(highlight_trace, self.card.pane.param.click_data, watch=True)
     
+    def update_data(
+            self, 
+            x: list[npt.ArrayLike],
+            y: list[npt.ArrayLike],
+            names: list[str]
+        ) -> None:
+        # Assume first trace is special
+        data = [go.Scatter(
+            x=x[0],
+            y=y[0],
+            mode="lines",
+            line=dict(color="#3C00FF", width=2),
+            name=names[0]
+        )]
+
+        # Generate remaining traces
+        color_index = 0
+        for idx in range(1, len(y)):
+            data.append(go.Scatter(
+                x=x[idx],
+                y=y[idx],
+                mode="lines",
+                name=names[idx],
+                line=dict(color=cc.CET_L8[color_index], width=1)
+                ))
+            color_index += 1
+            if color_index == len(cc.CET_L8):
+                color_index = 0
+
+        # Update interface
+        self.card.data = data
+        self.card.refresh()
+    
     def servable(self) -> pn.Card:
         return self.card.servable()
 
@@ -194,12 +228,36 @@ def main():
     N = 100
     x = [np.linspace(0, 10, 50)+idx for idx in range(N)]
     y = [0.5 * x[idx] + idx for idx in range(N)]
+    t = [pd.date_range(
+        start=pd.Timestamp("2025-01-01")+pd.Timedelta(idx, unit="h"),
+        freq="1h",
+        periods=50
+    ) for idx in range(N)]
+    names = ["USGS-01013500"]+[s[0].strftime("%Y%m%d %HZ") for s in t[1:]]
+
     card = HydrographCard(
-        x=x,
+        x=t,
         y=y,
-        names=["USGS-01013500"]+[f"Forecast {idx}" for idx in range(len(y))],
+        names=names,
         y_title="STREAMFLOW (CFS)"
     )
+
+    N = 51
+    x = [np.linspace(0, 10, 50)+idx for idx in range(N)]
+    y = [-0.5 * x[idx] + idx for idx in range(N)]
+    t = [pd.date_range(
+        start=pd.Timestamp("2025-01-01")+pd.Timedelta(idx, unit="h"),
+        freq="1h",
+        periods=50
+    ) for idx in range(N)]
+    names = ["USGS-01013500"]+[s[0].strftime("%Y%m%d %HZ") for s in t[1:]]
+
+    card.update_data(
+        x=t,
+        y=y,
+        names=names
+    )
+
     pn.serve(card.servable())
 
 if __name__ == "__main__":
