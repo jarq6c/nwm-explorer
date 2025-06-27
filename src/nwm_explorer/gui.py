@@ -11,7 +11,7 @@ from nwm_explorer.mappings import (EVALUATIONS, DOMAIN_STRINGS,
     DOMAIN_CONFIGURATION_MAPPING, Domain, Configuration, LEAD_TIME_VALUES,
     CONFIDENCE_STRINGS, Confidence, METRIC_STRINGS, Metric, DEFAULT_ZOOM,
     METRIC_SHORTHAND, CONFIDENCE_SHORTHAND)
-from nwm_explorer.readers import MetricReader, DashboardState, NWMReader
+from nwm_explorer.readers import MetricReader, DashboardState, NWMReader, USGSReader
 from nwm_explorer.plotters import SiteMapPlotter
 from nwm_explorer.histogram import HistogramGrid
 from nwm_explorer.hydrographer import HydrographCard
@@ -174,6 +174,7 @@ class Dashboard:
         # Data readers
         self.metrics_reader = MetricReader(root)
         self.nwm_reader = NWMReader(root)
+        self.usgs_reader = USGSReader(root)
     
         # Get widgets
         self.filter_widgets = FilteringWidgets()
@@ -330,23 +331,30 @@ class Dashboard:
 
             if self.usgs_site_code is None:
                 return
-            data = self.nwm_reader.query(self.state, self.nwm_feature_id)
+            print(self.usgs_site_code)
+            nwm_data = self.nwm_reader.query(self.state, self.nwm_feature_id)
 
-            if data is None or data.is_empty():
+            if nwm_data is None or nwm_data.is_empty():
                 return
-            xdata = []
-            ydata = []
-            names = []
+            usgs_data = self.usgs_reader.query(
+                self.state.domain,
+                self.usgs_site_code,
+                nwm_data["value_time"].min(),
+                nwm_data["value_time"].max()
+            )
+            xdata = [usgs_data["value_time"]]
+            ydata = [usgs_data["value"]]
+            names = ["USGS"]
             
             if self.state.configuration in LEAD_TIME_VALUES:
-                for rt in data["reference_time"].unique().to_list():
-                    forecast = data.filter(pl.col("reference_time") == rt)
+                for rt in nwm_data["reference_time"].unique().to_list():
+                    forecast = nwm_data.filter(pl.col("reference_time") == rt)
                     xdata.append(forecast["value_time"])
                     ydata.append(forecast["value"])
                     names.append(str(rt))
             else:
-                xdata.append(data["value_time"])
-                ydata.append(data["value"])
+                xdata.append(nwm_data["value_time"])
+                ydata.append(nwm_data["value"])
                 names.append("Analysis")
 
             if self.hydrograph is None:
@@ -357,6 +365,12 @@ class Dashboard:
                     y_title="Streamflow (cfs)"
                 )
                 self.hydrograph_card.object = self.hydrograph.servable()
+            else:
+                self.hydrograph.update_data(
+                    x=xdata,
+                    y=ydata,
+                    names=names
+                )
         self.filter_widgets.register_callback(update_hydrograph)
         pn.bind(update_hydrograph, self.site_map.param.click_data, watch=True,
             event_type="click")

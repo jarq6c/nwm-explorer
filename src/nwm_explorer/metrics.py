@@ -156,7 +156,7 @@ def relative_mean(
     if mean == 0:
         result[0] = np.nan
         return
-    result[0] = np.std(y_pred) / mean
+    result[0] = np.mean(y_pred) / mean
 
 @guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
 def kling_gupta_efficiency(

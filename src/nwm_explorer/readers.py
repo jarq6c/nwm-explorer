@@ -1,6 +1,7 @@
 """Read-only methods."""
 from pathlib import Path
 from dataclasses import dataclass
+from datetime import datetime
 import pandas as pd
 import polars as pl
 
@@ -291,4 +292,35 @@ class NWMReader:
             return None
         return data.filter(
             pl.col("nwm_feature_id") == nwm_feature_id
-            ).collect()
+        ).collect()
+
+@dataclass
+class USGSReader:
+    """Intermediate reader to query and return USGS data to dashboards."""
+    root: Path
+
+    def __post_init__(self) -> None:
+        # Scan data
+        directory = self.root / "parquet/usgs"
+        self.usgs_data: dict[Domain, pl.LazyFrame] = {}
+        for domain in list(Domain):
+            self.usgs_data[domain] = pl.scan_parquet(*tuple(directory.glob(f"{domain}_*.parquet")))
+
+    def query(
+            self,
+            domain: Domain,
+            usgs_site_code: str,
+            start_date: datetime,
+            end_date: datetime
+        ) -> pl.DataFrame | None:
+        """Return data matching dashboard state."""
+        try:
+            data = self.usgs_data[domain]
+        except KeyError:
+            return None
+        return data.filter(
+            pl.col("usgs_site_code") == usgs_site_code,
+            pl.col("value_time") >= start_date,
+            pl.col("value_time") <= end_date
+        ).select(["value_time", "value"]).unique(
+            subset=["value_time"]).sort("value_time").collect()
