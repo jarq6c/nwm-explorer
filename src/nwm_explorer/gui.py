@@ -1,7 +1,6 @@
 """Generate and serve exploratory applications."""
 from pathlib import Path
 from typing import Callable
-import numpy as np
 import pandas as pd
 import polars as pl
 import panel as pn
@@ -331,7 +330,6 @@ class Dashboard:
 
             if self.usgs_site_code is None:
                 return
-            print(self.usgs_site_code)
             nwm_data = self.nwm_reader.query(self.state, self.nwm_feature_id)
 
             if nwm_data is None or nwm_data.is_empty():
@@ -347,11 +345,10 @@ class Dashboard:
             names = ["USGS"]
             
             if self.state.configuration in LEAD_TIME_VALUES:
-                for rt in nwm_data["reference_time"].unique().to_list():
-                    forecast = nwm_data.filter(pl.col("reference_time") == rt)
+                for forecast in nwm_data.partition_by("reference_time"):
                     xdata.append(forecast["value_time"])
                     ydata.append(forecast["value"])
-                    names.append(str(rt))
+                    names.append(str(forecast["reference_time"].first()))
             else:
                 xdata.append(nwm_data["value_time"])
                 ydata.append(nwm_data["value"])
