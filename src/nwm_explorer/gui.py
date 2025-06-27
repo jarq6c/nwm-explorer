@@ -342,13 +342,13 @@ class Dashboard:
             )
             xdata = [usgs_data["value_time"]]
             ydata = [usgs_data["value"]]
-            names = ["USGS"]
+            names = [f"USGS-{self.usgs_site_code}"]
             
             if self.state.configuration in LEAD_TIME_VALUES:
-                for forecast in nwm_data.partition_by("reference_time"):
+                for (rt,), forecast in nwm_data.partition_by("reference_time", as_dict=True, include_key=False).items():
                     xdata.append(forecast["value_time"])
                     ydata.append(forecast["value"])
-                    names.append(str(forecast["reference_time"].first()))
+                    names.append(rt.strftime("%Y-%m-%d %HZ"))
             else:
                 xdata.append(nwm_data["value_time"])
                 ydata.append(nwm_data["value"])
