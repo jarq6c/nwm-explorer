@@ -154,6 +154,10 @@ class BarPlot:
                 arrayminus=ydata - ydata_lower
             )
         ))
+
+        # Update axis titles
+        self.card.update_xaxis_title_text(xlabel)
+        self.card.update_yaxis_title_text(ylabel)
     
     def servable(self) -> pn.Card:
         return self.card.servable()
