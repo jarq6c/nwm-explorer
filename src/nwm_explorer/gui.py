@@ -14,6 +14,7 @@ from nwm_explorer.readers import MetricReader, DashboardState, NWMReader, USGSRe
 from nwm_explorer.plotters import SiteMapPlotter
 from nwm_explorer.histogram import HistogramGrid
 from nwm_explorer.hydrographer import HydrographCard
+from nwm_explorer.barplot import BarPlot
 
 pn.extension("plotly")
 
@@ -373,11 +374,24 @@ class Dashboard:
         self.filter_widgets.register_callback(update_hydrograph)
         pn.bind(update_hydrograph, self.site_map.param.click_data, watch=True,
             event_type="click")
+        
+        # Setup bar plot
+        self.barplot: BarPlot = None
+        self.barplot_card = pn.pane.Placeholder(pn.Card(
+            pn.pane.Markdown(
+                "## Click a site on the map to view its statistics.",
+                align="center"
+                ),
+            collapsible=False,
+            hide_header=True,
+            height=265,
+            width=475
+        ))
 
         # Layout cards
         controls = pn.Column(self.filter_card, status_card)
         over_view = pn.Row(self.map_card, self.hgrid.servable())
-        site_view = pn.Row(self.hydrograph_card)
+        site_view = pn.Row(self.hydrograph_card, self.barplot_card)
         layout = pn.Row(
             controls,
             pn.Column(over_view, site_view)
