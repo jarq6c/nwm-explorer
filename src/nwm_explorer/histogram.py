@@ -44,7 +44,7 @@ class PlotlyCard:
         self.pane = pn.pane.Plotly({
             "data": self.data,
             "layout": self.layout
-        })
+        }, config={'displaylogo': False})
 
         # Build card
         self.card = pn.Card(

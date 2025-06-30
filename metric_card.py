@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Any
 import numpy as np
+import numpy.typing as npt
 import panel as pn
 import plotly.graph_objects as go
 from plotly.basedatatypes import BaseTraceType
@@ -15,7 +16,7 @@ class PlotlyCard:
         self.pane = pn.pane.Plotly({
             "data": self.data,
             "layout": self.layout
-        })
+        }, config={'displaylogo': False})
 
         # Build card
         self.card = pn.Card(
@@ -85,43 +86,106 @@ class PlotlyCard:
     
     def servable(self) -> pn.Card:
         return self.card
+    
+class BarPlot:
+    def __init__(
+            self,
+            xdata: npt.ArrayLike,
+            ydata: npt.ArrayLike,
+            ydata_lower: npt.ArrayLike,
+            ydata_upper: npt.ArrayLike,
+            xlabel: str,
+            ylabel: str
+            ) -> None:
+        custom_data = np.hstack((ydata_lower[:, np.newaxis], ydata_upper[:, np.newaxis]))
+        data = [go.Bar(
+            x=xdata,
+            y=ydata,
+            customdata=custom_data,
+            hovertemplate=(
+                f"{xlabel}: " + "%{x}<br>" + 
+                f"{ylabel}: " + "%{customdata[0]:.2f} -- %{customdata[1]:.2f} (%{y:.2f})"
+            ),
+            name="",
+            error_y=dict(
+                type="data",
+                array=ydata_upper - ydata,
+                arrayminus=ydata - ydata_lower
+            )
+        )]
+        layout = go.Layout(
+            height=250,
+            width=250,
+            xaxis=dict(title=dict(text=xlabel)),
+            yaxis=dict(title=dict(text=ylabel)),
+            margin=dict(l=0, r=0, t=0, b=0),
+            modebar=dict(
+                remove=["lasso", "select", "pan", "autoscale", "zoomin", "zoomout"],
+                orientation="v"
+            )
+        )
+
+        self.card = PlotlyCard(data, layout)
+    
+    def update_data(
+            self, 
+            xdata: npt.ArrayLike,
+            ydata: npt.ArrayLike,
+            ydata_lower: npt.ArrayLike,
+            ydata_upper: npt.ArrayLike,
+            xlabel: str,
+            ylabel: str
+        ) -> None:
+        # Construct custom data
+        custom_data = np.hstack((ydata_lower[:, np.newaxis], ydata_upper[:, np.newaxis]))
+
+        # Update trace
+        self.card.update_data(dict(
+            x=xdata,
+            y=ydata,
+            customdata=custom_data,
+            hovertemplate=(
+                f"{xlabel}: " + "%{x}<br>" + 
+                f"{ylabel}: " + "%{customdata[0]:.2f} -- %{customdata[1]:.2f} (%{y:.2f})"
+            ),
+            error_y=dict(
+                type="data",
+                array=ydata_upper - ydata,
+                arrayminus=ydata - ydata_lower
+            )
+        ))
+    
+    def servable(self) -> pn.Card:
+        return self.card.servable()
+    
+    def refresh(self) -> None:
+        self.card.refresh()
 
 def main():
     x = np.arange(10)
     y = 1.0 * np.exp(-0.5 * x)
-    y_lo = y * 0.8
-    y_hi = y * 1.2
-    y_lo_err = y - y_lo
-    y_hi_err = y_hi - y
-    l = [f"{n:.0f}" for n in x]
-    xlabel = "Minimum Lead Time (h)"
-    ylabel = "Kling-Gupta Efficiency"
-    custom_data = np.hstack((y_lo[:, np.newaxis], y_hi[:, np.newaxis]))
 
-    data = [go.Bar(
-        x=l,
-        y=y,
-        customdata=custom_data,
-        hovertemplate=(
-            f"{xlabel}: " + "%{x}<br>" + 
-            f"{ylabel}: " + "%{customdata[0]:.2f} -- %{customdata[1]:.2f} (%{y:.2f})"
-        ),
-        name="",
-        error_y=dict(
-            type="data",
-            array=y_hi_err,
-            arrayminus=y_lo_err
-        )
-    )]
-    layout = go.Layout(
-        height=250,
-        width=250,
-        xaxis=dict(title=dict(text=xlabel)),
-        yaxis=dict(title=dict(text=ylabel)),
-        margin=dict(l=0, r=0, t=0, b=0)
+    barplot = BarPlot(
+        xdata = [f"{n:.0f}" for n in x],
+        ydata = y,
+        ydata_lower = y * 0.8,
+        ydata_upper = y * 1.2,
+        xlabel = "Minimum Lead Time (h)",
+        ylabel = "Kling-Gupta Efficiency"
     )
-    card = PlotlyCard(data, layout)
-    pn.serve(card.servable())
+    x = np.arange(10)+24
+    y = 1_000_000 * np.exp(-0.5 * x)
+
+    barplot.update_data(
+        xdata = [f"{n:.0f}" for n in x],
+        ydata = y,
+        ydata_lower = y * 0.8,
+        ydata_upper = y * 1.2,
+        xlabel = "Minimum Lead Time (h)",
+        ylabel = "Relative Mean"
+    )
+    barplot.refresh()
+    pn.serve(barplot.servable())
 
 if __name__ == "__main__":
     main()
