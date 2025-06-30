@@ -263,3 +263,15 @@ METRIC_HISTOGRAMS: dict[Metric, HistogramSpec] = {
     Metric.kling_gupta_efficiency: HistogramSpec(0.2, -1.0, 1.0)
 }
 """Mapping from Metrics to histogram parameters."""
+
+class CallbackType(StrEnum):
+    """Symbols used to reference different types of callbacks."""
+    evaluation = "evaluation"
+    domain = "domain"
+    configuration = "configuration"
+    threshold = "threshold"
+    metric = "metric"
+    confidence = "confidence"
+    lead_time = "lead_time"
+    click = "click"
+    relayout = "relayout"
