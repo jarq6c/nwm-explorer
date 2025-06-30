@@ -268,6 +268,24 @@ class MetricReader:
             ).drop_nulls()
         return data.collect()
 
+    def query_site(
+            self,
+            state: DashboardState,
+            nwm_feature_id: int
+        ) -> pl.DataFrame | None:
+        """Return data matching dashboard state."""
+        try:
+            cols = [METRIC_SHORTHAND[state.metric] + s for s in CONFIDENCE_SHORTHAND.values()]
+            if state.configuration in LEAD_TIME_FREQUENCY:
+                cols.append("lead_time_hours_min")
+            data = self.metrics[state.evaluation][
+                (state.domain, state.configuration)].filter(
+                    pl.col("nwm_feature_id") == nwm_feature_id
+                ).select(cols)
+        except KeyError:
+            return None
+        return data.collect()
+
 @dataclass
 class NWMReader:
     """Intermediate reader to query and return NWM data to dashboards."""

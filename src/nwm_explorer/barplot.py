@@ -115,7 +115,7 @@ class BarPlot:
         )]
         layout = go.Layout(
             height=250,
-            width=250,
+            width=440,
             xaxis=dict(title=dict(text=xlabel)),
             yaxis=dict(title=dict(text=ylabel)),
             margin=dict(l=0, r=0, t=0, b=0),

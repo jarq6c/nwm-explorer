@@ -9,7 +9,7 @@ from panel.template import BootstrapTemplate
 from nwm_explorer.mappings import (EVALUATIONS, DOMAIN_STRINGS,
     DOMAIN_CONFIGURATION_MAPPING, Domain, Configuration, LEAD_TIME_VALUES,
     CONFIDENCE_STRINGS, Confidence, METRIC_STRINGS, Metric, DEFAULT_ZOOM,
-    METRIC_SHORTHAND, CONFIDENCE_SHORTHAND)
+    METRIC_SHORTHAND, CONFIDENCE_SHORTHAND, CallbackType)
 from nwm_explorer.readers import MetricReader, DashboardState, NWMReader, USGSReader
 from nwm_explorer.plotters import SiteMapPlotter
 from nwm_explorer.histogram import HistogramGrid
@@ -127,7 +127,7 @@ class FilteringWidgets:
                 )
         ]
         for func in self.callbacks:
-            pn.bind(func, self.lead_time_filter[0], watch=True)
+            pn.bind(func, self.lead_time_filter[0], callback_type=CallbackType.lead_time, watch=True)
 
     @property
     def state(self) -> DashboardState:
@@ -159,13 +159,13 @@ class FilteringWidgets:
     
     def register_callback(self, func: Callable) -> None:
         """Register callback function."""
-        pn.bind(func, self.evaluation_filter, watch=True)
-        pn.bind(func, self.domain_filter, watch=True)
-        pn.bind(func, self.configuration_filter, watch=True)
-        pn.bind(func, self.threshold_filter, watch=True)
-        pn.bind(func, self.metric_filter, watch=True)
-        pn.bind(func, self.confidence_filter, watch=True)
-        pn.bind(func, self.lead_time_filter[0], watch=True)
+        pn.bind(func, self.evaluation_filter, callback_type=CallbackType.evaluation, watch=True)
+        pn.bind(func, self.domain_filter, callback_type=CallbackType.domain, watch=True)
+        pn.bind(func, self.configuration_filter, callback_type=CallbackType.configuration, watch=True)
+        pn.bind(func, self.threshold_filter, callback_type=CallbackType.threshold, watch=True)
+        pn.bind(func, self.metric_filter, callback_type=CallbackType.metric, watch=True)
+        pn.bind(func, self.confidence_filter, callback_type=CallbackType.confidence, watch=True)
+        pn.bind(func, self.lead_time_filter[0], callback_type=CallbackType.lead_time, watch=True)
         self.callbacks.append(func)
 
 class Dashboard:
@@ -213,7 +213,7 @@ class Dashboard:
         # Update data
         self.data = self.metrics_reader.query(self.state)
 
-        def update_map(event):
+        def update_map(event, callback_type: CallbackType):
             if event is None:
                 return
             current_state = self.state
@@ -263,14 +263,13 @@ class Dashboard:
         ]
         self.hgrid = HistogramGrid(datasets, specs, labels, 2)
 
-        def update_histograms(event, event_type: str = "normal"):
+        def update_histograms(event, callback_type: CallbackType):
             if not event:
                 return
-            if event_type == "normal":
-                if event in METRIC_STRINGS:
-                    return
-                if event in CONFIDENCE_STRINGS:
-                    return
+            if callback_type == CallbackType.metric:
+                return
+            if callback_type == CallbackType.confidence:
+                return
             bbox = None
             relayout_data = self.site_map.relayout_data
             if "map._derived" in relayout_data:
@@ -299,7 +298,7 @@ class Dashboard:
             self.hgrid.refresh()
         self.filter_widgets.register_callback(update_histograms)
         pn.bind(update_histograms, self.site_map.param.relayout_data, watch=True,
-            event_type="relayout")
+            callback_type=CallbackType.relayout)
         
         # Setup hydrograph
         self.usgs_site_code = None
@@ -316,18 +315,18 @@ class Dashboard:
             width=1045
         ))
 
-        def update_hydrograph(event, event_type: str = "normal"):
+        def update_hydrograph(event, callback_type: CallbackType):
             if not event:
                 return
 
-            if event_type == "click":
+            if callback_type == CallbackType.click:
                 self.usgs_site_code = event["points"][0]["customdata"][0]
                 self.nwm_feature_id = event["points"][0]["customdata"][1]
-            elif event in DOMAIN_STRINGS:
+            elif callback_type == CallbackType.domain:
                 self.usgs_site_code = None
                 self.nwm_feature_id = None
                 return
-            elif event not in DOMAIN_CONFIGURATION_MAPPING[self.state.domain]:
+            elif callback_type != CallbackType.configuration:
                 return
 
             if self.usgs_site_code is None:
@@ -373,7 +372,7 @@ class Dashboard:
                 self.hydrograph.refresh()
         self.filter_widgets.register_callback(update_hydrograph)
         pn.bind(update_hydrograph, self.site_map.param.click_data, watch=True,
-            event_type="click")
+            callback_type=CallbackType.click)
         
         # Setup bar plot
         self.barplot: BarPlot = None
@@ -387,6 +386,54 @@ class Dashboard:
             height=265,
             width=475
         ))
+
+        def update_barplot(event, callback_type: CallbackType):
+            if not event:
+                return
+
+            if callback_type not in [CallbackType.click, CallbackType.configuration, CallbackType.metric]:
+                return
+
+            if self.usgs_site_code is None:
+                return
+            data = self.metrics_reader.query_site(self.state, self.nwm_feature_id)
+
+            if data is None or data.is_empty():
+                return
+            if self.state.configuration in LEAD_TIME_VALUES:
+                xdata = data["lead_time_hours_min"].to_numpy()
+            else:
+                xdata = [0]
+            c = METRIC_SHORTHAND[self.state.metric]
+            ydata = data[c].to_numpy()
+            ydata_lower = data[f"{c}_lower"].to_numpy()
+            ydata_upper = data[f"{c}_upper"].to_numpy()
+            xlabel = "Minimum Lead Time (h)"
+            ylabel = self.state.metric_label
+
+            if self.barplot is None:
+                self.barplot = BarPlot(
+                    xdata=xdata,
+                    ydata=ydata,
+                    ydata_lower=ydata_lower,
+                    ydata_upper=ydata_upper,
+                    xlabel=xlabel,
+                    ylabel=ylabel
+                )
+                self.barplot_card.object = self.barplot.servable()
+            else:
+                self.barplot.update_data(
+                    xdata=xdata,
+                    ydata=ydata,
+                    ydata_lower=ydata_lower,
+                    ydata_upper=ydata_upper,
+                    xlabel=xlabel,
+                    ylabel=ylabel
+                )
+                self.barplot.refresh()
+        self.filter_widgets.register_callback(update_barplot)
+        pn.bind(update_barplot, self.site_map.param.click_data, watch=True,
+            callback_type=CallbackType.click)
 
         # Layout cards
         controls = pn.Column(self.filter_card, status_card)
