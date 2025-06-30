@@ -295,6 +295,7 @@ class Dashboard:
                     d[f"{c}_upper"].to_numpy()
                 ))
             self.hgrid.update_data(datasets)
+            self.hgrid.refresh()
         self.filter_widgets.register_callback(update_histograms)
         pn.bind(update_histograms, self.site_map.param.relayout_data, watch=True,
             event_type="relayout")
@@ -368,6 +369,7 @@ class Dashboard:
                     y=ydata,
                     names=names
                 )
+                self.hydrograph.refresh()
         self.filter_widgets.register_callback(update_hydrograph)
         pn.bind(update_hydrograph, self.site_map.param.click_data, watch=True,
             event_type="click")
