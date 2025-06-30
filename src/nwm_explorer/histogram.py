@@ -53,25 +53,20 @@ class PlotlyCard:
             hide_header=True
         )
     
-    def update_layout(self, parameters: dict[str, Any]) -> None:
-        # Update layout
-        self.layout.update(parameters)
-
+    def refresh(self) -> None:
         # Update pane
         self.pane.object = {
             "data": self.data,
             "layout": self.layout
         }
     
+    def update_layout(self, parameters: dict[str, Any]) -> None:
+        # Update layout
+        self.layout.update(parameters)
+    
     def update_data(self, parameters: dict[str, Any], index: int = 0) -> None:
         # Update trace
         self.data[index].update(parameters)
-
-        # Update pane
-        self.pane.object = {
-            "data": self.data,
-            "layout": self.layout
-        }
     
     def update_config(self, parameters: dict[str, Any]) -> None:
         # Assign config is non-existent
@@ -85,12 +80,6 @@ class PlotlyCard:
     def update_xaxis_title_text(self, title: str) -> None:
         # Update layout
         self.layout["xaxis"]["title"].update({"text": title})
-
-        # Update pane
-        self.pane.object = {
-            "data": self.data,
-            "layout": self.layout
-        }
     
     def servable(self) -> pn.Card:
         return self.card
@@ -276,6 +265,9 @@ class HistogramCard:
     
     def servable(self) -> pn.Card:
         return self.card.servable()
+    
+    def refresh(self) -> None:
+        self.card.refresh()
 
 @dataclass
 class HistogramGrid:
@@ -302,3 +294,7 @@ class HistogramGrid:
     
     def servable(self) -> pn.GridBox:
         return self.grid
+    
+    def refresh(self) -> None:
+        for c in self.cards:
+            c.refresh()

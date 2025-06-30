@@ -150,7 +150,6 @@ class HydrographCard:
 
         # Set y-label
         self.card.update_yaxis_title_text(y_title)
-        self.card.refresh()
 
         self.curve_number = None
         self.curve_color = None
@@ -184,7 +183,6 @@ class HydrographCard:
                     ),
                 self.curve_number
             )
-            self.card.refresh()
         pn.bind(highlight_trace, self.card.pane.param.click_data, watch=True)
     
     def update_data(
@@ -218,7 +216,9 @@ class HydrographCard:
 
         # Update interface
         self.card.data = data
-        self.card.refresh()
     
     def servable(self) -> pn.Card:
         return self.card.servable()
+    
+    def refresh(self) -> None:
+        self.card.refresh()
