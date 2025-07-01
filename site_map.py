@@ -1,4 +1,5 @@
 """Site map card."""
+from typing import Any
 import numpy as np
 import numpy.typing as npt
 import polars as pl
@@ -85,6 +86,11 @@ class SiteMapCard:
         self.lon_min = np.min(longitude)
         self.lon_max = np.max(longitude)
         pn.bind(self.update_boundaries, self.relayout_data, watch=True)
+
+        # Click data
+        self.columns = custom_data.columns
+        self.selection: dict[str, Any] = {}
+        pn.bind(self.update_selection, self.click_data, watch=True)
     
     @property
     def click_data(self) -> dict:
@@ -105,6 +111,14 @@ class SiteMapCard:
             self.lat_max = np.max(self.card.data[0].lat)
             self.lon_min = np.min(self.card.data[0].lon)
             self.lon_max = np.max(self.card.data[0].lon)
+        
+    def update_selection(self, data: dict) -> None:
+        custom_data = data["points"][0]["customdata"]
+        for key, value in zip(self.columns, custom_data):
+            self.selection[key] = value
+        self.selection["value"] = data["points"][0]["marker.color"]
+        self.selection["lon"] = data["points"][0]["lon"]
+        self.selection["lat"] = data["points"][0]["lat"]
     
     def update_points(
             self, 
@@ -163,6 +177,10 @@ class SiteMapCard:
         self.lon_min = np.min(longitude)
         self.lon_max = np.max(longitude)
 
+        # Click data
+        self.columns = custom_data.columns
+        self.selection = {}
+
     def servable(self) -> pn.Card:
         return self.card.servable()
     
@@ -198,7 +216,8 @@ def main():
         print(card.lat_min)
         print(card.lon_max)
         print(card.lon_min)
-    pn.bind(update_map, card.relayout_data, watch=True)
+        print(card.selection)
+    pn.bind(update_map, card.click_data, watch=True)
 
     latitude = [37.0042]
     longitude = [-95.59124]
