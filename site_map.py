@@ -75,9 +75,60 @@ class SiteMapCard:
                     remove=["lasso", "select"],
                     orientation="v"
                 ),
-                dragmode="zoom",
+                dragmode="zoom"
             )
         )
+    
+    def update_points(
+            self, 
+            latitude: npt.ArrayLike,
+            longitude: npt.ArrayLike,
+            custom_data: pl.DataFrame,
+            values: npt.ArrayLike,
+            value_label: str,
+            value_limits: tuple[float, float],
+            custom_labels: list[str],
+            default_zoom: int
+        ) -> None:
+        # Hover template
+        hover_template = ""
+        for idx, c in enumerate(custom_labels):
+            hover_template += f"{c}: %" + "{customdata[" + str(idx) + "]}<br>"
+        
+        # Data
+        self.card.update_data(dict(
+            lat=latitude,
+            lon=longitude,
+            customdata=custom_data,
+            hovertemplate=(
+                hover_template +
+                "Longitude: %{lon}<br>"
+                "Latitude: %{lat}"
+                f"<br>{value_label}: "
+                "%{marker.color:.2f}"
+            )
+        ))
+
+        # Markers
+        self.card.update_markers(dict(
+            color=values,
+            colorbar=dict(
+                title=dict(
+                    text=value_label
+                    )
+                ),
+            cmin=value_limits[0],
+            cmax=value_limits[1]
+        ))
+
+        # Re-center map
+        self.card.recenter_map(dict(
+            center={
+                "lat": np.mean(latitude),
+                "lon": np.mean(longitude)
+                },
+            zoom=default_zoom
+        ))
     
     def servable(self) -> pn.Card:
         return self.card.servable()
@@ -108,6 +159,30 @@ def main():
         custom_labels=custom_labels,
         default_zoom=default_zoom
     )
+
+    latitude = [37.0042]
+    longitude = [-95.59124]
+    custom_data = pl.DataFrame({
+        "usgs_site_code": ["07170990"],
+        "nwm_feature_id": [21797449]
+    })
+    values = [0.44]
+    value_label = "Mean Relative Bias"
+    value_limits = [0.0, 2.0]
+    custom_labels = ["USGS Site Code", "NWM Feature ID"]
+    default_zoom = 3
+
+    card.update_points(
+        latitude=latitude,
+        longitude=longitude,
+        custom_data=custom_data,
+        values=values,
+        value_label=value_label,
+        value_limits=value_limits,
+        custom_labels=custom_labels,
+        default_zoom=default_zoom
+    )
+    card.refresh()
 
     pn.serve(card.servable())
 
