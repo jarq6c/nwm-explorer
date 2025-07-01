@@ -23,6 +23,14 @@ class PlotlyCard:
             hide_header=True
         )
     
+    @property
+    def click_data(self) -> dict:
+        return self.pane.param.click_data
+    
+    @property
+    def relayout_data(self) -> dict:
+        return self.pane.param.relayout_data
+    
     def refresh(self) -> None:
         # Update pane
         self.pane.object = {
@@ -81,6 +89,14 @@ class PlotlyCard:
         else:
             self.update_xaxis_range(None)
             self.update_yaxis_range(None)
+    
+    def update_markers(self, parameters: dict[str, Any], index: int = 0) -> None:
+        # Update trace
+        self.data[index]["marker"].update(parameters)
+    
+    def recenter_map(self, parameters: dict[str, Any]) -> None:
+        # Update map
+        self.layout["map"].update(parameters)
     
     def servable(self) -> pn.Card:
         return self.card

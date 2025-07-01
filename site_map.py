@@ -78,6 +78,33 @@ class SiteMapCard:
                 dragmode="zoom"
             )
         )
+
+        # Boundaries
+        self.lat_min = np.min(latitude)
+        self.lat_max = np.max(latitude)
+        self.lon_min = np.min(longitude)
+        self.lon_max = np.max(longitude)
+        pn.bind(self.update_boundaries, self.relayout_data, watch=True)
+    
+    @property
+    def click_data(self) -> dict:
+        return self.card.click_data
+    
+    @property
+    def relayout_data(self) -> dict:
+        return self.card.relayout_data
+    
+    def update_boundaries(self, data: dict) -> None:
+        if "map._derived" in data:
+            self.lat_max = data["map._derived"]["coordinates"][0][1]
+            self.lat_min = data["map._derived"]["coordinates"][2][1]
+            self.lon_max = data["map._derived"]["coordinates"][1][0]
+            self.lon_min = data["map._derived"]["coordinates"][0][0]
+        elif "map.center" in data:
+            self.lat_min = np.min(self.card.data[0].lat)
+            self.lat_max = np.max(self.card.data[0].lat)
+            self.lon_min = np.min(self.card.data[0].lon)
+            self.lon_max = np.max(self.card.data[0].lon)
     
     def update_points(
             self, 
@@ -129,7 +156,13 @@ class SiteMapCard:
                 },
             zoom=default_zoom
         ))
-    
+
+        # Update boundaries
+        self.lat_min = np.min(latitude)
+        self.lat_max = np.max(latitude)
+        self.lon_min = np.min(longitude)
+        self.lon_max = np.max(longitude)
+
     def servable(self) -> pn.Card:
         return self.card.servable()
     
