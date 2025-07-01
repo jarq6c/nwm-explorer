@@ -99,7 +99,12 @@ class HydrographCard:
                     ),
                 self.curve_number
             )
-        pn.bind(highlight_trace, self.card.pane.param.click_data, watch=True)
+            self.refresh()
+        pn.bind(highlight_trace, self.click_data, watch=True)
+    
+    @property
+    def click_data(self) -> dict:
+        return self.card.click_data
     
     def update_data(
             self, 
