@@ -12,6 +12,7 @@ from nwm_explorer.mappings import (EVALUATIONS, DOMAIN_STRINGS,
     METRIC_SHORTHAND, CONFIDENCE_SHORTHAND, CallbackType)
 from nwm_explorer.readers import MetricReader, DashboardState, NWMReader, USGSReader
 from nwm_explorer.plotters import SiteMapPlotter
+from nwm_explorer.site_map import SiteMapCard
 from nwm_explorer.histogram import HistogramGrid
 from nwm_explorer.hydrographer import HydrographCard
 from nwm_explorer.barplot import BarPlot
