@@ -192,6 +192,13 @@ def main():
         custom_labels=custom_labels,
         default_zoom=default_zoom
     )
+    def update_map(event):
+        print(event)
+        print(card.lat_max)
+        print(card.lat_min)
+        print(card.lon_max)
+        print(card.lon_min)
+    pn.bind(update_map, card.relayout_data, watch=True)
 
     latitude = [37.0042]
     longitude = [-95.59124]
