@@ -1,11 +1,11 @@
 """Generate standardized histogram plots."""
 from dataclasses import dataclass
-from typing import Any
 import numpy as np
 import numpy.typing as npt
 import panel as pn
 import plotly.graph_objects as go
 from plotly.basedatatypes import BaseTraceType
+from nwm_explorer.plotly_card import PlotlyCard
 
 def generate_histogram(
         x: npt.ArrayLike,
@@ -33,56 +33,6 @@ def generate_histogram(
     if density:
         counts = counts / np.sum(counts)
     return bin_centers, counts
-
-@dataclass
-class PlotlyCard:
-    data: list[BaseTraceType]
-    layout: go.Layout
-
-    def __post_init__(self) -> None:
-        # Build pane
-        self.pane = pn.pane.Plotly({
-            "data": self.data,
-            "layout": self.layout
-        }, config={'displaylogo': False})
-
-        # Build card
-        self.card = pn.Card(
-            self.pane,
-            collapsible=False,
-            hide_header=True
-        )
-    
-    def refresh(self) -> None:
-        # Update pane
-        self.pane.object = {
-            "data": self.data,
-            "layout": self.layout
-        }
-    
-    def update_layout(self, parameters: dict[str, Any]) -> None:
-        # Update layout
-        self.layout.update(parameters)
-    
-    def update_data(self, parameters: dict[str, Any], index: int = 0) -> None:
-        # Update trace
-        self.data[index].update(parameters)
-    
-    def update_config(self, parameters: dict[str, Any]) -> None:
-        # Assign config is non-existent
-        if self.pane.config is None:
-            self.pane.config = parameters
-            return
-        
-        # Update existing config
-        self.pane.config.update(parameters)
-    
-    def update_xaxis_title_text(self, title: str) -> None:
-        # Update layout
-        self.layout["xaxis"]["title"].update({"text": title})
-    
-    def servable(self) -> pn.Card:
-        return self.card
 
 class HistogramCard:
     def __init__(
