@@ -240,6 +240,16 @@ METRIC_SHORTHAND: dict[Metric, str] = {
 }
 """Mapping from Metrics to short column names."""
 
+METRIC_PLOTTING_LIMITS: dict[Metric, tuple[float, float]] = {
+    Metric.mean_relative_bias: (-1.0, 1.0),
+    Metric.pearson_correlation_coefficient: (-1.0, 1.0),
+    Metric.nash_sutcliffe_efficiency: (-1.0, 1.0),
+    Metric.relative_mean: (0.0, 2.0),
+    Metric.relative_variability: (0.0, 2.0),
+    Metric.kling_gupta_efficiency: (-1.0, 1.0)
+}
+"""Mapping from Metrics to plotting limist (cmin, cmax)."""
+
 CONFIDENCE_SHORTHAND: dict[Confidence, str] = {
     Confidence.point: "",
     Confidence.lower: "_lower",

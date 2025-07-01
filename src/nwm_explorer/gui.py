@@ -9,9 +9,8 @@ from panel.template import BootstrapTemplate
 from nwm_explorer.mappings import (EVALUATIONS, DOMAIN_STRINGS,
     DOMAIN_CONFIGURATION_MAPPING, Domain, Configuration, LEAD_TIME_VALUES,
     CONFIDENCE_STRINGS, Confidence, METRIC_STRINGS, Metric, DEFAULT_ZOOM,
-    METRIC_SHORTHAND, CONFIDENCE_SHORTHAND, CallbackType)
+    METRIC_SHORTHAND, CONFIDENCE_SHORTHAND, CallbackType, METRIC_PLOTTING_LIMITS)
 from nwm_explorer.readers import MetricReader, DashboardState, NWMReader, USGSReader
-from nwm_explorer.plotters import SiteMapPlotter
 from nwm_explorer.site_map import SiteMapCard
 from nwm_explorer.histogram import HistogramGrid
 from nwm_explorer.hydrographer import HydrographCard
@@ -199,50 +198,46 @@ class Dashboard:
             title="Status",
             collapsible=False
             )
-        
-        # Setup map
-        self.last_domain = self.state.domain
-        self.site_plotter = SiteMapPlotter()
-        self.site_map = pn.pane.Plotly(
-            self.site_plotter.figure, config={"displaylogo": False})
-        self.map_card = pn.Card(
-            self.site_map,
-            collapsible=False,
-            hide_header=True
-            )
-        
-        # Update data
-        self.data = self.metrics_reader.query(self.state)
 
-        def update_map(event, callback_type: CallbackType):
-            if event is None:
+        # Setup map
+        data = self.metrics_reader.query(self.state)
+        column = METRIC_SHORTHAND[self.state.metric] + CONFIDENCE_SHORTHAND[self.state.confidence]
+        self.site_map = SiteMapCard(
+            latitude=data["latitude"].to_numpy(),
+            longitude=data["longitude"].to_numpy(),
+            custom_data=data.select(["usgs_site_code", "nwm_feature_id"]),
+            values=data[column].to_numpy(),
+            value_label=self.state.metric_label,
+            value_limits=METRIC_PLOTTING_LIMITS[self.state.metric],
+            custom_labels=["USGS Site Code", "NWM Feature ID"],
+            default_zoom=DEFAULT_ZOOM[self.state.domain]
+        )
+
+        def update_map(event, callback_type: CallbackType) -> None:
+            if not event:
                 return
-            current_state = self.state
-            self.data = self.metrics_reader.query(current_state)
-            if self.data is None:
-                self.status_feed.insert(0,
-                    pn.pane.Alert("No data found", alert_type="warning"))
-                return
-            relayout_data = self.site_map.relayout_data
-            col = METRIC_SHORTHAND[current_state.metric] + CONFIDENCE_SHORTHAND[current_state.confidence]
             
-            if current_state.domain == self.last_domain and relayout_data is not None:
-                self.site_plotter.update_colors(
-                    values=self.data[col].to_numpy(),
-                    label=self.state.metric_label,
-                    relayout_data=relayout_data
+            data = self.metrics_reader.query(self.state)
+            column = METRIC_SHORTHAND[self.state.metric] + CONFIDENCE_SHORTHAND[self.state.confidence]
+
+            if callback_type in [CallbackType.domain, CallbackType.evaluation]:
+                self.site_map.update_points(
+                    latitude=data["latitude"].to_numpy(),
+                    longitude=data["longitude"].to_numpy(),
+                    custom_data=data.select(["usgs_site_code", "nwm_feature_id"]),
+                    values=data[column].to_numpy(),
+                    value_label=self.state.metric_label,
+                    value_limits=METRIC_PLOTTING_LIMITS[self.state.metric],
+                    custom_labels=["USGS Site Code", "NWM Feature ID"],
+                    default_zoom=DEFAULT_ZOOM[self.state.domain]
                 )
             else:
-                self.site_plotter.update_points(
-                    values=self.data[col].to_numpy(),
-                    latitude=self.data["latitude"].to_numpy(),
-                    longitude=self.data["longitude"].to_numpy(),
-                    metric_label=current_state.metric_label,
-                    zoom=DEFAULT_ZOOM[current_state.domain],
-                    custom_data=self.data.select(["usgs_site_code", "nwm_feature_id"])
+                self.site_map.update_values(
+                    values=data[column].to_numpy(),
+                    value_label=self.state.metric_label,
+                    value_limits=METRIC_PLOTTING_LIMITS[self.state.metric]
                 )
-                self.last_domain = current_state.domain
-            self.site_map.object = self.site_plotter.figure
+            self.site_map.refresh()
         self.filter_widgets.register_callback(update_map)
 
         # Setup histogram
@@ -271,25 +266,16 @@ class Dashboard:
                 return
             if callback_type == CallbackType.confidence:
                 return
-            bbox = None
-            relayout_data = self.site_map.relayout_data
-            if "map._derived" in relayout_data:
-                bbox = {
-                    "lat_max": relayout_data["map._derived"]["coordinates"][0][1],
-                    "lat_min": relayout_data["map._derived"]["coordinates"][2][1],
-                    "lon_max": relayout_data["map._derived"]["coordinates"][1][0],
-                    "lon_min": relayout_data["map._derived"]["coordinates"][0][0],
-                }
+
             datasets = []
             for c in self.hcolumns:
                 d = self.metrics_reader.query(self.state, [c, f"{c}_lower", f"{c}_upper"])
-                if bbox is not None:
-                    d = d.filter(
-                        pl.col("latitude") <= bbox["lat_max"],
-                        pl.col("latitude") >= bbox["lat_min"],
-                        pl.col("longitude") <= bbox["lon_max"],
-                        pl.col("longitude") >= bbox["lon_min"],
-                    )
+                d = d.filter(
+                    pl.col("latitude") <= self.site_map.lat_max,
+                    pl.col("latitude") >= self.site_map.lat_min,
+                    pl.col("longitude") <= self.site_map.lon_max,
+                    pl.col("longitude") >= self.site_map.lon_min,
+                )
                 datasets.append((
                     d[c].to_numpy(),
                     d[f"{c}_lower"].to_numpy(),
@@ -298,12 +284,10 @@ class Dashboard:
             self.hgrid.update_data(datasets)
             self.hgrid.refresh()
         self.filter_widgets.register_callback(update_histograms)
-        pn.bind(update_histograms, self.site_map.param.relayout_data, watch=True,
+        pn.bind(update_histograms, self.site_map.relayout_data, watch=True,
             callback_type=CallbackType.relayout)
         
         # Setup hydrograph
-        self.usgs_site_code = None
-        self.nwm_feature_id = None
         self.hydrograph: HydrographCard = None
         self.hydrograph_card = pn.pane.Placeholder(pn.Card(
             pn.pane.Markdown(
@@ -319,32 +303,29 @@ class Dashboard:
         def update_hydrograph(event, callback_type: CallbackType):
             if not event:
                 return
+            
+            if callback_type in [CallbackType.domain, CallbackType.configuration]:
+                return
+            
+            usgs_site_code = self.site_map.selection.get("usgs_site_code", None)
+            nwm_feature_id = self.site_map.selection.get("nwm_feature_id", None)
 
-            if callback_type == CallbackType.click:
-                self.usgs_site_code = event["points"][0]["customdata"][0]
-                self.nwm_feature_id = event["points"][0]["customdata"][1]
-            elif callback_type == CallbackType.domain:
-                self.usgs_site_code = None
-                self.nwm_feature_id = None
+            if usgs_site_code is None:
                 return
-            elif callback_type != CallbackType.configuration:
-                return
-
-            if self.usgs_site_code is None:
-                return
-            nwm_data = self.nwm_reader.query(self.state, self.nwm_feature_id)
+            
+            nwm_data = self.nwm_reader.query(self.state, nwm_feature_id)
 
             if nwm_data is None or nwm_data.is_empty():
                 return
             usgs_data = self.usgs_reader.query(
                 self.state.domain,
-                self.usgs_site_code,
+                usgs_site_code,
                 nwm_data["value_time"].min(),
                 nwm_data["value_time"].max()
             )
             xdata = [usgs_data["value_time"]]
             ydata = [usgs_data["value"]]
-            names = [f"USGS-{self.usgs_site_code}"]
+            names = [f"USGS-{usgs_site_code}"]
             
             if self.state.configuration in LEAD_TIME_VALUES:
                 for (rt,), forecast in nwm_data.partition_by("reference_time", as_dict=True, include_key=False).items():
@@ -372,7 +353,7 @@ class Dashboard:
                 )
                 self.hydrograph.refresh()
         self.filter_widgets.register_callback(update_hydrograph)
-        pn.bind(update_hydrograph, self.site_map.param.click_data, watch=True,
+        pn.bind(update_hydrograph, self.site_map.click_data, watch=True,
             callback_type=CallbackType.click)
         
         # Setup bar plot
@@ -394,10 +375,13 @@ class Dashboard:
 
             if callback_type not in [CallbackType.click, CallbackType.configuration, CallbackType.metric]:
                 return
+            
+            usgs_site_code = self.site_map.selection.get("usgs_site_code", None)
+            nwm_feature_id = self.site_map.selection.get("nwm_feature_id", None)
 
-            if self.usgs_site_code is None:
+            if usgs_site_code is None:
                 return
-            data = self.metrics_reader.query_site(self.state, self.nwm_feature_id)
+            data = self.metrics_reader.query_site(self.state, nwm_feature_id)
 
             if data is None or data.is_empty():
                 return
@@ -433,12 +417,12 @@ class Dashboard:
                 )
                 self.barplot.refresh()
         self.filter_widgets.register_callback(update_barplot)
-        pn.bind(update_barplot, self.site_map.param.click_data, watch=True,
+        pn.bind(update_barplot, self.site_map.click_data, watch=True,
             callback_type=CallbackType.click)
 
         # Layout cards
         controls = pn.Column(self.filter_card, status_card)
-        over_view = pn.Row(self.map_card, self.hgrid.servable())
+        over_view = pn.Row(self.site_map.servable(), self.hgrid.servable())
         site_view = pn.Row(self.hydrograph_card, self.barplot_card)
         layout = pn.Row(
             controls,
