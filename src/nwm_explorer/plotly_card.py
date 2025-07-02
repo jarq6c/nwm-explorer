@@ -1,8 +1,10 @@
+"""Visual components that display plots in cards."""
 from dataclasses import dataclass
 from typing import Any
 import panel as pn
 import plotly.graph_objects as go
 from plotly.basedatatypes import BaseTraceType
+pn.extension("plotly")
 
 @dataclass
 class PlotlyCard:

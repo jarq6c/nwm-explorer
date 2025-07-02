@@ -1,4 +1,4 @@
-"""Generate standardized histogram plots."""
+"""Generate standardized hydrograph plots."""
 import numpy.typing as npt
 import panel as pn
 import colorcet as cc

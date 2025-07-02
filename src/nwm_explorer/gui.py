@@ -16,8 +16,6 @@ from nwm_explorer.histogram import HistogramGrid
 from nwm_explorer.hydrographer import HydrographCard
 from nwm_explorer.barplot import BarPlot
 
-pn.extension("plotly")
-
 class FilteringWidgets:
     def __init__(self):
         # Filtering options

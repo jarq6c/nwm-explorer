@@ -1,10 +1,10 @@
-"""Display bar plots."""
+"""Display standardized bar plots."""
 import numpy as np
 import numpy.typing as npt
 import panel as pn
 import plotly.graph_objects as go
 from nwm_explorer.plotly_card import PlotlyCard
-    
+
 class BarPlot:
     def __init__(
             self,
