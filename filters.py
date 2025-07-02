@@ -308,7 +308,13 @@ class FilteringWidgets:
 
 def main():
     filters = FilteringWidgets()
-    pn.serve(filters.servable())
+    output = pn.pane.Markdown("Update")
+    def update_output(event, callback_type):
+        if event is None:
+            return
+        output.object = str(filters.state)
+    filters.register_callback(update_output)
+    pn.serve(pn.Row(filters.servable(), output))
 
 if __name__ == "__main__":
     main()
