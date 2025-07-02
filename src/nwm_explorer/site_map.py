@@ -1,4 +1,4 @@
-"""Site map card."""
+"""Site map."""
 from typing import Any
 import numpy as np
 import numpy.typing as npt
@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 import colorcet as cc
 from nwm_explorer.plotly_card import PlotlyCard
 
-class SiteMapCard:
+class SiteMap:
     def __init__(
             self,
             latitude: npt.ArrayLike,
