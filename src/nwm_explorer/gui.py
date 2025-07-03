@@ -27,9 +27,9 @@ class Dashboard:
                 longitude=[-87.54662400303468],
                 custom_data=pl.DataFrame({"A": ["1234"], "B": [4325]}),
                 values=[0.567],
-                value_label="KGE",
+                value_label=f"KGE {idx}",
                 value_limits=(0.0, 1.0),
-                custom_labels=["First", "Second"],
+                custom_labels=[f"First {idx}", f"Second {idx}"],
                 default_zoom=15
             ).servable()
         self.site_map = pn.pane.Placeholder(self.site_maps[self.filters.state.domain])

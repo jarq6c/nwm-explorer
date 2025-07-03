@@ -95,6 +95,11 @@ class SiteMap:
         self.columns = custom_data.columns
         self.selection: dict[str, Any] = {}
         pn.bind(self.update_selection, self.click_data, watch=True)
+
+        def handle_double_click(event):
+            print(event)
+            print("got it")
+        pn.bind(handle_double_click, self.card.pane.param.doubleclick_data, watch=True)
     
     @property
     def click_data(self) -> dict:
@@ -151,18 +156,20 @@ class SiteMap:
             self.hover_template += f"{c}: %" + "{customdata[" + str(idx) + "]}<br>"
 
         # Make map
-        markers = dict(
-            color=values,
-            colorbar=dict(
-                title=dict(
-                    text=value_label,
-                    side="right"
-                    )
-                ),
-            cmin=value_limits[0],
-            cmax=value_limits[1]
-        )
-        data = dict(
+        data = [go.Scattermap(
+            marker=dict(
+                color=values,
+                colorbar=dict(
+                    title=dict(
+                        text=value_label,
+                        side="right"
+                        )
+                    ),
+                cmin=value_limits[0],
+                cmax=value_limits[1],
+                size=15,
+                colorscale=cc.gouldian
+            ),
             lat=latitude,
             lon=longitude,
             customdata=custom_data,
@@ -172,8 +179,11 @@ class SiteMap:
                 "Latitude: %{lat}"
                 f"<br>{value_label}: "
                 "%{marker.color:.2f}"
-            )
-        )
+            ),
+            showlegend=False,
+            name="",
+            mode="markers"
+        )]
 
         # Default map options
         self.map_center = {
@@ -182,19 +192,39 @@ class SiteMap:
         }
         self.map_zoom = default_zoom
 
-        # Update card
-        self.card.data[0].update(data)
-        self.card.data[0]["marker"].update(markers)
-        self.card.layout["map"].update(dict(
-            center=self.map_center,
-            zoom=self.map_zoom
-        ))
-
         # Boundaries
         self.lat_min = np.min(latitude)
         self.lat_max = np.max(latitude)
         self.lon_min = np.min(longitude)
         self.lon_max = np.max(longitude)
+
+        # Update card
+        self.card.data = data
+        self.card.layout=go.Layout(
+            showlegend=False,
+            height=540,
+            width=850,
+            margin=dict(l=0, r=0, t=0, b=0),
+            map=dict(
+                style="satellite-streets",
+                center=self.map_center,
+                zoom=self.map_zoom
+            ),
+            clickmode="event",
+            modebar=dict(
+                remove=["lasso", "select"],
+                orientation="v"
+            ),
+            dragmode="zoom",
+            geo=dict(
+                lataxis=dict(
+                    range=[self.lat_min, self.lat_max]
+                ),
+                lonaxis=dict(
+                    range=[self.lon_min, self.lon_max]
+                )
+            )
+        )
 
         # Click data
         self.columns = custom_data.columns
