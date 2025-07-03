@@ -149,9 +149,20 @@ class SiteMap:
         self.hover_template = ""
         for idx, c in enumerate(custom_labels):
             self.hover_template += f"{c}: %" + "{customdata[" + str(idx) + "]}<br>"
-        
-        # Data
-        self.card.update_data(dict(
+
+        # Make map
+        markers = dict(
+            color=values,
+            colorbar=dict(
+                title=dict(
+                    text=value_label,
+                    side="right"
+                    )
+                ),
+            cmin=value_limits[0],
+            cmax=value_limits[1]
+        )
+        data = dict(
             lat=latitude,
             lon=longitude,
             customdata=custom_data,
@@ -162,19 +173,7 @@ class SiteMap:
                 f"<br>{value_label}: "
                 "%{marker.color:.2f}"
             )
-        ))
-
-        # Markers
-        self.card.update_markers(dict(
-            color=values,
-            colorbar=dict(
-                title=dict(
-                    text=value_label
-                    )
-                ),
-            cmin=value_limits[0],
-            cmax=value_limits[1]
-        ))
+        )
 
         # Default map options
         self.map_center = {
@@ -183,13 +182,15 @@ class SiteMap:
         }
         self.map_zoom = default_zoom
 
-        # Re-center map
-        self.card.recenter_map(dict(
+        # Update card
+        self.card.data[0].update(data)
+        self.card.data[0]["marker"].update(markers)
+        self.card.layout["map"].update(dict(
             center=self.map_center,
             zoom=self.map_zoom
         ))
 
-        # Update boundaries
+        # Boundaries
         self.lat_min = np.min(latitude)
         self.lat_max = np.max(latitude)
         self.lon_min = np.min(longitude)
