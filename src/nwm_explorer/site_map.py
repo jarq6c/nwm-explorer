@@ -99,6 +99,11 @@ class SiteMap:
         def handle_double_click(event):
             print(event)
             print("got it")
+            self.card.update_layout(dict(map=dict(
+                    center={"lat": 33.20563855835994, "lon": -87.54662400303468},
+                    zoom=10
+                ),))
+            self.refresh()
         pn.bind(handle_double_click, self.card.pane.param.doubleclick_data, watch=True)
     
     @property
