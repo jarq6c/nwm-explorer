@@ -5,6 +5,7 @@ import pandas as pd
 
 from nwm_explorer.data.routelink import download_routelinks, get_routelink_readers
 from nwm_explorer.data.nwm import download_nwm, get_nwm_readers
+from nwm_explorer.data.usgs import download_usgs, get_usgs_readers
 
 # CSV_HEADERS: dict[str, str] = {
 #     "value_time": "Datetime of measurement or forecast valid time (UTC) (datetime string)",
@@ -120,9 +121,19 @@ def build(
 
     # Scan NWM data
     predictions = get_nwm_readers(startDT, endDT, directory)
-    for (d, c), df in predictions.items():
-        print(d, c)
-        print(df.collect())
+
+    # Determine date range for observations
+    first = startDT
+    last = endDT
+    for df in predictions.values():
+        first = min(first, df.select("value_time").min().collect().item(0, 0))
+        last = max(last, df.select("value_time").max().collect().item(0, 0))
+    
+    # Download observations, if needed
+    download_usgs(first, last, directory, routelinks, jobs)
+
+    # Scan USGS data
+    observations = get_usgs_readers(first, last, directory)
 
 # @export_group.command()
 # @click.argument("domain", nargs=1, required=True, type=click.Choice(Domain))
