@@ -32,7 +32,14 @@ def build_routelink_filepaths(root: Path) -> dict[ModelDomain, Path]:
     return {d: build_routelink_filepath(root, d) for d in ROUTELINK_FILENAMES}
 
 def get_routelink_reader(root: Path, domain: ModelDomain) -> pl.LazyFrame:
-    return pl.scan_parquet(build_routelink_filepath(root, domain))
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+    
+    # Get file path
+    fp = build_routelink_filepath(root, domain)
+    logger.info(f"Scanning {fp}")
+    return pl.scan_parquet(fp)
 
 def get_routelink_readers(root: Path) -> dict[ModelDomain, pl.LazyFrame]:
     """Returns mapping from ModelDomain to polars.LazyFrame."""
