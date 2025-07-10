@@ -1,7 +1,6 @@
 """Utilities to support downloading files."""
 from typing import Callable
 from time import sleep
-import tarfile
 from pathlib import Path
 import asyncio
 import aiohttp.client_exceptions
@@ -12,10 +11,9 @@ import aiofiles
 import ssl
 from http import HTTPStatus
 import warnings
+import inspect
 
-# from nwm_explorer.urls import ROUTELINKS_URL
-# from nwm_explorer.manifests import ROUTELINKS_MANIFEST
-# from nwm_explorer.logger import get_logger
+from nwm_explorer.logging.logger import get_logger
 
 def default_file_validator(filepath: Path) -> None:
     """
@@ -224,14 +222,17 @@ def download_files(
     ...     ("https://numpy.org/doc/stable/index.html", "numpy_index.html")
     ...     )
     """
-    # logger = get_logger("nwm_explorer.downloads.download_files")
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+
     # SSL
     if ssl_context is None:
         ssl_context = ssl.create_default_context()
 
     # Retrieve
     for attempt in range(10):
-        # logger.info(f"Downloading files, attempt {attempt}")
+        logger.info(f"Downloading files, attempt {attempt}")
         try:
             asyncio.run(
                 download_files_awaitable(
@@ -256,11 +257,11 @@ def download_files(
             warnings.warn("Failed to write file, trying again", RuntimeWarning)
 
         # Validate files
-        # logger.info("Validating files, this will take some time")
+        logger.info("Validating files, this will take some time")
         filepaths = [Path(dst) for _, dst in src_dst]
         validated = 0
         for fp in filepaths:
-            # logger.info(f"{fp}")
+            logger.info(f"{fp}")
             if fp.exists():
                 try:
                     file_validator(fp)
@@ -274,53 +275,8 @@ def download_files(
             warnings.warn("Unable to retrieve any files", RuntimeWarning)
             return
         if validated == len(filepaths):
-            # logger.info("All files validated")
+            logger.info("All files validated")
             return
         warnings.warn("Unable to retrieve all files, trying again", RuntimeWarning)
         sleep(5 * 2 ** attempt)
     warnings.warn("Unable to retrieve all files", RuntimeWarning)
-
-# def download_routelinks(
-#         directory: str | Path = Path("."),
-#         create_directory: bool = True,
-#         url: str | URL = ROUTELINKS_URL,
-#         manifest: tuple[Path, ...] | None = ROUTELINKS_MANIFEST,
-#         read_only: bool = False
-#         ) -> tuple[Path, ...]:
-#     """
-#     Download routelink tarball from url. Save to directory and extract.
-    
-#     Parameters
-#     ----------
-#     directory: str | Path, optional, default "."
-#         Destination to save and extract files.
-#     create_directory: bool, optional, default True
-#         Create specified directory and parents.
-#     url: str | URL, optional
-#         Source URL to download. Defaults to HydroShare source.
-#     manifest: list[str], optional
-#         List of expected filepaths beneath directory after download and
-#         extraction.
-#     read_only: bool, optional, default True
-#         Skip directory creation, download, and extraction. Assumes files
-#         have already been downloaded.
-
-#     Returns
-#     -------
-#     Tuple of Path objects to routelinks in .csv format.
-#     """
-#     url = URL(url)
-#     directory = Path(directory)
-#     filepath = directory / url.name
-#     if filepath.exists() or read_only:
-#         return tuple(
-#             directory / fp for fp in manifest if (directory / fp).exists()
-#             )
-#     if create_directory:
-#         directory.mkdir(exist_ok=True, parents=True)
-#     download_files((url, filepath))
-#     with tarfile.open(filepath, "r:gz") as tf:
-#         tf.extractall(directory)
-#     return tuple(
-#         directory / fp for fp in manifest if (directory / fp).exists()
-#         )
