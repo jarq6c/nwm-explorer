@@ -508,8 +508,8 @@ def short_range_puertorico_no_da(
 NWM_URL_BUILDERS: dict[tuple[ModelDomain, ModelConfiguration], Callable[[pd.Timestamp], list[str]]] = {
     (ModelDomain.alaska, ModelConfiguration.analysis_assim_extend_alaska_no_da): analysis_assim_extend_alaska_no_da,
     # (ModelDomain.conus, ModelConfiguration.analysis_assim_extend_no_da): analysis_assim_extend_no_da,
-    # (ModelDomain.hawaii, ModelConfiguration.analysis_assim_hawaii_no_da): analysis_assim_hawaii_no_da,
-    # (ModelDomain.puertorico, ModelConfiguration.analysis_assim_puertorico_no_da): analysis_assim_puertorico_no_da,
+    (ModelDomain.hawaii, ModelConfiguration.analysis_assim_hawaii_no_da): analysis_assim_hawaii_no_da,
+    (ModelDomain.puertorico, ModelConfiguration.analysis_assim_puertorico_no_da): analysis_assim_puertorico_no_da,
     # (ModelDomain.conus, ModelConfiguration.medium_range_mem1): medium_range_mem1,
     # (ModelDomain.conus, ModelConfiguration.medium_range_blend): medium_range_blend,
     # (ModelDomain.conus, ModelConfiguration.medium_range_no_da): medium_range_no_da,
@@ -518,10 +518,10 @@ NWM_URL_BUILDERS: dict[tuple[ModelDomain, ModelConfiguration], Callable[[pd.Time
     # (ModelDomain.alaska, ModelConfiguration.medium_range_alaska_no_da): medium_range_alaska_no_da,
     # (ModelDomain.conus, ModelConfiguration.short_range): short_range,
     # (ModelDomain.alaska, ModelConfiguration.short_range_alaska): short_range_alaska,
-    # (ModelDomain.hawaii, ModelConfiguration.short_range_hawaii): short_range_hawaii,
-    # (ModelDomain.hawaii, ModelConfiguration.short_range_hawaii_no_da): short_range_hawaii_no_da,
-    # (ModelDomain.puertorico, ModelConfiguration.short_range_puertorico): short_range_puertorico,
-    # (ModelDomain.puertorico, ModelConfiguration.short_range_puertorico_no_da): short_range_puertorico_no_da
+    (ModelDomain.hawaii, ModelConfiguration.short_range_hawaii): short_range_hawaii,
+    (ModelDomain.hawaii, ModelConfiguration.short_range_hawaii_no_da): short_range_hawaii_no_da,
+    (ModelDomain.puertorico, ModelConfiguration.short_range_puertorico): short_range_puertorico,
+    (ModelDomain.puertorico, ModelConfiguration.short_range_puertorico_no_da): short_range_puertorico_no_da
 }
 """Mapping from (ModelDomain, ModelConfiguration) to url builder function."""
 
@@ -558,20 +558,30 @@ def build_nwm_file_details(
                 ))
     return details
 
-def get_nwm_reader(root: Path, domain: ModelDomain) -> pl.LazyFrame:
+def get_nwm_reader(
+    root: Path,
+    domain: ModelDomain,
+    configuration: ModelConfiguration,
+    reference_dates: list[pd.Timestamp]
+    ) -> pl.LazyFrame:
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
     
     # Get file path
-    fp = build_nwm_filepath(root, domain)
-    logger.info(f"Scanning {fp}")
-    return pl.scan_parquet(fp)
+    logger.info(f"Scanning {domain} {configuration} {reference_dates[0]} to {reference_dates[-1]}")
+    file_paths = [build_nwm_filepath(root, domain, configuration, rd) for rd in reference_dates]
+    return pl.scan_parquet(file_paths)
 
-def get_nwm_readers(root: Path) -> dict[ModelDomain, pl.LazyFrame]:
+def get_nwm_readers(
+    startDT: pd.Timestamp,
+    endDT: pd.Timestamp,
+    root: Path
+    ) -> dict[tuple[ModelDomain, ModelConfiguration], pl.LazyFrame]:
     """Returns mapping from ModelDomain to polars.LazyFrame."""
-    return 1
-    return {d: get_nwm_reader(root, d) for d in nwm_FILENAMES}
+    # Generate reference dates
+    reference_dates = generate_reference_dates(startDT, endDT)
+    return {(d, c): get_nwm_reader(root, d, c, reference_dates) for d, c in NWM_URL_BUILDERS}
 
 def download_nwm(
     startDT: pd.Timestamp,

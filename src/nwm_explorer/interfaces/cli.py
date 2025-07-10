@@ -119,7 +119,10 @@ def build(
     download_nwm(startDT, endDT, directory, routelinks, jobs)
 
     # Scan NWM data
-    # predictions = get_nwm_readers(startDT, endDT, directory)
+    predictions = get_nwm_readers(startDT, endDT, directory)
+    for (d, c), df in predictions.items():
+        print(d, c)
+        print(df.collect())
 
 # @export_group.command()
 # @click.argument("domain", nargs=1, required=True, type=click.Choice(Domain))
