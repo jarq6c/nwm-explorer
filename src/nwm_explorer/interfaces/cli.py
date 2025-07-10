@@ -2,7 +2,9 @@
 from pathlib import Path
 import click
 import pandas as pd
+
 from nwm_explorer.data.routelink import download_routelinks, get_routelink_readers
+from nwm_explorer.data.nwm import download_nwm, get_nwm_readers
 
 # CSV_HEADERS: dict[str, str] = {
 #     "value_time": "Datetime of measurement or forecast valid time (UTC) (datetime string)",
@@ -99,10 +101,12 @@ build_group = click.Group()
 @click.option("-s", "--startDT", "startDT", nargs=1, required=True, type=TimestampParamType(), help="Start datetime")
 @click.option("-e", "--endDT", "endDT", nargs=1, required=True, type=TimestampParamType(), help="End datetime")
 @click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data-new", help="Data directory (./data-new)")
+@click.option("-j", "--jobs", "jobs", nargs=1, required=False, type=click.INT, default=1, help="Maximum number of parallel processes (1)")
 def build(
     startDT: pd.Timestamp,
     endDT: pd.Timestamp,
-    directory: Path = Path("data-new")
+    directory: Path = Path("data-new"),
+    jobs: int = 1
     ) -> None:
     """Retrieve and process required evaluation data."""
     # Download routelink, if missing
@@ -110,6 +114,12 @@ def build(
 
     # Scan routelinks
     routelinks = get_routelink_readers(directory)
+
+    # Download NWM data, if needed
+    download_nwm(startDT, endDT, directory, routelinks, jobs)
+
+    # Scan NWM data
+    # predictions = get_nwm_readers(startDT, endDT, directory)
 
 # @export_group.command()
 # @click.argument("domain", nargs=1, required=True, type=click.Choice(Domain))
