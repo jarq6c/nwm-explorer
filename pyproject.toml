@@ -55,3 +55,4 @@ Repository = "https://github.com/jarq6c/nwm-explorer"
 
 [project.scripts]
 nwm-explorer = "nwm_explorer.cli:cli"
+new-explorer = "nwm_explorer.interfaces.cli:cli"
