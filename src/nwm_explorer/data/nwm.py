@@ -649,4 +649,7 @@ def download_nwm(
 
     # Clean-up
     logger.info(f"Cleaning up {temporary_directory}")
-    temporary_directory.rmdir()
+    try:
+        temporary_directory.rmdir()
+    except OSError:
+        logger.info(f"Unable to clean-up {temporary_directory}")
