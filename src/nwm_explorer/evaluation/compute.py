@@ -7,7 +7,7 @@ import pandas as pd
 
 from nwm_explorer.logging.logger import get_logger
 from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration
-from nwm_explorer.data.nwm import generate_reference_dates, build_nwm_file_details
+from nwm_explorer.data.nwm import generate_reference_dates, build_nwm_file_details, NWM_URL_BUILDERS
 from nwm_explorer.data.usgs import get_usgs_reader
 
 OBSERVATION_RESAMPLING: dict[ModelDomain, tuple[str]] = {
@@ -34,7 +34,7 @@ PREDICTION_RESAMPLING: dict[ModelConfiguration, tuple[pl.Duration, str]] = {
 }
 """Mapping used for computing lead time and sampling frequency."""
 
-def pair_data(
+def generate_pairs(
     startDT: pd.Timestamp,
     endDT: pd.Timestamp,
     root: Path,
@@ -137,6 +137,40 @@ def pair_data(
             logger.info(f"Saving {ofile}")
             pairs.write_parquet(ofile)
 
+def build_pairs_filepath(
+    root: Path,
+    domain: ModelDomain,
+    configuration: ModelConfiguration,
+    reference_date: pd.Timestamp
+    ) -> Path:
+    date_string = reference_date.strftime("nwm.%Y%m%d")
+    return root / "parquet" / domain / date_string / f"{configuration}_pairs_cfs.parquet"
+
+def get_pairs_reader(
+    root: Path,
+    domain: ModelDomain,
+    configuration: ModelConfiguration,
+    reference_dates: list[pd.Timestamp]
+    ) -> pl.LazyFrame:
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+    
+    # Get file path
+    logger.info(f"Scanning {domain} {configuration} {reference_dates[0]} to {reference_dates[-1]}")
+    file_paths = [build_pairs_filepath(root, domain, configuration, rd) for rd in reference_dates]
+    return pl.scan_parquet([fp for fp in file_paths if fp.exists()])
+
+def get_pairs_readers(
+    startDT: pd.Timestamp,
+    endDT: pd.Timestamp,
+    root: Path
+    ) -> dict[tuple[ModelDomain, ModelConfiguration], pl.LazyFrame]:
+    """Returns mapping from ModelDomain to polars.LazyFrame."""
+    # Generate reference dates
+    reference_dates = generate_reference_dates(startDT, endDT)
+    return {(d, c): get_pairs_reader(root, d, c, reference_dates) for d, c in NWM_URL_BUILDERS}
+
 def compute_metrics(
     startDT: pd.Timestamp,
     endDT: pd.Timestamp,
@@ -149,9 +183,30 @@ def compute_metrics(
     logger = get_logger(name)
 
     # Pair data
-    pair_data(
+    generate_pairs(
         startDT,
         endDT,
         root,
         routelinks
     )
+
+    # Scan
+    pairs = get_pairs_readers(startDT, endDT, root)
+    for (d, c), data in pairs.items():
+        # Handle simulations
+        if c not in PREDICTION_RESAMPLING:
+            # Resolve duplicate predictions
+            data = data.sort(
+                    ("nwm_feature_id", "value_time")
+                ).group_by_dynamic(
+                    "value_time",
+                    every="1d",
+                    group_by="nwm_feature_id"
+                ).agg(
+                    pl.col("predicted").max(),
+                    pl.col("observed").max(),
+                    pl.col("usgs_site_code").first()
+                )
+        print(d, c)
+        print(data.filter(pl.col("nwm_feature_id") == 19020190011954).collect())
+        break
