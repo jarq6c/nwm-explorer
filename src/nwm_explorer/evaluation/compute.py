@@ -4,7 +4,6 @@ import inspect
 
 import polars as pl
 import pandas as pd
-import numpy as np
 
 from nwm_explorer.logging.logger import get_logger
 from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration
@@ -35,12 +34,11 @@ PREDICTION_RESAMPLING: dict[ModelConfiguration, tuple[pl.Duration, str]] = {
 }
 """Mapping used for computing lead time and sampling frequency."""
 
-def compute_metrics(
+def pair_data(
     startDT: pd.Timestamp,
     endDT: pd.Timestamp,
     root: Path,
-    routelinks: dict[ModelDomain, pl.LazyFrame],
-    jobs: int
+    routelinks: dict[ModelDomain, pl.LazyFrame]
     ) -> None:
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
@@ -138,3 +136,22 @@ def compute_metrics(
             
             logger.info(f"Saving {ofile}")
             pairs.write_parquet(ofile)
+
+def compute_metrics(
+    startDT: pd.Timestamp,
+    endDT: pd.Timestamp,
+    root: Path,
+    routelinks: dict[ModelDomain, pl.LazyFrame],
+    jobs: int
+    ) -> None:
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+
+    # Pair data
+    pair_data(
+        startDT,
+        endDT,
+        root,
+        routelinks
+    )
