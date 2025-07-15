@@ -507,17 +507,17 @@ def short_range_puertorico_no_da(
 
 NWM_URL_BUILDERS: dict[tuple[ModelDomain, ModelConfiguration], Callable[[pd.Timestamp], list[str]]] = {
     (ModelDomain.alaska, ModelConfiguration.analysis_assim_extend_alaska_no_da): analysis_assim_extend_alaska_no_da,
-    # (ModelDomain.conus, ModelConfiguration.analysis_assim_extend_no_da): analysis_assim_extend_no_da,
+    (ModelDomain.conus, ModelConfiguration.analysis_assim_extend_no_da): analysis_assim_extend_no_da,
     (ModelDomain.hawaii, ModelConfiguration.analysis_assim_hawaii_no_da): analysis_assim_hawaii_no_da,
     (ModelDomain.puertorico, ModelConfiguration.analysis_assim_puertorico_no_da): analysis_assim_puertorico_no_da,
-    # (ModelDomain.conus, ModelConfiguration.medium_range_mem1): medium_range_mem1,
-    # (ModelDomain.conus, ModelConfiguration.medium_range_blend): medium_range_blend,
-    # (ModelDomain.conus, ModelConfiguration.medium_range_no_da): medium_range_no_da,
-    # (ModelDomain.alaska, ModelConfiguration.medium_range_alaska_mem1): medium_range_alaska_mem1,
-    # (ModelDomain.alaska, ModelConfiguration.medium_range_blend_alaska): medium_range_blend_alaska,
-    # (ModelDomain.alaska, ModelConfiguration.medium_range_alaska_no_da): medium_range_alaska_no_da,
-    # (ModelDomain.conus, ModelConfiguration.short_range): short_range,
-    # (ModelDomain.alaska, ModelConfiguration.short_range_alaska): short_range_alaska,
+    (ModelDomain.conus, ModelConfiguration.medium_range_mem1): medium_range_mem1,
+    (ModelDomain.conus, ModelConfiguration.medium_range_blend): medium_range_blend,
+    (ModelDomain.conus, ModelConfiguration.medium_range_no_da): medium_range_no_da,
+    (ModelDomain.alaska, ModelConfiguration.medium_range_alaska_mem1): medium_range_alaska_mem1,
+    (ModelDomain.alaska, ModelConfiguration.medium_range_blend_alaska): medium_range_blend_alaska,
+    (ModelDomain.alaska, ModelConfiguration.medium_range_alaska_no_da): medium_range_alaska_no_da,
+    (ModelDomain.conus, ModelConfiguration.short_range): short_range,
+    (ModelDomain.alaska, ModelConfiguration.short_range_alaska): short_range_alaska,
     (ModelDomain.hawaii, ModelConfiguration.short_range_hawaii): short_range_hawaii,
     (ModelDomain.hawaii, ModelConfiguration.short_range_hawaii_no_da): short_range_hawaii_no_da,
     (ModelDomain.puertorico, ModelConfiguration.short_range_puertorico): short_range_puertorico,
@@ -571,7 +571,7 @@ def get_nwm_reader(
     # Get file path
     logger.info(f"Scanning {domain} {configuration} {reference_dates[0]} to {reference_dates[-1]}")
     file_paths = [build_nwm_filepath(root, domain, configuration, rd) for rd in reference_dates]
-    return pl.scan_parquet(file_paths)
+    return pl.scan_parquet([fp for fp in file_paths if fp.exists()])
 
 def get_nwm_readers(
     startDT: pd.Timestamp,
@@ -630,6 +630,11 @@ def download_nwm(
             timeout=3600,
             file_validator=netcdf_validator
         )
+        file_paths = [fp for fp in file_paths if fp.exists()]
+
+        if len(file_paths) == 0:
+            logger.info("No data found")
+            continue
 
         logger.info("Processing NWM data")
         data = process_netcdf_parallel(

@@ -89,6 +89,16 @@ def download_routelinks(root: Path) -> None:
             comment_prefix="#",
             schema_overrides={"usgs_site_code": pl.String}
         )
+        
+        if d == ModelDomain.conus:
+            df = df.with_columns(
+                    pl.col("usgs_site_code").replace("8313150", "08313150")
+                )
+
+        # Limit usgs_site_code to digits
+        pdf = df.to_pandas()
+        pdf = pdf[pdf["usgs_site_code"].str.isdigit()]
+        df = pl.DataFrame(pdf)
         df.write_parquet(ofile)
         ifile.unlink()
     
