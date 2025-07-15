@@ -541,21 +541,29 @@ class PredictionFileDetails:
     configuration: ModelConfiguration
     path: Path
     builder: Callable[[pd.Timestamp], list[str]]
-    features: np.ndarray[np.int64]
+    features: np.ndarray[np.int64] | None = None
 
 def build_nwm_file_details(
     root: Path,
     reference_dates: list[pd.Timestamp],
-    features: dict[ModelDomain, np.ndarray[np.int64]]
+    features: dict[ModelDomain, np.ndarray[np.int64]] | None = None
     ) -> list[PredictionFileDetails]:
     """Returns list of file details matching parameters."""
     details = []
-    for (d, c), b in NWM_URL_BUILDERS.items():
-        for rd in reference_dates:
-            details.append(
-                PredictionFileDetails(
-                    d, rd, c, build_nwm_filepath(root, d, c, rd), b, features[d]
-                ))
+    if features is not None:
+        for (d, c), b in NWM_URL_BUILDERS.items():
+            for rd in reference_dates:
+                details.append(
+                    PredictionFileDetails(
+                        d, rd, c, build_nwm_filepath(root, d, c, rd), b, features[d]
+                    ))
+    else:
+        for (d, c), b in NWM_URL_BUILDERS.items():
+            for rd in reference_dates:
+                details.append(
+                    PredictionFileDetails(
+                        d, rd, c, build_nwm_filepath(root, d, c, rd), b, None
+                    ))
     return details
 
 def get_nwm_reader(
