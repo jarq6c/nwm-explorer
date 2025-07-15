@@ -532,7 +532,7 @@ def build_nwm_filepath(
     reference_date: pd.Timestamp
     ) -> Path:
     date_string = reference_date.strftime("nwm.%Y%m%d")
-    return root / "parquet" / domain / date_string / f"{configuration}.parquet"
+    return root / "parquet" / domain / date_string / f"{configuration}_streamflow_cfs.parquet"
 
 @dataclass
 class PredictionFileDetails:

@@ -74,12 +74,12 @@ export_group = click.Group("export")
 @build_group.command()
 @click.option("-s", "--startDT", "startDT", nargs=1, required=True, type=TimestampParamType(), help="Start datetime")
 @click.option("-e", "--endDT", "endDT", nargs=1, required=True, type=TimestampParamType(), help="End datetime")
-@click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data-new", help="Data directory (./data-new)")
+@click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
 @click.option("-j", "--jobs", "jobs", nargs=1, required=False, type=click.INT, default=1, help="Maximum number of parallel processes (1)")
 def build(
     startDT: pd.Timestamp,
     endDT: pd.Timestamp,
-    directory: Path = Path("data-new"),
+    directory: Path = Path("data"),
     jobs: int = 1
     ) -> None:
     """Retrieve and process required evaluation data."""
@@ -124,7 +124,7 @@ def export():
 @click.option("-e", "--endDT", "endDT", nargs=1, required=True, type=TimestampParamType(), help="End datetime")
 @click.option('--comments/--no-comments', default=True, help="Enable/disable comments in output, enabled by default")
 @click.option('--header/--no-header', default=True, help="Enable/disable header in output, enabled by default")
-@click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data-new", help="Data directory (./data-new)")
+@click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
 def predictions(
     domain: ModelDomain,
     configuration: ModelConfiguration,
@@ -133,7 +133,7 @@ def predictions(
     endDT: pd.Timestamp,
     comments: bool = True,
     header: bool = True,
-    directory: Path = Path("data-new")
+    directory: Path = Path("data")
     ) -> None:
     """Export NWM evaluation data to CSV format.
 
@@ -155,7 +155,7 @@ def predictions(
 @click.option("-e", "--endDT", "endDT", nargs=1, required=True, type=TimestampParamType(), help="End datetime")
 @click.option('--comments/--no-comments', default=True, help="Enable/disable comments in output, enabled by default")
 @click.option('--header/--no-header', default=True, help="Enable/disable header in output, enabled by default")
-@click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data-new", help="Data directory (./data-new)")
+@click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
 def observations(
     domain: ModelDomain,
     output: click.File,
@@ -163,7 +163,7 @@ def observations(
     endDT: pd.Timestamp,
     comments: bool = True,
     header: bool = True,
-    directory: Path = Path("data-new")
+    directory: Path = Path("data")
     ) -> None:
     """Export USGS observations to CSV format.
 
