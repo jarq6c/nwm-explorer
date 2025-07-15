@@ -62,16 +62,23 @@ def compute_metrics(
     logger.info("Pairing NWM data")
     for fd in file_details:
         if fd.path.exists():
+            ofile = Path(fd.path.parent) / fd.path.name.replace("streamflow", "pairs")
+            if ofile.exists():
+                logger.info(f"Found {ofile}")
+                continue
+            logger.info(f"Building {ofile}")
             logger.info(f"Loading {fd.path}")
             sim = pl.read_parquet(fd.path)
             first = sim["value_time"].min()
             last = sim["value_time"].max()
 
             logger.info("Loading observations")
-            obs = get_usgs_reader(root, fd.domain, first, last).collect()
+            obs = get_usgs_reader(root, fd.domain, first, last).with_columns(
+                pl.col("observed").cast(pl.Float32)
+            ).collect()
             xwalk = crosswalk[fd.domain]
 
-            logger.info(f"Resampling {fd.path}")
+            logger.info(f"Resampling")
             if fd.configuration in PREDICTION_RESAMPLING:
                 sampling_duration = PREDICTION_RESAMPLING[fd.configuration][0]
                 resampling_frequency = PREDICTION_RESAMPLING[fd.configuration][1]
@@ -82,7 +89,7 @@ def compute_metrics(
                     ((pl.col("value_time").sub(
                         pl.col("reference_time")
                         ) / sampling_duration).floor() *
-                            hours).alias("lead_time_hours_min")
+                            hours).cast(pl.Int32).alias("lead_time_hours_min")
                 ).group_by_dynamic(
                     "value_time",
                     every=resampling_frequency,
@@ -90,6 +97,15 @@ def compute_metrics(
                 ).agg(
                     pl.col("predicted").max(),
                     pl.col("lead_time_hours_min").min()
+                )
+                obs = obs.sort(
+                    ("usgs_site_code", "value_time")
+                ).group_by_dynamic(
+                    "value_time",
+                    every=resampling_frequency,
+                    group_by="usgs_site_code"
+                ).agg(
+                    pl.col("observed").max()
                 )
             else:
                 # NOTE This will result in two simulation values per
@@ -103,5 +119,22 @@ def compute_metrics(
                 ).agg(
                     pl.col("predicted").max()
                 )
-            print(sim.head())
-            break
+                obs = obs.sort(
+                    ("usgs_site_code", "value_time")
+                ).group_by_dynamic(
+                    "value_time",
+                    every="1d",
+                    group_by="usgs_site_code"
+                ).agg(
+                    pl.col("observed").max()
+                )
+            
+            obs = obs.with_columns(
+                nwm_feature_id=pl.col("usgs_site_code").replace_strict(
+                    xwalk["usgs_site_code"], xwalk["nwm_feature_id"])
+                )
+            pairs = sim.join(obs, on=["nwm_feature_id", "value_time"],
+                how="left").drop_nulls()
+            
+            logger.info(f"Saving {ofile}")
+            pairs.write_parquet(ofile)
