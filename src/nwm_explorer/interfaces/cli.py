@@ -194,26 +194,8 @@ def evaluate(
     # Scan routelinks
     routelinks = get_routelink_readers(directory)
 
-    # Scan NWM data
-    model_output = get_nwm_readers(startDT, endDT, directory)
-
-    # Determine date range for observations
-    first = startDT
-    last = endDT
-    for df in model_output.values():
-        first = min(first, df.select("value_time").min().collect().item(0, 0))
-        last = max(last, df.select("value_time").max().collect().item(0, 0))
-
-    # Scan USGS data
-    obs_data = get_usgs_readers(directory, first, last)
-
-    # Compute metrics
-    compute_metrics(
-        model_output,
-        obs_data,
-        routelinks,
-        directory
-        )
+    # Download NWM data, if needed
+    compute_metrics(startDT, endDT, directory, routelinks, jobs)
 
 cli = click.CommandCollection(sources=[
     build_group,
