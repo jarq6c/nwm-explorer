@@ -11,7 +11,7 @@ from nwm_explorer.data.nwm import download_nwm, get_nwm_readers, get_nwm_reader,
 from nwm_explorer.data.usgs import download_usgs, get_usgs_reader, get_usgs_readers
 from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration
 from nwm_explorer.logging.logger import get_logger
-from nwm_explorer.evaluation.compute import compute_metrics
+from nwm_explorer.evaluation.compute import run_standard_evaluation
 
 CSV_HEADERS: dict[str, str] = {
     "value_time": "Valid time of observation or prediction (UTC).",
@@ -195,7 +195,7 @@ def evaluate(
     routelinks = get_routelink_readers(directory)
 
     # Download NWM data, if needed
-    compute_metrics(startDT, endDT, directory, routelinks, jobs)
+    run_standard_evaluation(startDT, endDT, directory, routelinks, jobs)
 
 cli = click.CommandCollection(sources=[
     build_group,

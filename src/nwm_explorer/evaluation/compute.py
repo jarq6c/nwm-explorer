@@ -171,7 +171,12 @@ def get_pairs_readers(
     reference_dates = generate_reference_dates(startDT, endDT)
     return {(d, c): get_pairs_reader(root, d, c, reference_dates) for d, c in NWM_URL_BUILDERS}
 
-def compute_metrics(
+def compute_metrics(data: pd.DataFrame) -> dict[str, float]:
+    return {
+        "nash_sutcliffe_efficiency": 1.5
+    }
+
+def run_standard_evaluation(
     startDT: pd.Timestamp,
     endDT: pd.Timestamp,
     root: Path,
@@ -207,6 +212,18 @@ def compute_metrics(
                     pl.col("observed").max(),
                     pl.col("usgs_site_code").first()
                 )
+            
+            # Group by feature id
+            # TODO Re-implement this using a dataclass to insure correct mapping of metadata
+            crosswalk = data.select(["nwm_feature_id", "usgs_site_code"]).unique("nwm_feature_id").collect()
+            features = crosswalk["nwm_feature_id"].to_numpy()
+            sites = crosswalk["usgs_site_code"].to_numpy()
+            dataframes = [data.filter(pl.col("nwm_feature_id") == fid).select(["predicted", "observed"]).collect().to_pandas() for fid in features]
+
+            # Evaluate
+            metrics = pd.DataFrame.from_records([compute_metrics(df) for df in dataframes[:10]])
+            metrics["nwm_feature_id"] = features[:10]
+            metrics["usgs_site_code"] = sites[:10]
         print(d, c)
-        print(data.filter(pl.col("nwm_feature_id") == 19020190011954).collect())
+        print(metrics)
         break
