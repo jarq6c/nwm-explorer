@@ -118,7 +118,6 @@ def process_nwis_tsv_parallel(
     df["usgs_site_code"] = df["usgs_site_code"].astype("category")
     return df
 
-
 def generate_usgs_urls(
         site_list: list[str],
         start_datetime: pd.Timestamp,
@@ -150,6 +149,54 @@ def generate_usgs_urls(
         middle = f"sites={site}&startDT={start_str}&endDT={end_str}"
         urls.append(prefix+middle+suffix)
     return urls
+
+def get_usgs_reader(
+    root: Path,
+    domain: ModelDomain,
+    startDT: pd.Timestamp,
+    endDT: pd.Timestamp,
+    ) -> pl.LazyFrame:
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+
+    # Generate observational time periods
+    logger.info(f"Scanning USGS {domain} {startDT} to {endDT}")
+    logger.info("Generating observational time periods")
+    padded_start = startDT - pd.Timedelta("31d")
+    padded_end = endDT + pd.Timedelta("31d")
+    months = pd.date_range(
+        start=padded_start.strftime("%Y%m01"),
+        end=padded_end.strftime("%Y%m01"),
+        freq="MS"
+    )
+
+    # File details
+    logger.info("Generating file details")
+    file_paths = []
+    for idx in range(len(months)-1):
+        filename = months[idx].strftime("usgs.%Y%m.parquet")
+        fp = root / "parquet" / domain / filename
+        if fp.exists():
+            file_paths.append(fp)
+    
+    # Scan data
+    return pl.scan_parquet(file_paths).filter(
+        pl.col("value_time") >= startDT,
+        pl.col("value_time") <= endDT
+    )
+
+def get_usgs_readers(
+    root: Path,
+    startDT: pd.Timestamp,
+    endDT: pd.Timestamp,
+    ) -> dict[ModelDomain, pl.LazyFrame]:
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+
+    # Generate observational time periods
+    return {d: get_usgs_reader(root, d, startDT, endDT) for d in list(ModelDomain)}
 
 def download_usgs(
     startDT: pd.Timestamp,

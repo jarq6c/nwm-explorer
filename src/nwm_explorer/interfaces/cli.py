@@ -130,10 +130,13 @@ def build(
         last = max(last, df.select("value_time").max().collect().item(0, 0))
     
     # Download observations, if needed
-    download_usgs(first, last, directory, routelinks, jobs)
-
-    # Scan USGS data
-    observations = get_usgs_readers(first, last, directory)
+    download_usgs(
+        pd.Timestamp(first),
+        pd.Timestamp(last),
+        directory,
+        routelinks,
+        jobs
+    )
 
 # @export_group.command()
 # @click.argument("domain", nargs=1, required=True, type=click.Choice(Domain))
