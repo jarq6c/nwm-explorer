@@ -8,9 +8,10 @@ import polars as pl
 from nwm_explorer._version import __version__
 from nwm_explorer.data.routelink import download_routelinks, get_routelink_readers
 from nwm_explorer.data.nwm import download_nwm, get_nwm_readers, get_nwm_reader, generate_reference_dates
-from nwm_explorer.data.usgs import download_usgs, get_usgs_reader
+from nwm_explorer.data.usgs import download_usgs, get_usgs_reader, get_usgs_readers
 from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration
 from nwm_explorer.logging.logger import get_logger
+from nwm_explorer.evaluation.compute import compute_metrics
 
 CSV_HEADERS: dict[str, str] = {
     "value_time": "Valid time of observation or prediction (UTC).",
@@ -69,7 +70,8 @@ class TimestampParamType(click.ParamType):
             self.fail(f"{value!r} is not a valid timestamp", param, ctx)
 
 build_group = click.Group()
-export_group = click.Group("export")
+export_group = click.Group()
+evaluation_group = click.Group()
 
 @build_group.command()
 @click.option("-s", "--startDT", "startDT", nargs=1, required=True, type=TimestampParamType(), help="Start datetime")
@@ -177,9 +179,46 @@ def observations(
     except FileNotFoundError:
         print(f"Data are unavailble for {domain} usgs", file=stderr)
 
+@evaluation_group.command()
+@click.option("-s", "--startDT", "startDT", nargs=1, required=True, type=TimestampParamType(), help="Start datetime")
+@click.option("-e", "--endDT", "endDT", nargs=1, required=True, type=TimestampParamType(), help="End datetime")
+@click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
+@click.option("-j", "--jobs", "jobs", nargs=1, required=False, type=click.INT, default=1, help="Maximum number of parallel processes (1)")
+def evaluate(
+    startDT: pd.Timestamp,
+    endDT: pd.Timestamp,
+    directory: Path = Path("data"),
+    jobs: int = 1
+    ) -> None:
+    """Run standard evaluations."""
+    # Scan routelinks
+    routelinks = get_routelink_readers(directory)
+
+    # Scan NWM data
+    model_output = get_nwm_readers(startDT, endDT, directory)
+
+    # Determine date range for observations
+    first = startDT
+    last = endDT
+    for df in model_output.values():
+        first = min(first, df.select("value_time").min().collect().item(0, 0))
+        last = max(last, df.select("value_time").max().collect().item(0, 0))
+
+    # Scan USGS data
+    obs_data = get_usgs_readers(directory, first, last)
+
+    # Compute metrics
+    compute_metrics(
+        model_output,
+        obs_data,
+        routelinks,
+        directory
+        )
+
 cli = click.CommandCollection(sources=[
     build_group,
-    export_group
+    export_group,
+    evaluation_group
     ])
 
 if __name__ == "__main__":
