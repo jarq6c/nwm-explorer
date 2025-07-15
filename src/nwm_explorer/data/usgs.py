@@ -74,7 +74,7 @@ def process_nwis_tsv(filepath: Path) -> pd.DataFrame:
         return pd.DataFrame()
 
     df = df.set_axis(
-        ["usgs_site_code", "value_time", "timezone", "value"],
+        ["usgs_site_code", "value_time", "timezone", "observed"],
         axis="columns")
     df = df[df["usgs_site_code"].str.isdigit()]
     df["value_time"] = pd.to_datetime(df["value_time"])
@@ -88,8 +88,8 @@ def process_nwis_tsv(filepath: Path) -> pd.DataFrame:
                 mapped_tz, ambiguous=daylight).dt.tz_convert(
                     "UTC").dt.tz_localize(None)
 
-    df["value"] = pd.to_numeric(df["value"], errors="coerce")
-    df = df[["usgs_site_code", "value_time", "value"]].dropna()
+    df["observed"] = pd.to_numeric(df["observed"], errors="coerce")
+    df = df[["usgs_site_code", "value_time", "observed"]].dropna()
     return df
 
 def process_nwis_tsv_parallel(
