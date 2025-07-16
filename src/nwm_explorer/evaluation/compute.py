@@ -10,6 +10,7 @@ from nwm_explorer.logging.logger import get_logger
 from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration
 from nwm_explorer.data.nwm import generate_reference_dates, build_nwm_file_details, NWM_URL_BUILDERS
 from nwm_explorer.data.usgs import get_usgs_reader
+from nwm_explorer.evaluation.metrics import bootstrap_metrics
 
 OBSERVATION_RESAMPLING: dict[ModelDomain, tuple[str]] = {
     ModelDomain.alaska: ("1d", "5h"),
@@ -172,17 +173,6 @@ def get_pairs_readers(
     reference_dates = generate_reference_dates(startDT, endDT)
     return {(d, c): get_pairs_reader(root, d, c, reference_dates) for d, c in NWM_URL_BUILDERS}
 
-def compute_metrics(data: pd.DataFrame) -> dict[str, float]:
-    result = {
-        "nwm_feature_id": data["nwm_feature_id"].iloc[0],
-        "usgs_site_code": data["usgs_site_code"].iloc[0],
-        "sample_size": data["predicted"].count(),
-        "nash_sutcliffe_efficiency": 1.5,
-    }
-    if "lead_time_hours_min" in data:
-        result["lead_time_hours_min"] = data["lead_time_hours_min"].iloc[0]
-    return result
-
 def run_standard_evaluation(
     startDT: pd.Timestamp,
     endDT: pd.Timestamp,
@@ -210,8 +200,16 @@ def run_standard_evaluation(
     # Scan
     logger.info("Scanning pairs")
     pairs = get_pairs_readers(startDT, endDT, root)
+    start_string = startDT.strftime("%Y%m%d")
+    end_string = endDT.strftime("%Y%m%d")
     for (d, c), data in pairs.items():
-        logger.info(f"Evaluating {d} {c}")
+        odir = root / f"parquet/{d}/evaluations"
+        odir.mkdir(exist_ok=True)
+        ofile = odir / f"{c}_{start_string}_{end_string}.parquet"
+        if ofile.exists():
+            logger.info(f"Found {ofile}")
+            continue
+        logger.info(f"Building {ofile}")
         if c in PREDICTION_RESAMPLING:
             # Handle forecasts
             # Group by feature id and lead time
@@ -242,9 +240,11 @@ def run_standard_evaluation(
         # Evaluate
         logger.info("Computing metrics")
         chunk_size = max(1, len(dataframes) // jobs)
-        metrics = pd.DataFrame.from_records(pool.map(compute_metrics, dataframes, chunksize=chunk_size))
-        print(metrics.head())
-        break
+        results = pd.DataFrame.from_records(pool.map(bootstrap_metrics, dataframes, chunksize=chunk_size))
+        
+        # Save
+        logger.info(f"Saving {ofile}")
+        pl.DataFrame(results).write_parquet(ofile)
 
     # Clean-up
     logger.info("Cleaning up compute resources")
