@@ -173,11 +173,15 @@ def get_pairs_readers(
     return {(d, c): get_pairs_reader(root, d, c, reference_dates) for d, c in NWM_URL_BUILDERS}
 
 def compute_metrics(data: pd.DataFrame) -> dict[str, float]:
-    return {
+    result = {
         "nwm_feature_id": data["nwm_feature_id"].iloc[0],
         "usgs_site_code": data["usgs_site_code"].iloc[0],
-        "nash_sutcliffe_efficiency": 1.5
+        "sample_size": data["predicted"].count(),
+        "nash_sutcliffe_efficiency": 1.5,
     }
+    if "lead_time_hours_min" in data:
+        result["lead_time_hours_min"] = data["lead_time_hours_min"].iloc[0]
+    return result
 
 def run_standard_evaluation(
     startDT: pd.Timestamp,
@@ -204,13 +208,22 @@ def run_standard_evaluation(
     pool = ProcessPoolExecutor(max_workers=jobs)
 
     # Scan
-    logger.info("Scan pairs")
+    logger.info("Scanning pairs")
     pairs = get_pairs_readers(startDT, endDT, root)
     for (d, c), data in pairs.items():
         logger.info(f"Evaluating {d} {c}")
-        # Handle simulations
-        if c not in PREDICTION_RESAMPLING:
+        if c in PREDICTION_RESAMPLING:
+            # Handle forecasts
+            # Group by feature id and lead time
+            logger.info("Loading pairs")
+            data = data.collect().to_pandas()
+
+            logger.info("Grouping pairs")
+            dataframes = [df for _, df in data.groupby(["nwm_feature_id", "lead_time_hours_min"])]
+        else:
+            # Handle simulations
             # Resolve duplicate predictions
+            logger.info("Loading pairs")
             data = data.sort(
                     ("nwm_feature_id", "value_time")
                 ).group_by_dynamic(
@@ -221,17 +234,17 @@ def run_standard_evaluation(
                     pl.col("predicted").max(),
                     pl.col("observed").max(),
                     pl.col("usgs_site_code").first()
-                ).with_columns(pl.col("usgs_site_code").cast(pl.String)).collect()
-            
-            # Group by feature id
-            crosswalk = data.select("nwm_feature_id").unique("nwm_feature_id")
-            features = crosswalk["nwm_feature_id"].to_numpy()
-            dataframes = [data.filter(pl.col("nwm_feature_id") == fid).to_pandas() for fid in features]
+                ).with_columns(pl.col("usgs_site_code").cast(pl.String)).collect().to_pandas()
 
-            # Evaluate
-            chunk_size = max(1, len(dataframes) // jobs)
-            metrics = pd.DataFrame.from_records(pool.map(compute_metrics, dataframes, chunksize=chunk_size))
-            print(metrics.head())
+            logger.info("Grouping pairs")
+            dataframes = [df for _, df in data.groupby("nwm_feature_id")]
+
+        # Evaluate
+        logger.info("Computing metrics")
+        chunk_size = max(1, len(dataframes) // jobs)
+        metrics = pd.DataFrame.from_records(pool.map(compute_metrics, dataframes, chunksize=chunk_size))
+        print(metrics.head())
+        break
 
     # Clean-up
     logger.info("Cleaning up compute resources")
