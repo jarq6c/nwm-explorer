@@ -1,6 +1,7 @@
 """Compute standard evaluation metrics."""
 from pathlib import Path
 import inspect
+from concurrent.futures import ProcessPoolExecutor
 
 import polars as pl
 import pandas as pd
@@ -173,6 +174,8 @@ def get_pairs_readers(
 
 def compute_metrics(data: pd.DataFrame) -> dict[str, float]:
     return {
+        "nwm_feature_id": data["nwm_feature_id"].iloc[0],
+        "usgs_site_code": data["usgs_site_code"].iloc[0],
         "nash_sutcliffe_efficiency": 1.5
     }
 
@@ -188,6 +191,7 @@ def run_standard_evaluation(
     logger = get_logger(name)
 
     # Pair data
+    logger.info("Checking for pairs")
     generate_pairs(
         startDT,
         endDT,
@@ -195,9 +199,15 @@ def run_standard_evaluation(
         routelinks
     )
 
+    # Setup pool
+    logger.info("Setup compute resources")
+    pool = ProcessPoolExecutor(max_workers=jobs)
+
     # Scan
+    logger.info("Scan pairs")
     pairs = get_pairs_readers(startDT, endDT, root)
     for (d, c), data in pairs.items():
+        logger.info(f"Evaluating {d} {c}")
         # Handle simulations
         if c not in PREDICTION_RESAMPLING:
             # Resolve duplicate predictions
@@ -211,19 +221,18 @@ def run_standard_evaluation(
                     pl.col("predicted").max(),
                     pl.col("observed").max(),
                     pl.col("usgs_site_code").first()
-                )
+                ).with_columns(pl.col("usgs_site_code").cast(pl.String)).collect()
             
             # Group by feature id
-            # TODO Re-implement this using a dataclass to insure correct mapping of metadata
-            crosswalk = data.select(["nwm_feature_id", "usgs_site_code"]).unique("nwm_feature_id").collect()
+            crosswalk = data.select("nwm_feature_id").unique("nwm_feature_id")
             features = crosswalk["nwm_feature_id"].to_numpy()
-            sites = crosswalk["usgs_site_code"].to_numpy()
-            dataframes = [data.filter(pl.col("nwm_feature_id") == fid).select(["predicted", "observed"]).collect().to_pandas() for fid in features]
+            dataframes = [data.filter(pl.col("nwm_feature_id") == fid).to_pandas() for fid in features]
 
             # Evaluate
-            metrics = pd.DataFrame.from_records([compute_metrics(df) for df in dataframes[:10]])
-            metrics["nwm_feature_id"] = features[:10]
-            metrics["usgs_site_code"] = sites[:10]
-        print(d, c)
-        print(metrics)
-        break
+            chunk_size = max(1, len(dataframes) // jobs)
+            metrics = pd.DataFrame.from_records(pool.map(compute_metrics, dataframes, chunksize=chunk_size))
+            print(metrics.head())
+
+    # Clean-up
+    logger.info("Cleaning up compute resources")
+    pool.shutdown()
