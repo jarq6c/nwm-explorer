@@ -173,6 +173,41 @@ def get_pairs_readers(
     reference_dates = generate_reference_dates(startDT, endDT)
     return {(d, c): get_pairs_reader(root, d, c, reference_dates) for d, c in NWM_URL_BUILDERS}
 
+def get_evaluation_reader(
+    domain: ModelDomain,
+    configuration: ModelConfiguration,
+    startDT: pd.Timestamp,
+    endDT: pd.Timestamp,
+    root: Path
+    ) -> pl.LazyFrame | None:
+    start_string = startDT.strftime("%Y%m%d")
+    end_string = endDT.strftime("%Y%m%d")
+    odir = root / f"parquet/{domain}/evaluations"
+    odir.mkdir(exist_ok=True)
+    ofile = odir / f"{configuration}_{start_string}_{end_string}.parquet"
+    return pl.scan_parquet(ofile)
+
+def get_evaluation_readers(
+    startDT: pd.Timestamp,
+    endDT: pd.Timestamp,
+    root: Path
+    ) -> dict[tuple[ModelDomain, ModelConfiguration], pl.LazyFrame]:
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+    
+    # Scan files
+    evaluations = {}
+    start_string = startDT.strftime("%Y%m%d")
+    end_string = endDT.strftime("%Y%m%d")
+    for (d, c), _ in NWM_URL_BUILDERS.items():
+        odir = root / f"parquet/{d}/evaluations"
+        odir.mkdir(exist_ok=True)
+        ofile = odir / f"{c}_{start_string}_{end_string}.parquet"
+        if ofile.exists():
+            logger.info(f"Found {ofile}")
+            evaluations[(d, c)] = pl.scan_parquet(ofile)
+
 def run_standard_evaluation(
     startDT: pd.Timestamp,
     endDT: pd.Timestamp,

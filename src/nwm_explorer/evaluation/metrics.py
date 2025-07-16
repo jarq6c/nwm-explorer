@@ -99,13 +99,13 @@ def pearson_correlation_coefficient(
     result[0] = num / den
 
 @guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
-def relative_variability(
+def relative_standard_deviation(
     y_true: npt.NDArray[np.float64],
     y_pred: npt.NDArray[np.float64],
     result: npt.NDArray[np.float64]
     ) -> None:
     """
-    Numba and polars compatible implementation of relative variability,
+    Numba and polars compatible implementation of relative standard deviation,
     required to compute Kling-Gupta Model Efficiency.
         
     Parameters
@@ -166,7 +166,7 @@ def kling_gupta_efficiency(
     correlation = np.array([0.0], dtype=np.float64)
     pearson_correlation_coefficient(y_true, y_pred, correlation)
     rel_var = np.array([0.0], dtype=np.float64)
-    relative_variability(y_true, y_pred, rel_var)
+    relative_standard_deviation(y_true, y_pred, rel_var)
     rel_mean = np.array([0.0], dtype=np.float64)
     relative_mean(y_true, y_pred, rel_mean)
     result[0] = (1.0 - np.sqrt(
@@ -180,7 +180,7 @@ METRIC_FUNCTIONS: dict[str, Callable[[npt.NDArray[np.float64], npt.NDArray[np.fl
     "relative_mean_bias": relative_mean_bias,
     "pearson_correlation_coefficient": pearson_correlation_coefficient,
     "relative_mean": relative_mean,
-    "relative_variability": relative_variability,
+    "relative_standard_deviation": relative_standard_deviation,
     "kling_gupta_efficiency": kling_gupta_efficiency
 }
 """Metrics to compute."""
