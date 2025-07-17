@@ -596,7 +596,8 @@ def download_nwm(
     endDT: pd.Timestamp,
     root: Path,
     routelinks: dict[ModelDomain, pl.LazyFrame],
-    jobs: int
+    jobs: int,
+    retries: int = 10
     ) -> None:
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
@@ -636,7 +637,8 @@ def download_nwm(
         download_files(
             *list(zip(urls, file_paths)),
             timeout=3600,
-            file_validator=netcdf_validator
+            file_validator=netcdf_validator,
+            retries=retries
         )
         file_paths = [fp for fp in file_paths if fp.exists()]
 

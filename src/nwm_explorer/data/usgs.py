@@ -203,7 +203,8 @@ def download_usgs(
     endDT: pd.Timestamp,
     root: Path,
     routelinks: dict[ModelDomain, pl.LazyFrame],
-    jobs: int
+    jobs: int,
+    retries: int = 10
     ) -> None:
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
@@ -212,7 +213,7 @@ def download_usgs(
     # Generate observational time periods
     logger.info("Generating observational time periods")
     padded_start = startDT - pd.Timedelta("31d")
-    padded_end = endDT + pd.Timedelta("31d")
+    padded_end = min(pd.Timestamp.utcnow().tz_localize(None), endDT + pd.Timedelta("31d"))
     months = pd.date_range(
         start=padded_start.strftime("%Y%m01"),
         end=padded_end.strftime("%Y%m01"),
@@ -247,7 +248,8 @@ def download_usgs(
                 timeout=3600, 
                 headers={"Accept-Encoding": "gzip"},
                 auto_decompress=False,
-                file_validator=tsv_gz_validator
+                file_validator=tsv_gz_validator,
+                retries=retries
             )
 
             logger.info("Processing USGS data")

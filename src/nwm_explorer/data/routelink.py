@@ -45,7 +45,7 @@ def get_routelink_readers(root: Path) -> dict[ModelDomain, pl.LazyFrame]:
     """Returns mapping from ModelDomain to polars.LazyFrame."""
     return {d: get_routelink_reader(root, d) for d in ROUTELINK_FILENAMES}
 
-def download_routelinks(root: Path) -> None:
+def download_routelinks(root: Path, retries: int = 10) -> None:
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
@@ -70,7 +70,7 @@ def download_routelinks(root: Path) -> None:
     directory = root / "routelinks"
     filepath = directory / "Routelinks.tar.gz"
     directory.mkdir(exist_ok=True)
-    download_files((ROUTELINKS_URL, filepath), auto_decompress=False)
+    download_files((ROUTELINKS_URL, filepath), auto_decompress=False, retries=retries)
 
     logger.info("Extracting routelink files")
     with tarfile.open(filepath, "r:gz") as tf:

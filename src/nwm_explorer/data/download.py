@@ -179,7 +179,8 @@ def download_files(
         overwrite: bool = False,
         ssl_context: ssl.SSLContext | None = None,
         timeout: int = 300,
-        file_validator: Callable[[Path], None] = default_file_validator
+        file_validator: Callable[[Path], None] = default_file_validator,
+        retries: int = 10
     ) -> None:
     """
     Asynchronously retrieve multiple files from urls and save to filepaths.
@@ -231,7 +232,7 @@ def download_files(
         ssl_context = ssl.create_default_context()
 
     # Retrieve
-    for attempt in range(10):
+    for attempt in range(retries):
         logger.info(f"Downloading files, attempt {attempt}")
         try:
             asyncio.run(

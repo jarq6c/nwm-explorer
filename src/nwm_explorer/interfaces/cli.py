@@ -8,7 +8,7 @@ import polars as pl
 from nwm_explorer._version import __version__
 from nwm_explorer.data.routelink import download_routelinks, get_routelink_readers
 from nwm_explorer.data.nwm import download_nwm, get_nwm_readers, get_nwm_reader, generate_reference_dates
-from nwm_explorer.data.usgs import download_usgs, get_usgs_reader, get_usgs_readers
+from nwm_explorer.data.usgs import download_usgs, get_usgs_reader
 from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration
 from nwm_explorer.logging.logger import get_logger
 from nwm_explorer.evaluation.compute import run_standard_evaluation, get_evaluation_reader
@@ -100,21 +100,23 @@ evaluation_group = click.Group()
 @click.option("-e", "--endDT", "endDT", nargs=1, required=True, type=TimestampParamType(), help="End datetime")
 @click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
 @click.option("-j", "--jobs", "jobs", nargs=1, required=False, type=click.INT, default=1, help="Maximum number of parallel processes (1)")
+@click.option("-r", "--retries", "retries", nargs=1, required=False, type=click.INT, default=10, help="Maximum number of download retries (10)")
 def build(
     startDT: pd.Timestamp,
     endDT: pd.Timestamp,
     directory: Path = Path("data"),
-    jobs: int = 1
+    jobs: int = 1,
+    retries: int = 10
     ) -> None:
     """Retrieve and process required evaluation data."""
     # Download routelink, if missing
-    download_routelinks(directory)
+    download_routelinks(directory, retries=retries)
 
     # Scan routelinks
     routelinks = get_routelink_readers(directory)
 
     # Download NWM data, if needed
-    download_nwm(startDT, endDT, directory, routelinks, jobs)
+    download_nwm(startDT, endDT, directory, routelinks, jobs, retries=retries)
 
     # Scan NWM data
     model_output = get_nwm_readers(startDT, endDT, directory)
@@ -132,7 +134,8 @@ def build(
         pd.Timestamp(last),
         directory,
         routelinks,
-        jobs
+        jobs,
+        retries=retries
     )
 
 @export_group.group()
