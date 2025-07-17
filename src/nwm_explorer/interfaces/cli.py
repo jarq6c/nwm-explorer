@@ -12,6 +12,7 @@ from nwm_explorer.data.usgs import download_usgs, get_usgs_reader
 from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration
 from nwm_explorer.logging.logger import get_logger
 from nwm_explorer.evaluation.compute import run_standard_evaluation, get_evaluation_reader
+from nwm_explorer.interfaces.gui import serve_dashboard
 
 CSV_HEADERS: dict[str, str] = {
     "value_time": "Valid time of observation or prediction (UTC).",
@@ -94,6 +95,7 @@ class TimestampParamType(click.ParamType):
 build_group = click.Group()
 export_group = click.Group()
 evaluation_group = click.Group()
+display_group = click.Group()
 
 @build_group.command()
 @click.option("-s", "--startDT", "startDT", nargs=1, required=True, type=TimestampParamType(), help="Start datetime")
@@ -262,10 +264,26 @@ def evaluate(
     # Download NWM data, if needed
     run_standard_evaluation(startDT, endDT, directory, routelinks, jobs, label)
 
+@display_group.command()
+@click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
+@click.option("-t", "--title", "title", nargs=1, type=click.STRING, default="National Water Model Evaluations", help="Dashboard title header")
+def display(
+    directory: Path = Path("data"),
+    title: str = "National Water Model Evaluations"
+    ) -> None:
+    """Visualize and explore evaluation data.
+
+    Example:
+    
+    nwm-explorer display
+    """
+    serve_dashboard(directory, title)
+
 cli = click.CommandCollection(sources=[
     build_group,
     export_group,
-    evaluation_group
+    evaluation_group,
+    display_group
     ])
 
 if __name__ == "__main__":
