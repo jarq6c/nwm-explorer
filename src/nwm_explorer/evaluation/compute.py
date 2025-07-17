@@ -2,9 +2,11 @@
 from pathlib import Path
 import inspect
 from concurrent.futures import ProcessPoolExecutor
+from datetime import datetime
 
 import polars as pl
 import pandas as pd
+from pydantic import BaseModel
 
 from nwm_explorer.logging.logger import get_logger
 from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration
@@ -208,18 +210,42 @@ def get_evaluation_readers(
             logger.info(f"Found {ofile}")
             evaluations[(d, c)] = pl.scan_parquet(ofile)
 
+class EvaluationSpec(BaseModel):
+    startDT: datetime
+    endDT: datetime
+    directory: Path
+    files: dict[ModelDomain, dict[ModelConfiguration, Path]]
+
+class EvaluationRegistry(BaseModel):
+    evaluations: dict[str, EvaluationSpec]
+
 def run_standard_evaluation(
     startDT: pd.Timestamp,
     endDT: pd.Timestamp,
     root: Path,
     routelinks: dict[ModelDomain, pl.LazyFrame],
-    jobs: int
+    jobs: int,
+    label: str
     ) -> None:
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
 
+    # Setup registry
+    registry_file = root / "evaluation_registry.json"
+    if registry_file.exists():
+        logger.info(f"Reading {registry_file}")
+        with registry_file.open("r") as fo:
+            evaluation_registry = EvaluationRegistry.model_validate_json(fo.read())
+        if label in evaluation_registry.evaluations:
+            logger.info("Evaluation label already registered, skipping evaluation")
+            return
+    else:
+        evaluation_registry = None
+    evaluation_files = {}
+
     # Pair data
+    logger.info(f"Running standard evaluation: {label}")
     logger.info("Checking for pairs")
     generate_pairs(
         startDT,
@@ -238,12 +264,23 @@ def run_standard_evaluation(
     start_string = startDT.strftime("%Y%m%d")
     end_string = endDT.strftime("%Y%m%d")
     for (d, c), data in pairs.items():
+        # Check for domain
+        if d not in evaluation_files:
+            evaluation_files[d] = {}
+
         odir = root / f"parquet/{d}/evaluations"
         odir.mkdir(exist_ok=True)
         ofile = odir / f"{c}_{start_string}_{end_string}.parquet"
+
+        # Add to registry
+        evaluation_files[d][c] = ofile
+
+        # Check for existence
         if ofile.exists():
             logger.info(f"Found {ofile}")
             continue
+
+        # Run evaluation
         logger.info(f"Building {ofile}")
         if c in PREDICTION_RESAMPLING:
             # Handle forecasts
@@ -284,3 +321,19 @@ def run_standard_evaluation(
     # Clean-up
     logger.info("Cleaning up compute resources")
     pool.shutdown()
+
+    # Register evaluation
+    logger.info(f"Updating: {registry_file}")
+    evaluation_spec = EvaluationSpec(
+        label=label,
+        startDT=startDT,
+        endDT=endDT,
+        directory=root,
+        files=evaluation_files
+    )
+    if evaluation_registry is None:
+        evaluation_registry = EvaluationRegistry(evaluations={label: evaluation_spec})
+    else:
+        evaluation_registry.evaluations[label] = evaluation_spec
+    with registry_file.open("w") as fi:
+        fi.write(evaluation_registry.model_dump_json(indent=4))

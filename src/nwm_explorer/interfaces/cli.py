@@ -235,20 +235,28 @@ def evaluations(
 @evaluation_group.command()
 @click.option("-s", "--startDT", "startDT", nargs=1, required=True, type=TimestampParamType(), help="Start datetime")
 @click.option("-e", "--endDT", "endDT", nargs=1, required=True, type=TimestampParamType(), help="End datetime")
+@click.option("-l", "--label", "label", nargs=1, type=click.STRING, default=None, help="Evaluation label")
 @click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
 @click.option("-j", "--jobs", "jobs", nargs=1, required=False, type=click.INT, default=1, help="Maximum number of parallel processes (1)")
 def evaluate(
     startDT: pd.Timestamp,
     endDT: pd.Timestamp,
+    label: str | None = None,
     directory: Path = Path("data"),
     jobs: int = 1
     ) -> None:
     """Run standard evaluations."""
+    # Set label
+    if label is None:
+        start_string = startDT.strftime("%Y%m%dT%H%M")
+        end_string = endDT.strftime("%Y%m%dT%H%M")
+        label = f"evaluation_{start_string}_{end_string}"
+
     # Scan routelinks
     routelinks = get_routelink_readers(directory)
 
     # Download NWM data, if needed
-    run_standard_evaluation(startDT, endDT, directory, routelinks, jobs)
+    run_standard_evaluation(startDT, endDT, directory, routelinks, jobs, label)
 
 cli = click.CommandCollection(sources=[
     build_group,
