@@ -246,6 +246,7 @@ def evaluate(
     jobs: int = 1
     ) -> None:
     """Run standard evaluations."""
+    # NOTE July 8th 12Z, after 40 hour MRF mem1 was corrupted (incorrect reference time), add validation
     # Set label
     if label is None:
         start_string = startDT.strftime("%Y%m%dT%H%M")
