@@ -9,17 +9,7 @@ from panel.template import BootstrapTemplate
 from nwm_explorer.logging.logger import get_logger
 from nwm_explorer.evaluation.compute import EvaluationRegistry
 from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration
-
-PRETTY_DOMAINS: dict[ModelDomain, str] = {
-    ModelDomain.alaska: "Alaska",
-    ModelDomain.conus: "CONUS",
-    ModelDomain.hawaii: "Hawaii",
-    ModelDomain.puertorico: "Puerto Rico"
-}
-"""Mapping from ModelDomain to pretty strings."""
-
-DOMAIN_LOOKUP: dict[str, ModelDomain] = {v: k for k, v in PRETTY_DOMAINS.items()}
-"""Reverse look-up from pretty strings to ModelDomain."""
+from nwm_explorer.interfaces.filters import FilteringWidgets
 
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
@@ -51,36 +41,12 @@ class Dashboard:
                 for configuration, ifile in files.items():
                     logger.info(f"Scanning {ifile}")
                     self.data[label][domain][configuration] = pl.scan_parquet(ifile)
-
-        # Setup widgets
-        self.evaluation_filter = pn.widgets.Select(
-            name="Evaluation",
-            options=list(self.data.keys())
-        )
-        self.domain_filter = pn.widgets.Select(
-            name="Domain",
-            options=[]
-        )
-        self.configuration_filter = pn.widgets.Select(
-            name="Configuration",
-            options=[]
-        )
-
-        # Update domain
-        def update_domains(eval) -> None:
-            self.domain_filter.options = [PRETTY_DOMAINS[v] for v in self.data[eval].values()]
-        pn.bind(update_domains, self.evaluation_filter, watch=True)
+        
+        # Widgets
+        self.filters = FilteringWidgets(list(evaluation_registry.evaluations.keys()))
 
         # Layout
-        filters = pn.Card(pn.Column(
-            self.evaluation_filter,
-            self.domain_filter,
-            self.configuration_filter
-            ),
-            title="Filters",
-            collapsible=False
-        )
-        self.template.main.append(filters)
+        self.template.main.append(self.filters.servable())
     
     def servable(self) -> BootstrapTemplate:
         return self.template
