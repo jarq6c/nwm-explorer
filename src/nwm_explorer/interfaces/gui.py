@@ -41,7 +41,7 @@ METRIC_PLOTTING_LIMITS: dict[str, tuple[float, float]] = {
     "relative_standard_deviation": (0.0, 2.0),
     "kling_gupta_efficiency": (-1.0, 1.0)
 }
-"""Mapping from Metrics to plotting limist (cmin, cmax)."""
+"""Mapping from Metrics to plotting limits (cmin, cmax)."""
 
 class SiteMap:
     def __init__(self):
@@ -114,19 +114,34 @@ class SiteMap:
         values: npt.ArrayLike,
         latitude: npt.ArrayLike,
         longitude: npt.ArrayLike,
-        value_name: str,
+        value_label: str,
         cmin: float,
         cmax: float,
-        domain: ModelDomain
+        domain: ModelDomain,
+        custom_data: pl.DataFrame
         ) -> None:
         # Colors
         self.data[0]["marker"].update(dict(color=values, cmin=cmin, cmax=cmax))
 
-        # Coordinates
-        self.data[0].update(dict(lat=latitude, lon=longitude))
+        # ScatterMap
+        self.data[0].update(dict(
+            lat=latitude,
+            lon=longitude,
+            customdata=custom_data,
+            hovertemplate=(
+                f"<br>{value_label}: "
+                "%{marker.color:.2f}<br>"
+                "NWM Feature ID: %{customdata[0]}<br>"
+                "USGS Site Code: %{customdata[1]}<br>"
+                "Start Date: %{customdata[2]}<br>"
+                "End Date: %{customdata[3]}<br>"
+                "Samples: %{customdata[4]}<br>"
+                "Longitude: %{lon}<br>"
+                "Latitude: %{lat}"
+        )))
 
         # Title
-        self.data[0]["marker"]["colorbar"]["title"].update(dict(text=value_name))
+        self.data[0]["marker"]["colorbar"]["title"].update(dict(text=value_label))
 
         # Domain change
         if domain != self.domain:
@@ -200,11 +215,14 @@ class Dashboard:
 
             # Filter data
             value_column = self.state.metric + self.state.confidence
-            columns = [value_column, "start_date", "end_date", "nwm_feature_id", "usgs_site_code", "sample_size"]
+            columns = [value_column, "nwm_feature_id", "usgs_site_code", "start_date", "end_date", "sample_size"]
             if self.state.configuration in PREDICTION_RESAMPLING:
                 columns.append("lead_time_hours_min")
                 data = data.filter(pl.col("lead_time_hours_min") == self.state.lead_time)
-            data = data.select(columns).join(geometry, on="nwm_feature_id", how="left").collect()
+            data = data.select(columns).join(geometry, on="nwm_feature_id", how="left").with_columns(
+                pl.col("start_date").dt.strftime("%Y-%m-%d"),
+                pl.col("end_date").dt.strftime("%Y-%m-%d")
+            ).collect()
             
             # Update map
             cmin, cmax = METRIC_PLOTTING_LIMITS[self.state.metric]
@@ -212,10 +230,11 @@ class Dashboard:
                 values=data[value_column].to_numpy(),
                 latitude=data["latitude"].to_numpy(),
                 longitude=data["longitude"].to_numpy(),
-                value_name=self.state.metric_label,
+                value_label=self.state.metric_label,
                 cmin=cmin,
                 cmax=cmax,
-                domain=self.state.domain
+                domain=self.state.domain,
+                custom_data=data.select(columns[1:]).to_pandas()
             )
             self.map.refresh()
         self.filters.register_callback(update_map)
