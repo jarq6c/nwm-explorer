@@ -1,4 +1,5 @@
 """Plotting."""
+import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import panel as pn
@@ -83,6 +84,10 @@ class SiteMap:
         self.pane = pn.pane.Plotly(self.figure)
 
         # Update layout
+        self.lat_min = None
+        self.lat_max = None
+        self.lon_min = None
+        self.lon_max = None
         def apply_relayout_data(data) -> None:
             if data is None:
                 return
@@ -90,6 +95,15 @@ class SiteMap:
                 self.layout["map"]["center"].update(data["map.center"])
             if "map.zoom" in data:
                 self.layout["map"].update(dict(zoom=data["map.zoom"]))
+            if "map._derived" in data:
+                self.lat_max = data["map._derived"]["coordinates"][0][1]
+                self.lat_min = data["map._derived"]["coordinates"][2][1]
+                self.lon_max = data["map._derived"]["coordinates"][1][0]
+                self.lon_min = data["map._derived"]["coordinates"][0][0]
+            if "width" in data:
+                self.layout["map"]["center"].update(DEFAULT_CENTER[self.domain])
+                self.layout["map"].update(dict(zoom=DEFAULT_ZOOM[self.domain]))
+                self.refresh()
         pn.bind(apply_relayout_data, self.pane.param.relayout_data, watch=True)
 
         # Reset view
@@ -133,6 +147,12 @@ class SiteMap:
         # Title
         self.data[0]["marker"]["colorbar"]["title"].update(dict(text=value_label))
 
+        # Boundaries
+        self.lat_min = np.min(latitude)
+        self.lat_max = np.max(latitude)
+        self.lon_min = np.min(longitude)
+        self.lon_max = np.max(longitude)
+
         # Domain change
         if domain != self.domain:
             self.layout["map"]["center"].update(DEFAULT_CENTER[domain])
@@ -143,9 +163,13 @@ class SiteMap:
         self.figure.update(dict(data=self.data, layout=self.layout))
         self.pane.object = self.figure
     
-    def servable(self) -> pn.pane.Plotly:
+    def servable(self) -> pn.Card:
         return pn.Card(
             self.pane,
             collapsible=False,
             hide_header=True
         )
+    
+    @property
+    def relayout_data(self) -> dict:
+        return self.pane.param.relayout_data

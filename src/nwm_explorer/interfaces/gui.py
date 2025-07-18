@@ -13,6 +13,17 @@ from nwm_explorer.interfaces.filters import FilteringWidgets, CallbackType
 from nwm_explorer.data.routelink import get_routelink_readers
 from nwm_explorer.plots.site_map import SiteMap, METRIC_PLOTTING_LIMITS
 
+class Histogram:
+    def __init__(self):
+        pass
+
+    def servable(self) -> pn.Card:
+        return pn.Card(
+            pn.pane.Markdown("HISTOGRAM"),
+            collapsible=False,
+            hide_header=True
+        )
+
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
     def __init__(self, root: Path, title: str):
@@ -48,6 +59,7 @@ class Dashboard:
         # Widgets
         self.filters = FilteringWidgets(evaluation_registry)
         self.map = SiteMap()
+        self.histogram = Histogram()
         self.state = self.filters.state
 
         # Callbacks
@@ -91,12 +103,28 @@ class Dashboard:
             )
             self.map.refresh()
         self.filters.register_callback(update_map)
+        
+        # def update_histogram(event, callback_type: CallbackType) -> None:
+        #     if event is None:
+        #         return
+            
+        #     if callback_type == CallbackType.domain:
+        #         print(event)
+            
+        #     if callback_type == CallbackType.relayout:
+        #         if "map.center" not in event:
+        #             return
+        #         print(event)
+        # self.filters.register_callback(update_histogram)
+        # pn.bind(update_histogram, self.map.relayout_data, watch=True,
+        #     callback_type=CallbackType.relayout)
 
         # Layout
         self.template.main.append(
             pn.Row(
                 self.filters.servable(),
-                self.map.servable()
+                self.map.servable(),
+                self.histogram.servable()
         ))
     
     def servable(self) -> BootstrapTemplate:
