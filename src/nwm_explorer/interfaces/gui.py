@@ -33,6 +33,16 @@ DEFAULT_CENTER: dict[ModelDomain, dict[str, float]] = {
 }
 """Default map center for each domain."""
 
+METRIC_PLOTTING_LIMITS: dict[str, tuple[float, float]] = {
+    "relative_mean_bias": (-1.0, 1.0),
+    "pearson_correlation_coefficient": (-1.0, 1.0),
+    "nash_sutcliffe_efficiency": (-1.0, 1.0),
+    "relative_mean": (0.0, 2.0),
+    "relative_standard_deviation": (0.0, 2.0),
+    "kling_gupta_efficiency": (-1.0, 1.0)
+}
+"""Mapping from Metrics to plotting limist (cmin, cmax)."""
+
 class SiteMap:
     def __init__(self):
         # Viewport
@@ -197,13 +207,14 @@ class Dashboard:
             data = data.select(columns).join(geometry, on="nwm_feature_id", how="left").collect()
             
             # Update map
+            cmin, cmax = METRIC_PLOTTING_LIMITS[self.state.metric]
             self.map.update(
                 values=data[value_column].to_numpy(),
                 latitude=data["latitude"].to_numpy(),
                 longitude=data["longitude"].to_numpy(),
                 value_name=self.state.metric_label,
-                cmin=-1.0,
-                cmax=1.0,
+                cmin=cmin,
+                cmax=cmax,
                 domain=self.state.domain
             )
             self.map.refresh()
