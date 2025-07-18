@@ -5,6 +5,7 @@ from typing import Callable
 import panel as pn
 
 from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration
+from nwm_explorer.evaluation.compute import EvaluationRegistry
 
 DOMAIN_STRINGS: dict[str, ModelDomain] = {
     "Alaska": ModelDomain.alaska,
@@ -90,6 +91,32 @@ class FilterState:
     confidence: str
     lead_time: int
 
+    def __eq__(self, other):
+        self_states = (
+            self.evaluation,
+            self.domain,
+            self.configuration,
+            self.threshold,
+            self.metric,
+            self.metric_label,
+            self.confidence,
+            self.lead_time
+        )
+        other_states = (
+            other.evaluation,
+            other.domain,
+            other.configuration,
+            other.threshold,
+            other.metric,
+            other.metric_label,
+            other.confidence,
+            other.lead_time
+        )
+        for s, o in zip(self_states, other_states):
+            if s != o:
+                return False
+        return True
+
 class CallbackType(StrEnum):
     """Callback type enums."""
     evaluation = "evaluation"
@@ -103,12 +130,12 @@ class CallbackType(StrEnum):
     relayout = "relayout"
 
 class FilteringWidgets:
-    def __init__(self, evaluation_strings: list[str]):
+    def __init__(self, evaluation_registry: EvaluationRegistry):
         # Filtering options
         self.callbacks: list[Callable] = []
         self.evaluation_filter = pn.widgets.Select(
             name="Evaluation",
-            options=evaluation_strings
+            options=list(evaluation_registry.evaluations.keys())
         )
         self.domain_filter = pn.widgets.Select(
             name="Model Domain",

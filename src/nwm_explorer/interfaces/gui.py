@@ -7,9 +7,9 @@ import panel as pn
 from panel.template import BootstrapTemplate
 
 from nwm_explorer.logging.logger import get_logger
-from nwm_explorer.evaluation.compute import EvaluationRegistry
+from nwm_explorer.evaluation.compute import EvaluationRegistry, PREDICTION_RESAMPLING
 from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration
-from nwm_explorer.interfaces.filters import FilteringWidgets
+from nwm_explorer.interfaces.filters import FilteringWidgets, CallbackType
 
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
@@ -43,7 +43,34 @@ class Dashboard:
                     self.data[label][domain][configuration] = pl.scan_parquet(ifile)
         
         # Widgets
-        self.filters = FilteringWidgets(list(evaluation_registry.evaluations.keys()))
+        self.filters = FilteringWidgets(evaluation_registry)
+        self.state = self.filters.state
+
+        # Callbacks
+        def update_map(event, callback_type: CallbackType) -> None:
+            if event is None:
+                return
+            
+            # Limit number of state updates
+            if self.state == self.filters.state:
+                return
+            
+            # Update state
+            self.state = self.filters.state
+
+            # Select data
+            data = self.data[self.state.evaluation][self.state.domain][self.state.configuration]
+
+            # Filter data
+            value_column = self.state.metric + self.state.confidence
+            columns = [value_column, "start_date", "end_date", "nwm_feature_id", "usgs_site_code", "sample_size"]
+            if self.state.configuration in PREDICTION_RESAMPLING:
+                columns.append("lead_time_hours_min")
+                data = data.filter(pl.col("lead_time_hours_min") == self.state.lead_time)
+            data = data.select(columns)
+            
+            print(data.collect())
+        self.filters.register_callback(update_map)
 
         # Layout
         self.template.main.append(self.filters.servable())
