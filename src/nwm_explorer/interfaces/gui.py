@@ -39,6 +39,7 @@ class Histogram:
         # Bins
         self.bins = {}
         self.abscissa = {}
+        self.custom_data = {}
         for k in self.data:
             cmin, cmax = METRIC_PLOTTING_LIMITS[k]
             self.bins[k] = np.linspace(cmin, cmax, 11)
@@ -47,6 +48,25 @@ class Histogram:
             abscissa = np.insert(abscissa, 0, abscissa[0] - (abscissa[1] - abscissa[0]))
             abscissa = np.append(abscissa, abscissa[-1] + (abscissa[-1] - abscissa[-2]))
             self.abscissa[k] = abscissa
+
+            # Bin range
+            bin_ranges = [f"<{cmin:.1f}"]
+            for idx in range(len(self.bins[k])-1):
+                left = self.bins[k][idx]
+                right = self.bins[k][idx+1]
+                bin_ranges.append(f"{left:.1f} to {right:.1f}")
+            bin_ranges.append(f">{cmax:.1f}")
+
+            # Custom data
+            self.custom_data[k] = pd.DataFrame({
+                "counts": np.zeros(len(bin_ranges)),
+                "bin_range": bin_ranges
+            })
+
+            # Update plot data
+            self.data[k][0].update(
+                x=self.abscissa[k]
+            )
     
     def update(self, data: pl.DataFrame) -> None:
         for k in self.data:
@@ -63,26 +83,14 @@ class Histogram:
             count = np.insert(count, 0, number_low)
             count = np.append(count, number_high)
 
-            # Bin range
-            bin_ranges = [f"<{cmin:.1f}"]
-            for idx in range(len(self.bins[k])-1):
-                left = self.bins[k][idx]
-                right = self.bins[k][idx+1]
-                bin_ranges.append(f"{left:.1f} to {right:.1f}")
-            bin_ranges.append(f">{cmax:.1f}")
-
             # Custom data
-            custom_data = pd.DataFrame({
-                "counts": count,
-                "bin_range": bin_ranges
-            })
+            self.custom_data[k]["counts"] = count
             total_sites = np.sum(count)
 
             # Update plot data
             self.data[k][0].update(
-                x=self.abscissa[k],
                 y=100 * count / total_sites,
-                customdata=custom_data,
+                customdata=self.custom_data[k],
                 hovertemplate=(
                 f"{METRIC_STRING_LOOKUP[k]}<br>"
                 "Bin range: %{customdata[1]} <br>"
