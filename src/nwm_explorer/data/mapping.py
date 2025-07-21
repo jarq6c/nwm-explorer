@@ -25,3 +25,12 @@ class ModelConfiguration(StrEnum):
     short_range_hawaii_no_da = "short_range_hawaii_no_da"
     short_range_puertorico = "short_range_puertorico"
     short_range_puertorico_no_da = "short_range_puertorico_no_da"
+
+class Metric(StrEnum):
+    """Metrics."""
+    nash_sutcliffe_efficiency = "nash_sutcliffe_efficiency"
+    relative_mean_bias = "relative_mean_bias"
+    pearson_correlation_coefficient = "pearson_correlation_coefficient"
+    relative_mean = "relative_mean"
+    relative_standard_deviation = "relative_standard_deviation"
+    kling_gupta_efficiency = "kling_gupta_efficiency"

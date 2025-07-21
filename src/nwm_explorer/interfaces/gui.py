@@ -8,21 +8,38 @@ from panel.template import BootstrapTemplate
 
 from nwm_explorer.logging.logger import get_logger
 from nwm_explorer.evaluation.compute import EvaluationRegistry, PREDICTION_RESAMPLING
-from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration
-from nwm_explorer.interfaces.filters import FilteringWidgets, CallbackType
+from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration, Metric
+from nwm_explorer.interfaces.filters import FilteringWidgets, CallbackType, METRIC_STRINGS
 from nwm_explorer.data.routelink import get_routelink_readers
 from nwm_explorer.plots.site_map import SiteMap, METRIC_PLOTTING_LIMITS
 
-class Histogram:
-    def __init__(self):
-        pass
+import plotly.graph_objects as go
 
-    def servable(self) -> pn.Card:
-        return pn.Card(
-            pn.pane.Markdown("HISTOGRAM"),
+METRIC_STRING_LOOKUP: dict[Metric, str] = {v: k for k, v in METRIC_STRINGS.items()}
+"""Reverse look-up from metric column slugs to pretty strings."""
+
+class Histogram:
+    def __init__(self, columns: list[Metric]):
+        self.data = {c: go.Bar() for c in columns}
+        self.layouts = {k: go.Layout(
+            dragmode=False,
+            hovermode=False,
+            showlegend=False,
+            height=250,
+            width=300,
+            margin=dict(l=0, r=0, t=0, b=0),
+            yaxis=dict(title=dict(text="Frequency (%)"), range=[0.0, 100.0]),
+            xaxis=dict(title=dict(text=METRIC_STRING_LOOKUP[k]))) for k in self.data}
+        self.figures = {k: {"data": self.data[k], "layout": self.layouts[k]} for k in self.data}
+        self.plots = {k: pn.pane.Plotly(f, config={"displayModeBar": False}) for k, f in self.figures.items()}
+
+    def servable(self) -> pn.GridBox:
+        cards = [pn.Card(
+            v,
             collapsible=False,
             hide_header=True
-        )
+        ) for v in self.plots.values()]
+        return pn.GridBox(*cards, ncols=2)
 
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
@@ -59,7 +76,12 @@ class Dashboard:
         # Widgets
         self.filters = FilteringWidgets(evaluation_registry)
         self.map = SiteMap()
-        self.histogram = Histogram()
+        self.histogram = Histogram([
+            Metric.kling_gupta_efficiency,
+            Metric.pearson_correlation_coefficient,
+            Metric.relative_mean,
+            Metric.relative_standard_deviation
+        ])
         self.state = self.filters.state
 
         # Callbacks

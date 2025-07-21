@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Callable
 import panel as pn
 
-from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration
+from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration, Metric
 from nwm_explorer.evaluation.compute import EvaluationRegistry
 
 DOMAIN_STRINGS: dict[str, ModelDomain] = {
@@ -46,13 +46,13 @@ Mapping from ModelDomain to pretty string representations of model configuration
 Pretty strings map to model ModelConfiguration enums.
 """
 
-METRIC_STRINGS: dict[str, str] = {
-    "Nash-Sutcliffe Model Efficiency": "nash_sutcliffe_efficiency",
-    "Relative mean bias": "relative_mean_bias",
-    "Pearson correlation coefficient": "pearson_correlation_coefficient",
-    "Relative mean": "relative_mean",
-    "Relative standard deviation": "relative_standard_deviation",
-    "Kling-Gupta Model Efficiency": "kling_gupta_efficiency"
+METRIC_STRINGS: dict[str, Metric] = {
+    "Nash-Sutcliffe Model Efficiency": Metric.nash_sutcliffe_efficiency,
+    "Relative mean bias": Metric.relative_mean_bias,
+    "Pearson correlation coefficient": Metric.pearson_correlation_coefficient,
+    "Relative mean": Metric.relative_mean,
+    "Relative standard deviation": Metric.relative_standard_deviation,
+    "Kling-Gupta Model Efficiency": Metric.kling_gupta_efficiency
 }
 """Mapping from pretty strings to column names."""
 
@@ -86,7 +86,7 @@ class FilterState:
     domain: ModelDomain
     configuration: ModelConfiguration
     threshold: str
-    metric: str
+    metric: Metric
     metric_label: str
     confidence: str
     lead_time: int
