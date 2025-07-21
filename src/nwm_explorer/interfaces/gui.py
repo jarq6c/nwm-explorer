@@ -2,6 +2,9 @@
 from pathlib import Path
 import inspect
 
+import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
+import pandas as pd
 import polars as pl
 import panel as pn
 from panel.template import BootstrapTemplate
@@ -21,10 +24,9 @@ METRIC_STRING_LOOKUP: dict[Metric, str] = {v: k for k, v in METRIC_STRINGS.items
 class Histogram:
     def __init__(self, columns: list[Metric]):
         self.columns = columns
-        self.data = {c: go.Bar() for c in columns}
+        self.data = {c: [go.Bar(showlegend=False, name="")] for c in columns}
         self.layouts = {k: go.Layout(
             dragmode=False,
-            hovermode=False,
             showlegend=False,
             height=250,
             width=300,
@@ -33,6 +35,67 @@ class Histogram:
             xaxis=dict(title=dict(text=METRIC_STRING_LOOKUP[k]))) for k in self.data}
         self.figures = {k: {"data": self.data[k], "layout": self.layouts[k]} for k in self.data}
         self.plots = {k: pn.pane.Plotly(f, config={"displayModeBar": False}) for k, f in self.figures.items()}
+        
+        # Bins
+        self.bins = {}
+        self.abscissa = {}
+        for k in self.data:
+            cmin, cmax = METRIC_PLOTTING_LIMITS[k]
+            self.bins[k] = np.linspace(cmin, cmax, 11)
+            windows = sliding_window_view(self.bins[k], window_shape=2)
+            abscissa = windows.mean(axis=1)
+            abscissa = np.insert(abscissa, 0, abscissa[0] - (abscissa[1] - abscissa[0]))
+            abscissa = np.append(abscissa, abscissa[-1] + (abscissa[-1] - abscissa[-2]))
+            self.abscissa[k] = abscissa
+    
+    def update(self, data: pl.DataFrame) -> None:
+        for k in self.data:
+            # Point estimate
+            a = data[k+"_point"].to_numpy()
+            count, _ = np.histogram(a, bins=self.bins[k], density=False)
+
+            # Outside range
+            cmin, cmax = METRIC_PLOTTING_LIMITS[k]
+            number_low = a[a < cmin].size
+            number_high = a[a > cmax].size
+
+            # Expand original count
+            count = np.insert(count, 0, number_low)
+            count = np.append(count, number_high)
+
+            # Bin range
+            bin_ranges = [f"<{cmin:.1f}"]
+            for idx in range(len(self.bins[k])-1):
+                left = self.bins[k][idx]
+                right = self.bins[k][idx+1]
+                bin_ranges.append(f"{left:.1f} to {right:.1f}")
+            bin_ranges.append(f">{cmax:.1f}")
+
+            # Custom data
+            custom_data = pd.DataFrame({
+                "counts": count,
+                "bin_range": bin_ranges
+            })
+            total_sites = np.sum(count)
+
+            # Update plot data
+            self.data[k][0].update(
+                x=self.abscissa[k],
+                y=100 * count / total_sites,
+                customdata=custom_data,
+                hovertemplate=(
+                f"{METRIC_STRING_LOOKUP[k]}<br>"
+                "Bin range: %{customdata[1]} <br>"
+                "Sites: %{customdata[0]} of "
+                f"{total_sites} "
+                "(%{y:.1f} %)<br>"
+                )
+            )
+
+    def refresh(self) -> None:
+        self.figures = {k: {"data": self.data[k], "layout": self.layouts[k]} for k in self.data}
+        for k in self.plots:
+            self.plots[k].object = self.figures[k]
 
     def servable(self) -> pn.GridBox:
         cards = [pn.Card(
@@ -148,7 +211,9 @@ class Dashboard:
                 data = data.filter(pl.col("lead_time_hours_min") == self.state.lead_time)
             data = data.select(self.histogram_columns).collect()
             
-            print(data)
+            # Update and refresh
+            self.histogram.update(data)
+            self.histogram.refresh()
         self.filters.register_callback(update_histogram)
         pn.bind(update_histogram, self.map.relayout_data, watch=True,
             callback_type=CallbackType.relayout)
