@@ -66,6 +66,7 @@ class Dashboard:
         self.state = self.filters.state
 
         # Callbacks
+        # TODO solve double click domain change histogram error
         def update_map(event, callback_type: CallbackType) -> None:
             if event is None:
                 return
@@ -113,18 +114,23 @@ class Dashboard:
 
             if callback_type not in self.histogram_callbacks:
                 return
+            
+            # Get state
+            state = self.filters.state
 
             # Select data
-            geometry = self.routelinks[self.state.domain].select(["nwm_feature_id", "latitude", "longitude"])
-            data = self.data[self.state.evaluation][self.state.domain][self.state.configuration].join(
-                geometry, on="nwm_feature_id", how="left").filter(
-                    pl.col("latitude") <= self.map.lat_max,
-                    pl.col("latitude") >= self.map.lat_min,
-                    pl.col("longitude") <= self.map.lon_max,
-                    pl.col("longitude") >= self.map.lon_min
-                )
-            if self.state.configuration in PREDICTION_RESAMPLING:
-                data = data.filter(pl.col("lead_time_hours_min") == self.state.lead_time)
+            geometry = self.routelinks[state.domain].select(["nwm_feature_id", "latitude", "longitude"])
+            data = self.data[state.evaluation][state.domain][state.configuration].join(
+                geometry, on="nwm_feature_id", how="left")
+            if self.map.lat_min is not None:
+                data = data.filter(
+                        pl.col("latitude") <= self.map.lat_max,
+                        pl.col("latitude") >= self.map.lat_min,
+                        pl.col("longitude") <= self.map.lon_max,
+                        pl.col("longitude") >= self.map.lon_min
+                    )
+            if state.configuration in PREDICTION_RESAMPLING:
+                data = data.filter(pl.col("lead_time_hours_min") == state.lead_time)
             data = data.select(self.histogram_columns).collect()
             
             # Update and refresh

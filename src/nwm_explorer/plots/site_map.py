@@ -103,6 +103,10 @@ class SiteMap:
             if "width" in data:
                 self.layout["map"]["center"].update(DEFAULT_CENTER[self.domain])
                 self.layout["map"].update(dict(zoom=DEFAULT_ZOOM[self.domain]))
+                self.lat_min = None
+                self.lat_max = None
+                self.lon_min = None
+                self.lon_max = None
                 self.refresh()
         pn.bind(apply_relayout_data, self.pane.param.relayout_data, watch=True)
 
@@ -110,6 +114,10 @@ class SiteMap:
         def reset_view(event) -> None:
             self.layout["map"]["center"].update(DEFAULT_CENTER[self.domain])
             self.layout["map"].update(dict(zoom=DEFAULT_ZOOM[self.domain]))
+            self.lat_min = None
+            self.lat_max = None
+            self.lon_min = None
+            self.lon_max = None
             self.refresh()
         pn.bind(reset_view, self.pane.param.doubleclick_data, watch=True)
     
