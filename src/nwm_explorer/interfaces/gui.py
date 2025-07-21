@@ -70,26 +70,30 @@ class Histogram:
     
     def update(self, data: pl.DataFrame) -> None:
         for k in self.data:
-            # Point estimate
-            a = data[k+"_point"].to_numpy()
-            count, _ = np.histogram(a, bins=self.bins[k], density=False)
-
-            # Outside range
+            count = {}
             cmin, cmax = METRIC_PLOTTING_LIMITS[k]
-            number_low = a[a < cmin].size
-            number_high = a[a > cmax].size
+            for conf in ["_point", "_lower", "_upper"]:
+                # Count sites
+                a = data[k+conf].to_numpy()
+                number_of_sites, _ = np.histogram(a, bins=self.bins[k], density=False)
 
-            # Expand original count
-            count = np.insert(count, 0, number_low)
-            count = np.append(count, number_high)
+                # Outside range
+                number_low = a[a < cmin].size
+                number_high = a[a > cmax].size
+
+                # Expand original count
+                number_of_sites = np.insert(number_of_sites, 0, number_low)
+                number_of_sites = np.append(number_of_sites, number_high)
+
+                count[conf] = number_of_sites
 
             # Custom data
-            self.custom_data[k]["counts"] = count
-            total_sites = np.sum(count)
+            self.custom_data[k]["counts"] = count["_point"]
+            total_sites = np.sum(count["_point"])
 
             # Update plot data
             self.data[k][0].update(
-                y=100 * count / total_sites,
+                y=100 * count["_point"] / total_sites,
                 customdata=self.custom_data[k],
                 hovertemplate=(
                 f"{METRIC_STRING_LOOKUP[k]}<br>"
