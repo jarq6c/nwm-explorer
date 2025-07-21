@@ -60,7 +60,11 @@ class Histogram:
             # Custom data
             self.custom_data[k] = pd.DataFrame({
                 "counts": np.zeros(len(bin_ranges)),
-                "bin_range": bin_ranges
+                "bin_range": bin_ranges,
+                "counts_low": np.zeros(len(bin_ranges)),
+                "counts_high": np.zeros(len(bin_ranges)),
+                "lower_estimate": np.zeros(len(bin_ranges)),
+                "upper_estimate": np.zeros(len(bin_ranges))
             })
 
             # Update plot data
@@ -87,9 +91,18 @@ class Histogram:
 
                 count[conf] = number_of_sites
 
+            # Determine histogram error bars
+            estimates = np.vstack(tuple(count.values()))
+            e_lo = count["_point"] - np.min(estimates, axis=0)
+            e_hi = np.max(estimates, axis=0) - count["_point"]
+
             # Custom data
-            self.custom_data[k]["counts"] = count["_point"]
             total_sites = np.sum(count["_point"])
+            self.custom_data[k]["counts"] = count["_point"]
+            self.custom_data[k]["counts_low"] = np.min(estimates, axis=0)
+            self.custom_data[k]["counts_high"] = np.max(estimates, axis=0)
+            self.custom_data[k]["lower_estimate"] = 100 * np.min(estimates, axis=0) / total_sites
+            self.custom_data[k]["upper_estimate"] = 100 * np.max(estimates, axis=0) / total_sites
 
             # Update plot data
             self.data[k][0].update(
@@ -101,7 +114,15 @@ class Histogram:
                 "Sites: %{customdata[0]} of "
                 f"{total_sites} "
                 "(%{y:.1f} %)<br>"
-                )
+                "95% CI: %{customdata[2]} to %{customdata[3]} sites<br>"
+                "        (%{customdata[4]:.1f} to %{customdata[5]:.1f} %)"
+                ),
+                error_y=dict(
+                    type="data",
+                    symmetric=False,
+                    array=100 * e_hi / total_sites,
+                    arrayminus=100 * e_lo / total_sites
+                    )
             )
 
     def refresh(self) -> None:
