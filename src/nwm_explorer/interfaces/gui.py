@@ -9,7 +9,7 @@ from panel.template import BootstrapTemplate
 from nwm_explorer.logging.logger import get_logger
 from nwm_explorer.evaluation.compute import EvaluationRegistry, PREDICTION_RESAMPLING
 from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration, Metric
-from nwm_explorer.interfaces.filters import FilteringWidgets, CallbackType, METRIC_STRINGS
+from nwm_explorer.interfaces.filters import FilteringWidgets, CallbackType, METRIC_STRINGS, CONFIDENCE_STRINGS
 from nwm_explorer.data.routelink import get_routelink_readers
 from nwm_explorer.plots.site_map import SiteMap, METRIC_PLOTTING_LIMITS
 
@@ -20,6 +20,7 @@ METRIC_STRING_LOOKUP: dict[Metric, str] = {v: k for k, v in METRIC_STRINGS.items
 
 class Histogram:
     def __init__(self, columns: list[Metric]):
+        self.columns = columns
         self.data = {c: go.Bar() for c in columns}
         self.layouts = {k: go.Layout(
             dragmode=False,
@@ -82,6 +83,7 @@ class Dashboard:
             Metric.relative_mean,
             Metric.relative_standard_deviation
         ])
+        self.histogram_columns = [m+c for m in self.histogram.columns for c in CONFIDENCE_STRINGS.values()]
         self.state = self.filters.state
 
         # Callbacks
@@ -125,21 +127,31 @@ class Dashboard:
             )
             self.map.refresh()
         self.filters.register_callback(update_map)
-        
-        # def update_histogram(event, callback_type: CallbackType) -> None:
-        #     if event is None:
-        #         return
+
+        def update_histogram(event, callback_type: CallbackType) -> None:
+            if event is None:
+                return
+
+            if callback_type not in [CallbackType.relayout, CallbackType.lead_time, CallbackType.evaluation, CallbackType.configuration]:
+                return
+
+            # Select data
+            geometry = self.routelinks[self.state.domain].select(["nwm_feature_id", "latitude", "longitude"])
+            data = self.data[self.state.evaluation][self.state.domain][self.state.configuration].join(
+                geometry, on="nwm_feature_id", how="left").filter(
+                    pl.col("latitude") <= self.map.lat_max,
+                    pl.col("latitude") >= self.map.lat_min,
+                    pl.col("longitude") <= self.map.lon_max,
+                    pl.col("longitude") >= self.map.lon_min
+                )
+            if self.state.configuration in PREDICTION_RESAMPLING:
+                data = data.filter(pl.col("lead_time_hours_min") == self.state.lead_time)
+            data = data.select(self.histogram_columns).collect()
             
-        #     if callback_type == CallbackType.domain:
-        #         print(event)
-            
-        #     if callback_type == CallbackType.relayout:
-        #         if "map.center" not in event:
-        #             return
-        #         print(event)
-        # self.filters.register_callback(update_histogram)
-        # pn.bind(update_histogram, self.map.relayout_data, watch=True,
-        #     callback_type=CallbackType.relayout)
+            print(data)
+        self.filters.register_callback(update_histogram)
+        pn.bind(update_histogram, self.map.relayout_data, watch=True,
+            callback_type=CallbackType.relayout)
 
         # Layout
         self.template.main.append(
