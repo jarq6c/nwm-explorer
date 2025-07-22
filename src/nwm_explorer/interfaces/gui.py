@@ -68,10 +68,7 @@ class Dashboard:
             CallbackType.configuration,
             CallbackType.lead_time
         ]
-        self.lat_max: float | None = None
-        self.lat_min: float | None = None
-        self.lon_max: float | None = None
-        self.lon_min: float | None = None
+        self.bbox: dict[str, float] | None = None
 
         # Callbacks
         def update_histogram() -> None:
@@ -81,15 +78,22 @@ class Dashboard:
             # Select data
             geometry = self.routelinks[state.domain].select(["nwm_feature_id", "latitude", "longitude"])
             data = self.data[state.evaluation][state.domain][state.configuration].join(
-                geometry, on="nwm_feature_id", how="left").filter(
-                    pl.col("latitude") <= self.lat_max,
-                    pl.col("latitude") >= self.lat_min,
-                    pl.col("longitude") <= self.lon_max,
-                    pl.col("longitude") >= self.lon_min
-                )
+                geometry, on="nwm_feature_id", how="left")
+
+            if self.bbox is not None:
+                data = data.filter(
+                        pl.col("latitude") <= self.bbox["lat_max"],
+                        pl.col("latitude") >= self.bbox["lat_min"],
+                        pl.col("longitude") <= self.bbox["lon_max"],
+                        pl.col("longitude") >= self.bbox["lon_min"]
+                    )
             if state.configuration in PREDICTION_RESAMPLING:
                 data = data.filter(pl.col("lead_time_hours_min") == state.lead_time)
             data = data.select(self.histogram_columns).collect()
+            
+            # Ignore empty dataframes
+            if data.is_empty():
+                return
             
             # Update and refresh
             self.histogram.update(data)
@@ -108,7 +112,9 @@ class Dashboard:
                     zoom=self.map_zoom
                 ))
                 self.map.refresh()
+                self.bbox = None
                 self.double_click = True
+                update_histogram()
                 return
 
             # Register zoom
@@ -119,12 +125,22 @@ class Dashboard:
                 elif "map.center" in event and "map.zoom" in event:
                     self.map_center = event["map.center"]
                     self.map_zoom = event["map.zoom"]
+
+                    # Update histogram
+                    self.bbox = {
+                        "lat_max": event["map._derived"]["coordinates"][0][1],
+                        "lat_min": event["map._derived"]["coordinates"][2][1],
+                        "lon_max": event["map._derived"]["coordinates"][1][0],
+                        "lon_min": event["map._derived"]["coordinates"][0][0]
+                    }
+                    update_histogram()
                     return
 
             # Update domain
             if callback_type == CallbackType.domain:
                 self.map_center = DEFAULT_CENTER[state.domain]
                 self.map_zoom = DEFAULT_ZOOM[state.domain]
+                self.bbox = None
 
             # Maintain layout
             self.map.layout["map"].update(dict(
@@ -162,15 +178,9 @@ class Dashboard:
             # Send changes to frontend
             self.map.refresh()
 
-            # # Update bbox
-            # self.lat_max = data["latitude"].max()
-            # self.lat_min = data["latitude"].min()
-            # self.lon_max = data["longitude"].max()
-            # self.lon_min = data["longitude"].min()
-
-            # # Update histogram
-            # if callback_type in self.histogram_callbacks:
-            #     update_histogram()
+            # Update histogram
+            if callback_type in self.histogram_callbacks:
+                update_histogram()
         pn.bind(
             update_interface,
             self.map.pane.param.doubleclick_data,
