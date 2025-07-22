@@ -8,7 +8,7 @@ import panel as pn
 
 from nwm_explorer.data.mapping import Metric
 from nwm_explorer.interfaces.filters import METRIC_STRINGS, CONFIDENCE_STRINGS
-from nwm_explorer.plots.site_map import METRIC_PLOTTING_LIMITS
+from nwm_explorer.data.mapping import METRIC_PLOTTING_LIMITS
 
 import plotly.graph_objects as go
 

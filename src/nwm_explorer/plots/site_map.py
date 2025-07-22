@@ -1,5 +1,4 @@
 """Plotting."""
-# import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import panel as pn
@@ -95,7 +94,3 @@ class SiteMap:
             collapsible=False,
             hide_header=True
         )
-    
-    @property
-    def relayout_data(self) -> dict:
-        return self.pane.param.relayout_data

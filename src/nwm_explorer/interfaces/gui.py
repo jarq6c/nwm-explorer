@@ -8,39 +8,11 @@ from panel.template import BootstrapTemplate
 
 from nwm_explorer.logging.logger import get_logger
 from nwm_explorer.evaluation.compute import EvaluationRegistry, PREDICTION_RESAMPLING
-from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration, Metric
-from nwm_explorer.interfaces.filters import FilteringWidgets, CallbackType
+from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration, Metric, DEFAULT_CENTER, DEFAULT_ZOOM, METRIC_PLOTTING_LIMITS
+from nwm_explorer.interfaces.filters import FilteringWidgets, CallbackType, CONFIDENCE_STRINGS
 from nwm_explorer.data.routelink import get_routelink_readers
 from nwm_explorer.plots.site_map import SiteMap
-# from nwm_explorer.plots.histogram import Histogram
-
-from nwm_explorer.data.mapping import ModelDomain, Metric
-
-DEFAULT_ZOOM: dict[ModelDomain, int] = {
-    ModelDomain.alaska: 5,
-    ModelDomain.conus: 3,
-    ModelDomain.hawaii: 6,
-    ModelDomain.puertorico: 8
-}
-"""Default map zoom for each domain."""
-
-DEFAULT_CENTER: dict[ModelDomain, dict[str, float]] = {
-    ModelDomain.alaska: {"lat": 60.84683, "lon": -149.05659},
-    ModelDomain.conus: {"lat": 38.83348, "lon": -93.97612},
-    ModelDomain.hawaii: {"lat": 21.24988, "lon": -157.59606},
-    ModelDomain.puertorico: {"lat": 18.21807, "lon": -66.32802}
-}
-"""Default map center for each domain."""
-
-METRIC_PLOTTING_LIMITS: dict[Metric, tuple[float, float]] = {
-    Metric.relative_mean_bias: (-1.0, 1.0),
-    Metric.pearson_correlation_coefficient: (-1.0, 1.0),
-    Metric.nash_sutcliffe_efficiency: (-1.0, 1.0),
-    Metric.relative_mean: (0.0, 2.0),
-    Metric.relative_standard_deviation: (0.0, 2.0),
-    Metric.kling_gupta_efficiency: (-1.0, 1.0)
-}
-"""Mapping from Metrics to plotting limits (cmin, cmax)."""
+from nwm_explorer.plots.histogram import Histogram
 
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
@@ -76,63 +48,90 @@ class Dashboard:
 
         # Widgets
         self.filters = FilteringWidgets(evaluation_registry)
+        self.map_center = DEFAULT_CENTER[self.filters.state.domain]
+        self.map_zoom = DEFAULT_ZOOM[self.filters.state.domain]
         self.map = SiteMap(
-            center=DEFAULT_CENTER[self.filters.state.domain],
-            zoom=DEFAULT_ZOOM[self.filters.state.domain]
+            center=self.map_center,
+            zoom=self.map_zoom
         )
-        self.freeze_updates = False
-        # self.histogram = Histogram([
-        #     Metric.kling_gupta_efficiency,
-        #     Metric.pearson_correlation_coefficient,
-        #     Metric.relative_mean,
-        #     Metric.relative_standard_deviation
-        # ])
-        # self.histogram_columns = [m+c for m in self.histogram.columns for c in CONFIDENCE_STRINGS.values()]
-        # self.histogram_callbacks = [
-        #     CallbackType.relayout,
-        #     CallbackType.lead_time,
-        #     CallbackType.evaluation,
-        #     CallbackType.configuration,
-        #     CallbackType.domain
-        #     ]
+        self.double_click = False
+        self.histogram = Histogram([
+            Metric.kling_gupta_efficiency,
+            Metric.pearson_correlation_coefficient,
+            Metric.relative_mean,
+            Metric.relative_standard_deviation
+        ])
+        self.histogram_columns = [m+c for m in self.histogram.columns for c in CONFIDENCE_STRINGS.values()]
+        self.histogram_callbacks = [
+            CallbackType.evaluation,
+            CallbackType.domain,
+            CallbackType.configuration,
+            CallbackType.lead_time
+        ]
+        self.lat_max: float | None = None
+        self.lat_min: float | None = None
+        self.lon_max: float | None = None
+        self.lon_min: float | None = None
 
         # Callbacks
-        def update_interface(event, callback_type: CallbackType) -> None:
-            # Limit updates
-            if self.freeze_updates:
-                return
-            self.freeze_updates = True
-
-            if callback_type == CallbackType.relayout:
-                if "map.center" in event:
-                    self.map.layout["map"]["center"].update(event["map.center"])
-                if "map.zoom" in event:
-                    self.map.layout["map"].update(dict(zoom=event["map.zoom"]))
-                self.freeze_updates = False
-                return
-
+        def update_histogram() -> None:
             # Current state
             state = self.filters.state
 
-            # Reset view
+            # Select data
+            geometry = self.routelinks[state.domain].select(["nwm_feature_id", "latitude", "longitude"])
+            data = self.data[state.evaluation][state.domain][state.configuration].join(
+                geometry, on="nwm_feature_id", how="left").filter(
+                    pl.col("latitude") <= self.lat_max,
+                    pl.col("latitude") >= self.lat_min,
+                    pl.col("longitude") <= self.lon_max,
+                    pl.col("longitude") >= self.lon_min
+                )
+            if state.configuration in PREDICTION_RESAMPLING:
+                data = data.filter(pl.col("lead_time_hours_min") == state.lead_time)
+            data = data.select(self.histogram_columns).collect()
+            
+            # Update and refresh
+            self.histogram.update(data)
+            self.histogram.refresh()
+
+        def update_interface(event, callback_type: CallbackType) -> None:
+            # Current state
+            state = self.filters.state
+
+            # Reset map view
             if callback_type == CallbackType.double_click:
-                # Reset map view
+                self.map_center = DEFAULT_CENTER[state.domain]
+                self.map_zoom = DEFAULT_ZOOM[state.domain]
                 self.map.layout["map"].update(dict(
-                    center=DEFAULT_CENTER[state.domain],
-                    zoom=DEFAULT_ZOOM[state.domain]
+                    center=self.map_center,
+                    zoom=self.map_zoom
                 ))
                 self.map.refresh()
-                self.freeze_updates = False
+                self.double_click = True
                 return
+
+            # Register zoom
+            if callback_type == CallbackType.relayout:
+                if self.double_click:
+                    self.double_click = False
+                    return
+                elif "map.center" in event and "map.zoom" in event:
+                    self.map_center = event["map.center"]
+                    self.map_zoom = event["map.zoom"]
+                    return
 
             # Update domain
             if callback_type == CallbackType.domain:
-                # Reset map view
-                self.map.layout["map"].update(dict(
-                    center=DEFAULT_CENTER[state.domain],
-                    zoom=DEFAULT_ZOOM[state.domain]
-                ))
-            
+                self.map_center = DEFAULT_CENTER[state.domain]
+                self.map_zoom = DEFAULT_ZOOM[state.domain]
+
+            # Maintain layout
+            self.map.layout["map"].update(dict(
+                center=self.map_center,
+                zoom=self.map_zoom
+            ))
+
             # Select data
             data = self.data[state.evaluation][state.domain][state.configuration]
             geometry = self.routelinks[state.domain].select(["nwm_feature_id", "latitude", "longitude"])
@@ -162,8 +161,16 @@ class Dashboard:
             
             # Send changes to frontend
             self.map.refresh()
-            self.freeze_updates = False
-        self.filters.register_callback(update_interface)
+
+            # # Update bbox
+            # self.lat_max = data["latitude"].max()
+            # self.lat_min = data["latitude"].min()
+            # self.lon_max = data["longitude"].max()
+            # self.lon_min = data["longitude"].min()
+
+            # # Update histogram
+            # if callback_type in self.histogram_callbacks:
+            #     update_histogram()
         pn.bind(
             update_interface,
             self.map.pane.param.doubleclick_data,
@@ -176,46 +183,14 @@ class Dashboard:
             watch=True,
             callback_type=CallbackType.relayout
         )
-        # TODO solve double click domain change histogram error
-
-        # def update_histogram(event, callback_type: CallbackType) -> None:
-        #     if event is None:
-        #         return
-
-        #     if callback_type not in self.histogram_callbacks:
-        #         return
-            
-        #     # Get state
-        #     state = self.filters.state
-
-        #     # Select data
-        #     geometry = self.routelinks[state.domain].select(["nwm_feature_id", "latitude", "longitude"])
-        #     data = self.data[state.evaluation][state.domain][state.configuration].join(
-        #         geometry, on="nwm_feature_id", how="left")
-        #     if self.map.lat_min is not None:
-        #         data = data.filter(
-        #                 pl.col("latitude") <= self.map.lat_max,
-        #                 pl.col("latitude") >= self.map.lat_min,
-        #                 pl.col("longitude") <= self.map.lon_max,
-        #                 pl.col("longitude") >= self.map.lon_min
-        #             )
-        #     if state.configuration in PREDICTION_RESAMPLING:
-        #         data = data.filter(pl.col("lead_time_hours_min") == state.lead_time)
-        #     data = data.select(self.histogram_columns).collect()
-            
-        #     # Update and refresh
-        #     self.histogram.update(data)
-        #     self.histogram.refresh()
-        # self.filters.register_callback(update_histogram)
-        # pn.bind(update_histogram, self.map.relayout_data, watch=True,
-        #     callback_type=CallbackType.relayout)
+        self.filters.register_callback(update_interface)
 
         # Layout
         self.template.main.append(
             pn.Row(
                 self.filters.servable(),
                 self.map.servable(),
-                # self.histogram.servable()
+                self.histogram.servable()
         ))
     
     def servable(self) -> BootstrapTemplate:
