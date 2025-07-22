@@ -128,6 +128,7 @@ class CallbackType(StrEnum):
     lead_time = "lead_time"
     click = "click"
     relayout = "relayout"
+    double_click = "double_click"
 
 class FilteringWidgets:
     def __init__(self, evaluation_registry: EvaluationRegistry):
