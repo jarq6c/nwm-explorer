@@ -41,13 +41,28 @@ class Dashboard:
         # Scan evaluation data
         self.routelinks = get_routelink_readers(root)
         self.data: dict[str, dict[ModelDomain, dict[ModelConfiguration, pl.LazyFrame]]] = {}
+        self.predictions: dict[str, dict[ModelDomain, dict[ModelConfiguration, pl.LazyFrame]]] = {}
         for label, evaluation_spec in self.evaluation_registry.evaluations.items():
             self.data[label] = {}
+            self.predictions[label] = {}
+            
+            # Scan predictions
+            startDT = pd.Timestamp(evaluation_spec.startDT)
+            endDT = pd.Timestamp(evaluation_spec.endDT)
+            reference_dates = generate_reference_dates(startDT, endDT)
+
             for domain, files in evaluation_spec.files.items():
                 self.data[label][domain] = {}
+                self.predictions[label][domain] = {}
                 for configuration, ifile in files.items():
                     logger.info(f"Scanning {ifile}")
                     self.data[label][domain][configuration] = pl.scan_parquet(ifile)
+                    self.predictions[label][domain][configuration] = get_nwm_reader(
+                        root,
+                        domain,
+                        configuration,
+                        reference_dates
+                    )
 
         # Widgets
         self.filters = FilteringWidgets(self.evaluation_registry)
@@ -208,18 +223,10 @@ class Dashboard:
             feature_id = data[0]
 
             # Scan model output
-            evaluation = self.evaluation_registry.evaluations[state.evaluation]
-            startDT = pd.Timestamp(evaluation.startDT)
-            endDT = pd.Timestamp(evaluation.endDT)
-            reference_dates = generate_reference_dates(startDT, endDT)
-            model_output = get_nwm_reader(
-                root,
-                state.domain,
-                state.configuration,
-                reference_dates
-            ).filter(pl.col("nwm_feature_id") == feature_id)
-            print(event)
-            print(model_output.head().collect())
+            predictions = self.predictions[state.evaluation][state.domain][state.configuration].filter(
+                pl.col("nwm_feature_id") == feature_id)
+
+            print(predictions.head().collect())
         pn.bind(
             update_hydrograph,
             self.map.pane.param.click_data,
