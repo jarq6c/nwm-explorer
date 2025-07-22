@@ -13,6 +13,7 @@ from nwm_explorer.interfaces.filters import FilteringWidgets, CallbackType, CONF
 from nwm_explorer.data.routelink import get_routelink_readers
 from nwm_explorer.plots.site_map import SiteMap
 from nwm_explorer.plots.histogram import Histogram
+from nwm_explorer.plots.hydrograph import Hydrograph
 
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
@@ -69,6 +70,7 @@ class Dashboard:
             CallbackType.lead_time
         ]
         self.bbox: dict[str, float] | None = None
+        self.hydrograph = Hydrograph()
 
         # Callbacks
         def update_histogram() -> None:
@@ -196,11 +198,22 @@ class Dashboard:
         self.filters.register_callback(update_interface)
 
         # Layout
+        controls = pn.Column(self.filters.servable())
+        top_display = pn.Row(
+            self.map.servable(),
+            self.histogram.servable()
+        )
+        bottom_display = pn.Row(
+            self.hydrograph.servable()
+        )
+        display = pn.Column(
+            top_display,
+            bottom_display
+        )
         self.template.main.append(
             pn.Row(
-                self.filters.servable(),
-                self.map.servable(),
-                self.histogram.servable()
+                controls,
+                display
         ))
     
     def servable(self) -> BootstrapTemplate:
