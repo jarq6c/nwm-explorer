@@ -4,6 +4,7 @@ import inspect
 
 import polars as pl
 import panel as pn
+import pandas as pd
 from panel.template import BootstrapTemplate
 
 from nwm_explorer.logging.logger import get_logger
@@ -14,6 +15,7 @@ from nwm_explorer.data.routelink import get_routelink_readers
 from nwm_explorer.plots.site_map import SiteMap
 from nwm_explorer.plots.histogram import Histogram
 from nwm_explorer.plots.hydrograph import Hydrograph
+from nwm_explorer.data.nwm import get_nwm_reader, generate_reference_dates
 
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
@@ -30,7 +32,7 @@ class Dashboard:
         if registry_file.exists():
             logger.info(f"Reading {registry_file}")
             with registry_file.open("r") as fo:
-                evaluation_registry = EvaluationRegistry.model_validate_json(fo.read())
+                self.evaluation_registry = EvaluationRegistry.model_validate_json(fo.read())
         else:
             logger.info(f"No registry found at {registry_file}")
             self.template.main.append(pn.pane.Markdown("# Registry not found. Have you run an evaluation?"))
@@ -39,7 +41,7 @@ class Dashboard:
         # Scan evaluation data
         self.routelinks = get_routelink_readers(root)
         self.data: dict[str, dict[ModelDomain, dict[ModelConfiguration, pl.LazyFrame]]] = {}
-        for label, evaluation_spec in evaluation_registry.evaluations.items():
+        for label, evaluation_spec in self.evaluation_registry.evaluations.items():
             self.data[label] = {}
             for domain, files in evaluation_spec.files.items():
                 self.data[label][domain] = {}
@@ -48,7 +50,7 @@ class Dashboard:
                     self.data[label][domain][configuration] = pl.scan_parquet(ifile)
 
         # Widgets
-        self.filters = FilteringWidgets(evaluation_registry)
+        self.filters = FilteringWidgets(self.evaluation_registry)
         self.map_center = DEFAULT_CENTER[self.filters.state.domain]
         self.map_zoom = DEFAULT_ZOOM[self.filters.state.domain]
         self.map = SiteMap(
@@ -196,6 +198,33 @@ class Dashboard:
             callback_type=CallbackType.relayout
         )
         self.filters.register_callback(update_interface)
+
+        def update_hydrograph(event) -> None:
+            # Current state
+            state = self.filters.state
+
+            # Feature ID
+            data = event["points"][0]["customdata"]
+            feature_id = data[0]
+
+            # Scan model output
+            evaluation = self.evaluation_registry.evaluations[state.evaluation]
+            startDT = pd.Timestamp(evaluation.startDT)
+            endDT = pd.Timestamp(evaluation.endDT)
+            reference_dates = generate_reference_dates(startDT, endDT)
+            model_output = get_nwm_reader(
+                root,
+                state.domain,
+                state.configuration,
+                reference_dates
+            ).filter(pl.col("nwm_feature_id") == feature_id)
+            print(event)
+            print(model_output.head().collect())
+        pn.bind(
+            update_hydrograph,
+            self.map.pane.param.click_data,
+            watch=True
+        )
 
         # Layout
         controls = pn.Column(self.filters.servable())
