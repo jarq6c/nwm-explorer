@@ -24,13 +24,14 @@ def invert_color(value: str) -> str:
 class Hydrograph:
     def __init__(self):
         self.data = [go.Scatter()]
-        self.layout = go.Layout(
+        self.default_layout = go.Layout(
             height=250,
             width=1045,
             margin=dict(l=0, r=0, t=0, b=0),
             clickmode="event",
             yaxis=dict(title=dict(text="Streamflow (cfs)"))
         )
+        self.layout = self.default_layout
         self.figure = {
             "data": self.data,
             "layout": self.layout
@@ -69,6 +70,23 @@ class Hydrograph:
             ))
             self.refresh()
         pn.bind(highlight_trace, self.pane.param.click_data, watch=True)
+
+        def maintain_focus(event):
+            if event is None:
+                return
+            
+            # Reset layout
+            self.layout = self.default_layout
+            
+            # Update layout to reflect zoom
+            if "xaxis.range[0]" in event:
+                self.layout["xaxis"].update(dict(
+                    range=[event["xaxis.range[0]"], event["xaxis.range[1]"]]
+                ))
+                self.layout["yaxis"].update(dict(
+                    range=[event["yaxis.range[0]"], event["yaxis.range[1]"]]
+                ))
+        pn.bind(maintain_focus, self.pane.param.relayout_data, watch=True)
     
     def update_data(
             self, 
@@ -99,8 +117,14 @@ class Hydrograph:
             if color_index == len(cc.CET_L8):
                 color_index = 0
 
+        # Trace highlighting
+        self.curve_number = None
+        self.curve_color = None
+        self.curve_width = None
+
         # Update data
         self.data = data
+        self.layout = self.default_layout
     
     def refresh(self) -> None:
         self.figure.update(dict(data=self.data, layout=self.layout))
