@@ -17,6 +17,7 @@ from nwm_explorer.plots.histogram import Histogram
 from nwm_explorer.plots.hydrograph import Hydrograph
 from nwm_explorer.data.nwm import get_nwm_reader, generate_reference_dates
 from nwm_explorer.data.usgs import get_usgs_reader
+from nwm_explorer.plots.barplot import BarPlot
 
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
@@ -103,8 +104,49 @@ class Dashboard:
         self.hydrograph = Hydrograph()
         self.nwm_feature_id = None
         self.usgs_site_code = None
+        self.barplot = BarPlot()
 
         # Callbacks
+        def update_barplot() -> None:
+            # Vet call
+            if self.nwm_feature_id is None:
+                return
+
+            # Current state
+            state = self.filters.state
+            columns = [state.metric+c for c in CONFIDENCE_STRINGS.values()]
+
+            # Select data
+            data = self.data[state.evaluation][state.domain][state.configuration].filter(
+                pl.col("nwm_feature_id") == self.nwm_feature_id
+            )
+
+            # Deal with forecasts
+            if state.configuration in PREDICTION_RESAMPLING:
+                columns.append("lead_time_hours_min")
+            data = data.select(columns).collect()
+            
+            # Ignore empty dataframes
+            if data.is_empty():
+                return
+
+            # Set xdata
+            if "lead_time_hours_min" in data:
+                xdata = data["lead_time_hours_min"].to_numpy()
+            else:
+                xdata = [0]
+            
+            # Update and refresh
+            self.barplot.update(
+                xdata=xdata,
+                ydata=data[state.metric+"_point"].to_numpy(),
+                ydata_lower=data[state.metric+"_lower"].to_numpy(),
+                ydata_upper=data[state.metric+"_upper"].to_numpy(),
+                xlabel="Minimum Lead Time (h)",
+                ylabel=state.metric_label
+            )
+            self.barplot.refresh()
+
         def update_histogram() -> None:
             # Current state
             state = self.filters.state
@@ -217,6 +259,10 @@ class Dashboard:
             # Update histogram
             if callback_type in self.histogram_callbacks:
                 update_histogram()
+            
+            # Update barplot
+            if callback_type in [CallbackType.configuration, CallbackType.metric]:
+                update_barplot()
         pn.bind(
             update_interface,
             self.map.pane.param.doubleclick_data,
@@ -285,6 +331,9 @@ class Dashboard:
                 names=n
             )
             self.hydrograph.refresh()
+
+            # Update barplot
+            update_barplot()
         pn.bind(
             update_hydrograph,
             self.map.pane.param.click_data,
@@ -300,7 +349,8 @@ class Dashboard:
             self.histogram.servable()
         )
         bottom_display = pn.Row(
-            self.hydrograph.servable()
+            self.hydrograph.servable(),
+            self.barplot.servable()
         )
         display = pn.Column(
             top_display,
