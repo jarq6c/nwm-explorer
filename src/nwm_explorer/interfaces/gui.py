@@ -224,9 +224,27 @@ class Dashboard:
 
             # Scan model output
             predictions = self.predictions[state.evaluation][state.domain][state.configuration].filter(
-                pl.col("nwm_feature_id") == feature_id)
-
-            print(predictions.head().collect())
+                pl.col("nwm_feature_id") == feature_id).collect()
+            
+            # Prepare traces
+            x = []
+            y = []
+            n = []
+            if state.configuration in PREDICTION_RESAMPLING:
+                for (rt,), df in predictions.partition_by("reference_time", maintain_order=True, as_dict=True).items():
+                    x.append(df["value_time"].to_numpy())
+                    y.append(df["predicted"].to_numpy())
+                    n.append(rt.strftime("%Y-%m-%d %HZ"))
+            else:
+                x.append(predictions["value_time"].to_numpy())
+                y.append(predictions["predicted"].to_numpy())
+                n.append("Analysis")
+            self.hydrograph.update_data(
+                x=x,
+                y=y,
+                names=n
+            )
+            self.hydrograph.refresh()
         pn.bind(
             update_hydrograph,
             self.map.pane.param.click_data,
