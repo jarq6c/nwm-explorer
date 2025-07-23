@@ -16,6 +16,7 @@ from nwm_explorer.plots.site_map import SiteMap
 from nwm_explorer.plots.histogram import Histogram
 from nwm_explorer.plots.hydrograph import Hydrograph
 from nwm_explorer.data.nwm import get_nwm_reader, generate_reference_dates
+from nwm_explorer.data.usgs import get_usgs_reader
 
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
@@ -42,11 +43,13 @@ class Dashboard:
         self.routelinks = get_routelink_readers(root)
         self.data: dict[str, dict[ModelDomain, dict[ModelConfiguration, pl.LazyFrame]]] = {}
         self.predictions: dict[str, dict[ModelDomain, dict[ModelConfiguration, pl.LazyFrame]]] = {}
+        self.observations: dict[str, dict[ModelDomain, pl.LazyFrame]] = {}
         for label, evaluation_spec in self.evaluation_registry.evaluations.items():
             self.data[label] = {}
             self.predictions[label] = {}
+            self.observations[label] = {}
             
-            # Scan predictions
+            # Collect reference dates
             startDT = pd.Timestamp(evaluation_spec.startDT)
             endDT = pd.Timestamp(evaluation_spec.endDT)
             reference_dates = generate_reference_dates(startDT, endDT)
@@ -54,6 +57,16 @@ class Dashboard:
             for domain, files in evaluation_spec.files.items():
                 self.data[label][domain] = {}
                 self.predictions[label][domain] = {}
+
+                # Scan observations
+                self.observations[label][domain] = get_usgs_reader(
+                    root,
+                    domain,
+                    startDT,
+                    endDT+pd.Timedelta("10d")
+                )
+
+                # Scan predictions
                 for configuration, ifile in files.items():
                     logger.info(f"Scanning {ifile}")
                     self.data[label][domain][configuration] = pl.scan_parquet(ifile)
@@ -221,6 +234,11 @@ class Dashboard:
             # Feature ID
             data = event["points"][0]["customdata"]
             feature_id = data[0]
+            site_code = data[1]
+
+            # Scan observations
+            observations = self.observations[state.evaluation][state.domain].filter(
+                pl.col("usgs_site_code") == site_code).collect()
 
             # Scan model output
             predictions = self.predictions[state.evaluation][state.domain][state.configuration].filter(
@@ -230,6 +248,13 @@ class Dashboard:
             x = []
             y = []
             n = []
+
+            # Observation traces
+            x.append(observations["value_time"].to_numpy())
+            y.append(observations["observed"].to_numpy())
+            n.append(f"USGS-{site_code}")
+
+            # Prediction traces
             if state.configuration in PREDICTION_RESAMPLING:
                 for (rt,), df in predictions.partition_by("reference_time", maintain_order=True, as_dict=True).items():
                     x.append(df["value_time"].to_numpy())
