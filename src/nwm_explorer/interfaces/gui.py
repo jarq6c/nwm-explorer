@@ -101,6 +101,8 @@ class Dashboard:
         ]
         self.bbox: dict[str, float] | None = None
         self.hydrograph = Hydrograph()
+        self.nwm_feature_id = None
+        self.usgs_site_code = None
 
         # Callbacks
         def update_histogram() -> None:
@@ -173,6 +175,8 @@ class Dashboard:
                 self.map_center = DEFAULT_CENTER[state.domain]
                 self.map_zoom = DEFAULT_ZOOM[state.domain]
                 self.bbox = None
+                self.nwm_feature_id = None
+                self.usgs_site_code = None
 
             # Maintain layout
             self.map.layout["map"].update(dict(
@@ -227,22 +231,33 @@ class Dashboard:
         )
         self.filters.register_callback(update_interface)
 
-        def update_hydrograph(event) -> None:
+        def update_hydrograph(event, callback_type: CallbackType) -> None:
+            # Vet callback
+            if callback_type not in [CallbackType.click, CallbackType.configuration]:
+                return
+
+            # Update selected feature
+            if callback_type == CallbackType.click:
+                data = event["points"][0]["customdata"]
+                self.nwm_feature_id = data[0]
+                self.usgs_site_code = data[1]
+
+            # Check for selected feature
+            if self.nwm_feature_id is None:
+                return
+            if self.usgs_site_code is None: 
+                return
+
             # Current state
             state = self.filters.state
 
-            # Feature ID
-            data = event["points"][0]["customdata"]
-            feature_id = data[0]
-            site_code = data[1]
-
             # Scan observations
             observations = self.observations[state.evaluation][state.domain].filter(
-                pl.col("usgs_site_code") == site_code).collect()
+                pl.col("usgs_site_code") == self.usgs_site_code).collect()
 
             # Scan model output
             predictions = self.predictions[state.evaluation][state.domain][state.configuration].filter(
-                pl.col("nwm_feature_id") == feature_id).collect()
+                pl.col("nwm_feature_id") == self.nwm_feature_id).collect()
             
             # Prepare traces
             x = []
@@ -252,7 +267,7 @@ class Dashboard:
             # Observation traces
             x.append(observations["value_time"].to_numpy())
             y.append(observations["observed"].to_numpy())
-            n.append(f"USGS-{site_code}")
+            n.append(f"USGS-{self.usgs_site_code}")
 
             # Prediction traces
             if state.configuration in PREDICTION_RESAMPLING:
@@ -273,8 +288,10 @@ class Dashboard:
         pn.bind(
             update_hydrograph,
             self.map.pane.param.click_data,
-            watch=True
+            watch=True,
+            callback_type=CallbackType.click
         )
+        self.filters.register_callback(update_hydrograph)
 
         # Layout
         controls = pn.Column(self.filters.servable())
