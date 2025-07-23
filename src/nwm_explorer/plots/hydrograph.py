@@ -36,6 +36,39 @@ class Hydrograph:
             "layout": self.layout
         }
         self.pane = pn.pane.Plotly(self.figure)
+
+        # Trace highlighting
+        self.curve_number = None
+        self.curve_color = None
+        self.curve_width = None
+        def highlight_trace(event):
+            if not event:
+                return
+            if event["points"][0]["curveNumber"] == self.curve_number:
+                return
+            
+            # Restore color of old line
+            if self.curve_number is not None:
+                self.data[self.curve_number]["line"].update(dict(
+                    color=self.curve_color,
+                    width=self.curve_width
+                ))
+
+            # Update current curve
+            self.curve_number = event["points"][0]["curveNumber"]
+            trace = self.data[self.curve_number]
+            if "lines" not in trace["mode"]:
+                return
+            self.curve_color = trace["line"]["color"]
+            self.curve_width = trace["line"]["width"]
+
+            # Invert colors
+            self.data[self.curve_number]["line"].update(dict(
+                color=invert_color(self.curve_color),
+                width=self.curve_width+4
+            ))
+            self.refresh()
+        pn.bind(highlight_trace, self.pane.param.click_data, watch=True)
     
     def update_data(
             self, 
