@@ -18,6 +18,10 @@ from nwm_explorer.plots.hydrograph import Hydrograph
 from nwm_explorer.data.nwm import get_nwm_reader, generate_reference_dates
 from nwm_explorer.data.usgs import get_usgs_reader
 from nwm_explorer.plots.barplot import BarPlot
+from nwm_explorer.interfaces.site_information import SiteInformationTable
+from nwm_explorer.data.usgs_site_info import scan_site_info
+
+pn.extension("plotly")
 
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
@@ -25,9 +29,6 @@ class Dashboard:
         # Get logger
         name = __loader__.name + "." + inspect.currentframe().f_code.co_name
         logger = get_logger(name)
-
-        # Setup template
-        self.template = BootstrapTemplate(title=title)
 
         # Setup registry
         registry_file = root / "evaluation_registry.json"
@@ -105,6 +106,9 @@ class Dashboard:
         self.nwm_feature_id = None
         self.usgs_site_code = None
         self.barplot = BarPlot()
+        self.site_table = SiteInformationTable(
+            scan_site_info(root)
+        )
 
         # Callbacks
         def update_barplot() -> None:
@@ -342,8 +346,29 @@ class Dashboard:
         )
         self.filters.register_callback(update_hydrograph)
 
+        def update_site_info(event, callback_type: CallbackType) -> None:
+            if callback_type != CallbackType.click:
+                return
+            if self.usgs_site_code is None:
+                return
+            self.site_table.update(self.usgs_site_code)
+        pn.bind(update_site_info,
+            self.map.pane.param.click_data,
+            watch=True,
+            callback_type=CallbackType.click
+        )
+
+        # Setup template
+        self.template = BootstrapTemplate(
+            title=title,
+            collapsed_sidebar=True
+        )
+
         # Layout
-        controls = pn.Column(self.filters.servable())
+        controls = pn.Column(
+            self.filters.servable(),
+            self.site_table.servable()
+        )
         top_display = pn.Row(
             self.map.servable(),
             self.histogram.servable()
@@ -361,6 +386,7 @@ class Dashboard:
                 controls,
                 display
         ))
+        self.template.sidebar.append(pn.pane.Markdown("# Configuration"))
     
     def servable(self) -> BootstrapTemplate:
         return self.template
