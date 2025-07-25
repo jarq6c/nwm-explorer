@@ -10,8 +10,8 @@ COLUMNS: dict[str, str] = {
     "latitude": "Latitude",
     "longitude": "Longitude",
     "HUC": "HUC",
-    "drainage_area": "Drainage area (sq.mi.)",
-    "contributing_drainage_area": "Contrib. area (sq.mi.)"
+    "drainage_area": "Drainage (sq.mi.)",
+    "contributing_drainage_area": "Contrib. (sq.mi.)"
 }
 "Mapping from column names to pretty strings."
 
