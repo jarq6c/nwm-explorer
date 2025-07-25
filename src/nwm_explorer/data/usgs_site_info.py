@@ -161,3 +161,6 @@ def download_site_info(
         if tfile.exists():
             tfile.unlink()
     temporary_directory.rmdir()
+
+def scan_site_info(root: Path) -> pl.LazyFrame:
+    return pl.scan_parquet(root / "site_information.parquet")
