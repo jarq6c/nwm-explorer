@@ -13,6 +13,7 @@ from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration
 from nwm_explorer.logging.logger import get_logger
 from nwm_explorer.evaluation.compute import run_standard_evaluation, get_evaluation_reader
 from nwm_explorer.interfaces.gui import serve_dashboard
+from nwm_explorer.data.usgs_site_info import download_site_info
 
 CSV_HEADERS: dict[str, str] = {
     "value_time": "Valid time of observation or prediction (UTC).",
@@ -116,6 +117,9 @@ def build(
 
     # Scan routelinks
     routelinks = get_routelink_readers(directory)
+
+    # Download supplemental site information
+    download_site_info(directory, routelinks, jobs, retries)
 
     # Download NWM data, if needed
     download_nwm(startDT, endDT, directory, routelinks, jobs, retries=retries)

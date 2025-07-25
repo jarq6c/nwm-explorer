@@ -11,7 +11,6 @@ from nwm_explorer.data.download import download_files
 from nwm_explorer.logging.logger import get_logger
 from nwm_explorer.data.mapping import ModelDomain
 from nwm_explorer.data.usgs import tsv_gz_validator
-from nwm_explorer.data.routelink import get_routelink_readers
 
 HUC_URL: str = "https://waterservices.usgs.gov/nwis/site/?format=rdb&siteOutput=expanded&siteStatus=all&parameterCd=00060&huc="
 SITE_URL: str = "https://waterservices.usgs.gov/nwis/site/?format=rdb&siteOutput=expanded&siteStatus=all&parameterCd=00060&sites="
@@ -162,12 +161,3 @@ def download_site_info(
         if tfile.exists():
             tfile.unlink()
     temporary_directory.rmdir()
-
-directory = Path("./data")
-routelinks = get_routelink_readers(directory)
-download_site_info(
-    directory,
-    routelinks,
-    10,
-    2
-)
