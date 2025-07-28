@@ -2,9 +2,16 @@
 from enum import StrEnum
 from typing import Callable
 from dataclasses import dataclass
+
+import numpy as np
+import numpy.typing as npt
+import pandas as pd
 import panel as pn
 
 from nwm_explorer.interfaces.filters import CallbackType, EventHandler
+
+def convert_to_cms(a: npt.ArrayLike) -> npt.ArrayLike:
+    return
 
 class MeasurementUnits(StrEnum):
     """Measurement units enums."""

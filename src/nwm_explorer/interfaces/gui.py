@@ -116,6 +116,7 @@ class Dashboard:
         self.site_table = SiteInformationTable(
             scan_site_info(root)
         )
+        self.site_options = ConfigurationWidgets()
 
         # Callbacks
         def update_barplot() -> None:
@@ -364,9 +365,6 @@ class Dashboard:
             watch=True,
             callback_type=CallbackType.click
         )
-
-        # Site configuration options
-        self.site_options = ConfigurationWidgets()
 
         # Layout
         controls = pn.Column(
