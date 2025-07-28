@@ -1,7 +1,7 @@
 """Filtering widgets."""
 from enum import StrEnum
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Any
 import panel as pn
 
 from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration, Metric
@@ -129,11 +129,15 @@ class CallbackType(StrEnum):
     click = "click"
     relayout = "relayout"
     double_click = "double_click"
+    measurement_units = "measurement_units"
+
+EventHandler = Callable[[Any, CallbackType], None]
+"""Type hint for callback functions."""
 
 class FilteringWidgets:
     def __init__(self, evaluation_registry: EvaluationRegistry):
         # Filtering options
-        self.callbacks: list[Callable] = []
+        self.callbacks: list[EventHandler] = []
         self.evaluation_filter = pn.widgets.Select(
             name="Evaluation",
             options=list(evaluation_registry.evaluations.keys())
@@ -240,7 +244,7 @@ class FilteringWidgets:
             collapsible=False
         )
 
-    def register_callback(self, func: Callable) -> None:
+    def register_callback(self, func: EventHandler) -> None:
         """Register callback function."""
         pn.bind(func, self.evaluation_filter, callback_type=CallbackType.evaluation, watch=True)
         pn.bind(func, self.domain_filter, callback_type=CallbackType.domain, watch=True)

@@ -20,6 +20,7 @@ from nwm_explorer.data.usgs import get_usgs_reader
 from nwm_explorer.plots.barplot import BarPlot
 from nwm_explorer.interfaces.site_information import SiteInformationTable
 from nwm_explorer.data.usgs_site_info import scan_site_info
+from nwm_explorer.interfaces.configuration import ConfigurationWidgets
 
 pn.extension("plotly")
 
@@ -29,6 +30,12 @@ class Dashboard:
         # Get logger
         name = __loader__.name + "." + inspect.currentframe().f_code.co_name
         logger = get_logger(name)
+
+        # Setup template
+        self.template = BootstrapTemplate(
+            title=title,
+            collapsed_sidebar=True
+        )
 
         # Setup registry
         registry_file = root / "evaluation_registry.json"
@@ -358,11 +365,8 @@ class Dashboard:
             callback_type=CallbackType.click
         )
 
-        # Setup template
-        self.template = BootstrapTemplate(
-            title=title,
-            collapsed_sidebar=True
-        )
+        # Site configuration options
+        self.site_options = ConfigurationWidgets()
 
         # Layout
         controls = pn.Column(
@@ -386,7 +390,9 @@ class Dashboard:
                 controls,
                 display
         ))
-        self.template.sidebar.append(pn.pane.Markdown("# Configuration"))
+        self.template.sidebar.append(
+            self.site_options.servable()
+        )
     
     def servable(self) -> BootstrapTemplate:
         return self.template
