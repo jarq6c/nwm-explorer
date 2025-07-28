@@ -1,4 +1,5 @@
 """Command line interface utility."""
+import os
 from sys import stderr
 from pathlib import Path
 import click
@@ -104,12 +105,14 @@ display_group = click.Group()
 @click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
 @click.option("-j", "--jobs", "jobs", nargs=1, required=False, type=click.INT, default=1, help="Maximum number of parallel processes (1)")
 @click.option("-r", "--retries", "retries", nargs=1, required=False, type=click.INT, default=10, help="Maximum number of download retries (10)")
+@click.option("-u", "--url", "url", nargs=1, type=click.STRING, default=None, help="National Water Model data server.")
 def build(
     startDT: pd.Timestamp,
     endDT: pd.Timestamp,
     directory: Path = Path("data"),
     jobs: int = 1,
-    retries: int = 10
+    retries: int = 10,
+    url: str | None = None
     ) -> None:
     """Retrieve and process required evaluation data."""
     # Download routelink, if missing
@@ -122,6 +125,8 @@ def build(
     download_site_info(directory, routelinks, jobs, retries)
 
     # Download NWM data, if needed
+    if url is not None:
+        os.environ["NWM_BASE_URL"] = url
     download_nwm(startDT, endDT, directory, routelinks, jobs, retries=retries)
 
     # Scan NWM data

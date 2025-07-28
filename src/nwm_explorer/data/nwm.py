@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import inspect
 from concurrent.futures import ProcessPoolExecutor
+import os
 
 import numpy as np
 import pandas as pd
@@ -153,8 +154,10 @@ def build_gcs_public_urls(
         file_type: str,
         suffix: str,
         time_slices: list[str],
-        base_url: str = GOOGLE_CLOUD_BUCKET_URL
+        base_url: str | None = None
 ) -> list[str]:
+    if base_url is None:
+        base_url = os.environ.get("NWM_BASE_URL", GOOGLE_CLOUD_BUCKET_URL)
     urls = []
     rd = reference_date.strftime("nwm.%Y%m%d/")
     for pf in prefixes:
