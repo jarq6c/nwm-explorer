@@ -81,7 +81,9 @@ def process_netcdf(
         "feature_id": "nwm_feature_id",
         "streamflow": "predicted"
         })
-    df["predicted"] = df["predicted"].astype(np.float32)
+    
+    # Downcast and convert to cubic feet per second
+    df["predicted"] = df["predicted"].astype(np.float32) / (0.3048 ** 3.0)
     return df
 
 def process_netcdf_parallel(
