@@ -274,7 +274,6 @@ def download_files(
                 break
         if validated == 0:
             warnings.warn("Unable to retrieve any files", RuntimeWarning)
-            return
         if validated == len(filepaths):
             logger.info("All files validated")
             return
