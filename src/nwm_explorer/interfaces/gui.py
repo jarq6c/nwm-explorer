@@ -5,6 +5,7 @@ import inspect
 import polars as pl
 import panel as pn
 import pandas as pd
+import numpy as np
 from panel.template import BootstrapTemplate
 
 from nwm_explorer.logging.logger import get_logger
@@ -20,7 +21,7 @@ from nwm_explorer.data.usgs import get_usgs_reader
 from nwm_explorer.plots.barplot import BarPlot
 from nwm_explorer.interfaces.site_information import SiteInformationTable
 from nwm_explorer.data.usgs_site_info import scan_site_info
-from nwm_explorer.interfaces.configuration import ConfigurationWidgets
+from nwm_explorer.interfaces.configuration import ConfigurationWidgets, CMS_FACTOR, MeasurementUnits, INH_FACTOR
 
 pn.extension("plotly")
 
@@ -291,7 +292,7 @@ class Dashboard:
 
         def update_hydrograph(event, callback_type: CallbackType) -> None:
             # Vet callback
-            if callback_type not in [CallbackType.click, CallbackType.configuration]:
+            if callback_type not in [CallbackType.click, CallbackType.configuration, CallbackType.measurement_units]:
                 return
 
             # Update selected feature
@@ -308,6 +309,7 @@ class Dashboard:
 
             # Current state
             state = self.filters.state
+            units = self.site_options.state.units
 
             # Scan observations
             observations = self.observations[state.evaluation][state.domain].filter(
@@ -316,6 +318,22 @@ class Dashboard:
             # Scan model output
             predictions = self.predictions[state.evaluation][state.domain][state.configuration].filter(
                 pl.col("nwm_feature_id") == self.nwm_feature_id).collect()
+            
+            # Apply conversion factors
+            if units == MeasurementUnits.cms:
+                observations = observations.with_columns(
+                    pl.col("observed").mul(CMS_FACTOR)
+                )
+                predictions = predictions.with_columns(
+                    pl.col("predicted").mul(CMS_FACTOR)
+                )
+            elif (units == MeasurementUnits.inh) & (~np.isnan(self.site_table.area)):
+                observations = observations.with_columns(
+                    pl.col("observed").mul(INH_FACTOR) / self.site_table.area
+                )
+                predictions = predictions.with_columns(
+                    pl.col("predicted").mul(INH_FACTOR) / self.site_table.area
+                )
             
             # Prepare traces
             x = []
@@ -337,6 +355,8 @@ class Dashboard:
                 x.append(predictions["value_time"].to_numpy())
                 y.append(predictions["predicted"].to_numpy())
                 n.append("Analysis")
+
+            # Update hydrograph
             self.hydrograph.update_data(
                 x=x,
                 y=y,
@@ -353,6 +373,7 @@ class Dashboard:
             callback_type=CallbackType.click
         )
         self.filters.register_callback(update_hydrograph)
+        self.site_options.register_callback(update_hydrograph)
 
         def update_site_info(event, callback_type: CallbackType) -> None:
             if callback_type != CallbackType.click:

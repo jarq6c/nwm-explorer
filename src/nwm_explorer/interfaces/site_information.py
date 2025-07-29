@@ -1,6 +1,8 @@
 """Filtering widgets."""
 import panel as pn
 import polars as pl
+import pandas as pd
+import numpy as np
 
 pn.extension("tabulator")
 
@@ -22,16 +24,21 @@ class SiteInformationTable:
 
         # Site info table
         self.output = pn.pane.Placeholder()
+        self.info: pd.DataFrame | None = None
+        self.area: np.float64 = np.nan
     
     def update(self, usgs_site_code: str) -> None:
-        data = self.data.filter(
+        self.info = self.data.filter(
             pl.col("usgs_site_code") == usgs_site_code
         ).collect().to_pandas()
 
-        url = data["monitoring_url"].iloc[0]
+        # Set catchment area
+        self.area = self.info[["drainage_area", "contributing_drainage_area"]].min().min()
+
+        url = self.info["monitoring_url"].iloc[0]
         link = pn.pane.Markdown(f'<a href="{url}" target="_blank">Monitoring location</a>')
         
-        df = data[list(COLUMNS.keys())].rename(
+        df = self.info[list(COLUMNS.keys())].rename(
             columns=COLUMNS).transpose().reset_index()
         df.columns = ["Metadata", "Value"]
         self.output.object = pn.Column(

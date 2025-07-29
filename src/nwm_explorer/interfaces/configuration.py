@@ -3,15 +3,15 @@ from enum import StrEnum
 from typing import Callable
 from dataclasses import dataclass
 
-import numpy as np
-import numpy.typing as npt
-import pandas as pd
 import panel as pn
 
 from nwm_explorer.interfaces.filters import CallbackType, EventHandler
 
-def convert_to_cms(a: npt.ArrayLike) -> npt.ArrayLike:
-    return
+CMS_FACTOR: float = 0.3048 ** 3.0
+"""Conversion factor from CFS to CMS."""
+
+INH_FACTOR: float = 3.0 / 1936.0
+"""Conversion factor from CFS to inches per hour, must divide by area in square miles."""
 
 class MeasurementUnits(StrEnum):
     """Measurement units enums."""
