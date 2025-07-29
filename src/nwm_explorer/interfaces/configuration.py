@@ -17,9 +17,11 @@ class MeasurementUnits(StrEnum):
     """Measurement units enums."""
     cfs = "CFS"
     cms = "CMS"
-    inh = "in."
+    inh = "inch/h"
+    cfs_sqmi = "CFS/sq.mi."
 
 MEASUREMENT_UNIT_STRINGS: dict[str, MeasurementUnits] = {
+    "Cubic feet per second per square mile": MeasurementUnits.cfs_sqmi,
     "Cubic feet per second": MeasurementUnits.cfs,
     "Cubic meters per second": MeasurementUnits.cms,
     "Inches per hour": MeasurementUnits.inh
@@ -36,7 +38,7 @@ class ConfigurationWidgets:
         # Filtering options
         self.callbacks: list[EventHandler] = []
         self.units_selector = pn.widgets.RadioBoxGroup(
-            name="Measurement Units",
+            name="Discharge Units",
             options=list(MEASUREMENT_UNIT_STRINGS.keys())
         )
 

@@ -290,6 +290,11 @@ class Dashboard:
         )
         self.filters.register_callback(update_interface)
 
+        def update_site_info() -> None:
+            if self.usgs_site_code is None:
+                return
+            self.site_table.update(self.usgs_site_code)
+
         def update_hydrograph(event, callback_type: CallbackType) -> None:
             # Vet callback
             if callback_type not in [CallbackType.click, CallbackType.configuration, CallbackType.measurement_units]:
@@ -300,6 +305,7 @@ class Dashboard:
                 data = event["points"][0]["customdata"]
                 self.nwm_feature_id = data[0]
                 self.usgs_site_code = data[1]
+                update_site_info()
 
             # Check for selected feature
             if self.nwm_feature_id is None:
@@ -333,6 +339,13 @@ class Dashboard:
                 )
                 predictions = predictions.with_columns(
                     pl.col("predicted").mul(INH_FACTOR) / self.site_table.area
+                )
+            elif (units == MeasurementUnits.cfs_sqmi) & (~np.isnan(self.site_table.area)):
+                observations = observations.with_columns(
+                    pl.col("observed") / self.site_table.area
+                )
+                predictions = predictions.with_columns(
+                    pl.col("predicted") / self.site_table.area
                 )
             
             # Prepare traces
@@ -374,18 +387,6 @@ class Dashboard:
         )
         self.filters.register_callback(update_hydrograph)
         self.site_options.register_callback(update_hydrograph)
-
-        def update_site_info(event, callback_type: CallbackType) -> None:
-            if callback_type != CallbackType.click:
-                return
-            if self.usgs_site_code is None:
-                return
-            self.site_table.update(self.usgs_site_code)
-        pn.bind(update_site_info,
-            self.map.pane.param.click_data,
-            watch=True,
-            callback_type=CallbackType.click
-        )
 
         # Layout
         controls = pn.Column(
