@@ -29,7 +29,7 @@ class Hydrograph:
             width=1045,
             margin=dict(l=0, r=0, t=0, b=0),
             clickmode="event",
-            yaxis=dict(title=dict(text="Streamflow (cfs)"))
+            yaxis=dict(title=dict(text="Streamflow (CFS)"))
         )
         self.layout = self.default_layout
         self.figure = {
@@ -92,7 +92,8 @@ class Hydrograph:
             self, 
             x: list[npt.ArrayLike],
             y: list[npt.ArrayLike],
-            names: list[str]
+            names: list[str],
+            ylabel: str | None = None
         ) -> None:
         # Assume first trace is special
         data = [go.Scatter(
@@ -125,6 +126,10 @@ class Hydrograph:
         # Update data
         self.data = data
         self.layout = self.default_layout
+
+        # Update yaxis title
+        if ylabel is not None:
+            self.layout["yaxis"]["title"]["text"] = ylabel
     
     def refresh(self) -> None:
         self.figure.update(dict(data=self.data, layout=self.layout))

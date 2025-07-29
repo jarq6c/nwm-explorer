@@ -326,7 +326,9 @@ class Dashboard:
                 pl.col("nwm_feature_id") == self.nwm_feature_id).collect()
             
             # Apply conversion factors
+            ylabel = "CFS"
             if units == MeasurementUnits.cms:
+                ylabel = "Streamflow (CMS)"
                 observations = observations.with_columns(
                     pl.col("observed").mul(CMS_FACTOR)
                 )
@@ -334,6 +336,7 @@ class Dashboard:
                     pl.col("predicted").mul(CMS_FACTOR)
                 )
             elif (units == MeasurementUnits.inh) & (~np.isnan(self.site_table.area)):
+                ylabel = "Streamflow (inch/h)"
                 observations = observations.with_columns(
                     pl.col("observed").mul(INH_FACTOR) / self.site_table.area
                 )
@@ -341,6 +344,7 @@ class Dashboard:
                     pl.col("predicted").mul(INH_FACTOR) / self.site_table.area
                 )
             elif (units == MeasurementUnits.cfs_sqmi) & (~np.isnan(self.site_table.area)):
+                ylabel = "Streamflow (CFS/sq.mi.)"
                 observations = observations.with_columns(
                     pl.col("observed") / self.site_table.area
                 )
@@ -373,7 +377,8 @@ class Dashboard:
             self.hydrograph.update_data(
                 x=x,
                 y=y,
-                names=n
+                names=n,
+                ylabel=ylabel
             )
             self.hydrograph.refresh()
 
