@@ -149,7 +149,7 @@ def get_usgs_reader(
             file_paths.append(generate_usgs_filepath(root, rd, s.abbr.lower()))
 
     # Scan
-    return pl.scan_parquet([fp for fp in file_paths if fp.exists()])
+    return pl.scan_parquet([fp for fp in file_paths if fp.exists()]).rename({"value": "observed"})
 
 def get_usgs_readers(
     startDT: pd.Timestamp,

@@ -44,7 +44,11 @@ CSV_HEADERS: dict[str, str] = {
     "sample_size": "Number of samples used to compute metrics",
     "start_date": "Earliest valid time in sample pool",
     "end_date": "Latest valid time in sample pool",
-    "lead_time_hours_min": "Minimum lead time in hours"
+    "lead_time_hours_min": "Minimum lead time in hours",
+    "variable_name": "USGS variable name",
+    "measurement_unit": "Units of measurement",
+    "qualifiers": "USGS data quality codes",
+    "series": "Identifying series number in the case of multiple time series (often due to multiple sensors)"
 }
 """Column header descriptions."""
 
@@ -114,7 +118,12 @@ def build(
     retries: int = 10,
     url: str | None = None
     ) -> None:
-    """Retrieve and process required evaluation data."""
+    """Download and process data required by evaluations.
+
+    Example:
+    
+    nwm-explorer export build -s 2023-10-01 -e 2023-10-03
+    """
     # Download routelink, if missing
     download_routelinks(directory, retries=retries)
 
@@ -174,7 +183,7 @@ def predictions(
 
     Example:
     
-    nwm-explorer export predictions alaska analysis_assim_extend_alaska_no_da -s 2025-04-01 -e 2025-04-03 -o alaska_analysis_data.csv
+    nwm-explorer export predictions alaska analysis_assim_extend_alaska_no_da -s 2023-10-01 -e 2023-10-03 -o alaska_analysis_data.csv
     """
     reference_dates = generate_reference_dates(startDT, endDT)
     model_output = get_nwm_reader(directory, domain, configuration, reference_dates)
@@ -204,9 +213,17 @@ def observations(
 
     Example:
     
-    nwm-explorer export observations alaska -s 2025-04-01T12:00 -e 2025-04-02T02:15 -o alaska_usgs.csv
+    nwm-explorer export observations alaska -s 2023-10-01T12:00 -e 2023-10-03T02:15 -o alaska_usgs.csv
     """
-    obs = get_usgs_reader(directory, domain, startDT, endDT)
+    reference_dates = pd.date_range(
+        start=startDT.floor("1d"),
+        end=endDT.ceil("1d"),
+        freq="1d"
+    ).to_list()
+    obs = get_usgs_reader(directory, domain, reference_dates).filter(
+        pl.col("value_time") >= startDT,
+        pl.col("value_time") <= endDT
+    )
     try:
         write_to_csv(data=obs, ofile=output, comments=comments, header=header)
     except FileNotFoundError:
