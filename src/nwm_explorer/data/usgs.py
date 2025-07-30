@@ -1,280 +1,167 @@
-"""Testing interfaces and data models."""
+"""Retrieve and organize USGS streamflow observations."""
 from pathlib import Path
+from typing import TypedDict
 import inspect
-from concurrent.futures import ProcessPoolExecutor
 
+import us
 import pandas as pd
 import polars as pl
+from hydrotools.nwis_client.iv import IVDataService
 
-from nwm_explorer.data.download import download_files
-from nwm_explorer.logging.logger import get_logger
 from nwm_explorer.data.mapping import ModelDomain
+from nwm_explorer.logging.logger import get_logger
 
-TIMEZONE_MAPPING: dict[str, str] = {
-    "AKST": "America/Anchorage",
-    "AKDT": "America/Anchorage",
-    "HST": "America/Adak",
-    "HDT": "America/Adak",
-    "AST": "America/Puerto_Rico",
-    "CDT": "America/Chicago",
-    "CST": "America/Chicago",
-    "EDT": "America/New_York",
-    "EST": "America/New_York",
-    "MST": "America/Phoenix",
-    "MDT": "America/Denver",
-    "PST": "America/Los_Angeles",
-    "PDT": "America/Los_Angeles"
+STATE_LIST: list[us.states.State] = us.states.STATES + [us.states.PR]
+"""List of US states."""
+
+STATE_DOMAIN: dict[us.states.State, ModelDomain] = {
+    us.states.AK: ModelDomain.alaska,
+    us.states.HI: ModelDomain.hawaii,
+    us.states.PR: ModelDomain.puertorico
 }
-"""Mapping from common timezone strings to IANA compatible strings."""
+"""Mapping from US state to NWM domain."""
 
-def tsv_gz_validator(filepath: Path) -> None:
-    """
-    Validate that given filepath opens and closes without raising.
+DOMAIN_STATE_LOOKUP: dict[ModelDomain, us.states.State] = {v: k for k, v in STATE_DOMAIN.items()}
+"""Reverse look-up from NWM domain to US state."""
 
-    Parameters
-    ----------
-    filepath: Path
-        Path to file.
-    
-    Returns
-    -------
-    None
-    """
-    pd.read_csv(
-        filepath,
-        comment="#", 
-        dtype=str,
-        sep="\t",
-        header=None,
-        nrows=1
-        )
+def generate_usgs_filepath(
+        root: Path,
+        date: pd.Timestamp,
+        stateCd: str
+) -> Path:
+    """Returns a standardized filepath."""
+    # Look up state
+    state = us.states.lookup(stateCd)
 
-def process_nwis_tsv(filepath: Path) -> pd.DataFrame:
-    """
-    Process a NWIS IV API TSV file.
+    # Map to model domain
+    domain = STATE_DOMAIN.get(state, ModelDomain.conus)
 
-    Parameters
-    ----------
-    filepaths: list[Path]
-        Path to file to process.
+    # Directory name
+    directory = date.strftime("usgs.%Y%m%d")
 
-    Returns
-    -------
-    pandas.DataFrame
-    """
-    df = pd.read_csv(
-        filepath,
-        comment="#", 
-        dtype=str,
-        sep="\t",
-        header=None,
-        ).iloc[2:, 1:5]
+    # File name
+    file_name = f"{stateCd}_streamflow_cfs.parquet"
 
-    if df.iloc[:, -1].isna().all():
-        return pd.DataFrame()
+    # Full path
+    return root / f"parquet/{domain}/{directory}/{file_name}"
 
-    df = df.set_axis(
-        ["usgs_site_code", "value_time", "timezone", "observed"],
-        axis="columns")
-    df = df[df["usgs_site_code"].str.isdigit()]
-    df["value_time"] = pd.to_datetime(df["value_time"])
-    
-    # Deal with time zones
-    for tz in df["timezone"].unique():
-        mapped_tz = TIMEZONE_MAPPING.get(tz, tz)
-        daylight = tz.endswith("DT")
-        df.loc[df["timezone"] == tz, "value_time"] = df.loc[
-            df["timezone"] == tz, "value_time"].dt.tz_localize(
-                mapped_tz, ambiguous=daylight).dt.tz_convert(
-                    "UTC").dt.tz_localize(None)
+class DownloadParameters(TypedDict):
+    """Typed dict containing parameters for IVDataService.get."""
+    stateCd: str
+    startDT: pd.Timestamp
+    endDT: pd.Timestamp
 
-    df["observed"] = pd.to_numeric(df["observed"], errors="coerce")
-    df = df[["usgs_site_code", "value_time", "observed"]].dropna()
-    return df
+def generate_usgs_download_parameters(
+        date: pd.Timestamp,
+        stateCd: str
+) -> DownloadParameters:
+    """Returns download parameters."""
+    return DownloadParameters(
+        stateCd=stateCd,
+        startDT=date.floor(freq="1d"),
+        endDT=date.floor(freq="1d") + pd.Timedelta(hours=23, minutes=59)
+    )
 
-def process_nwis_tsv_parallel(
-        filepaths: list[Path],
-        max_processes: int = 1
-    ) -> pd.DataFrame:
-    """
-    Process a collection of USGS NWIS IV API TSV files and return a
-    dataframe, in parallel.
-
-    Parameters
-    ----------
-    filepaths: list[Path]
-        List of filepaths to process.
-    max_processes: int, optional, default 1
-        Maximum number of cores to use simultaneously.
-
-    Returns
-    -------
-    pandas.DataFrame
-    """
-    chunksize = max(1, len(filepaths) // max_processes)
-    with ProcessPoolExecutor(max_workers=max_processes) as pool:
-        df = pd.concat(pool.map(
-            process_nwis_tsv, filepaths, chunksize=chunksize), ignore_index=True)
-    df["usgs_site_code"] = df["usgs_site_code"].astype("category")
-    return df
-
-def generate_usgs_urls(
-        site_list: list[str],
-        start_datetime: pd.Timestamp,
-        end_datetime: pd.Timestamp
-) -> list[str]:
-    """
-    Generate a list of USGS NWIS RDB URLs for each site in site_list.
-
-    Parameters
-    ----------
-    site_list: list[str]
-        List of USGS site codes.
-    start_datetime: pd.Timestamp
-        startDT.
-    end_datetime: pd.Timestamp
-        endDT.
-    
-    Returns
-    -------
-    list[str]
-    """
-    urls = []
-    prefix = "https://waterservices.usgs.gov/nwis/iv/?format=rdb&"
-    start_str = start_datetime.strftime("%Y-%m-%dT%H:%MZ")
-    end_str = end_datetime.strftime("%Y-%m-%dT%H:%MZ")
-    suffix = "&siteStatus=all&parameterCd=00060"
-
-    for site in site_list:
-        middle = f"sites={site}&startDT={start_str}&endDT={end_str}"
-        urls.append(prefix+middle+suffix)
-    return urls
-
-def get_usgs_reader(
-    root: Path,
-    domain: ModelDomain,
-    startDT: pd.Timestamp,
-    endDT: pd.Timestamp,
-    ) -> pl.LazyFrame:
+def download_usgs_file(
+        parameters: DownloadParameters,
+        file_path: Path,
+        cache_path: Path
+) -> None:
+    """Download USGS observations and save to parquet."""
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
 
-    # Generate observational time periods
-    logger.info(f"Scanning USGS {domain} {startDT} to {endDT}")
-    logger.info("Generating observational time periods")
-    padded_start = startDT - pd.Timedelta("31d")
-    padded_end = endDT + pd.Timedelta("31d")
-    months = pd.date_range(
-        start=padded_start.strftime("%Y%m01"),
-        end=padded_end.strftime("%Y%m01"),
-        freq="MS"
-    )
-
-    # File details
-    logger.info("Generating file details")
-    file_paths = []
-    for idx in range(len(months)-1):
-        filename = months[idx].strftime("usgs.%Y%m.parquet")
-        fp = root / "parquet" / domain / filename
-        if fp.exists():
-            file_paths.append(fp)
+    if file_path.exists():
+        logger.info(f"{file_path} exists, skipping download")
+        return
     
-    # Scan data
-    return pl.scan_parquet(file_paths).filter(
-        pl.col("value_time") >= startDT,
-        pl.col("value_time") <= endDT
-    )
+    logger.info(f"Retrieving {file_path}")
+    client = IVDataService(cache_filename=cache_path)
+    df = pl.DataFrame(client.get(**parameters))
 
-def get_usgs_readers(
-    root: Path,
-    startDT: pd.Timestamp,
-    endDT: pd.Timestamp,
-    ) -> dict[ModelDomain, pl.LazyFrame]:
-    # Get logger
-    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
-    logger = get_logger(name)
-
-    # Generate observational time periods
-    return {d: get_usgs_reader(root, d, startDT, endDT) for d in list(ModelDomain)}
+    logger.info(f"Saving {file_path}")
+    file_path.parent.mkdir(exist_ok=True, parents=True)
+    df.write_parquet(file_path)
 
 def download_usgs(
     startDT: pd.Timestamp,
     endDT: pd.Timestamp,
-    root: Path,
-    routelinks: dict[ModelDomain, pl.LazyFrame],
-    jobs: int,
-    retries: int = 10
-    ) -> None:
+    root: Path
+    ):
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
 
-    # Generate observational time periods
-    logger.info("Generating observational time periods")
-    padded_start = startDT - pd.Timedelta("31d")
-    padded_end = min(pd.Timestamp.utcnow().tz_localize(None), endDT + pd.Timedelta("31d"))
-    months = pd.date_range(
-        start=padded_start.strftime("%Y%m01"),
-        end=padded_end.strftime("%Y%m01"),
-        freq="MS"
+    # List of dates to retrieve
+    reference_dates = pd.date_range(
+        start=startDT.floor("1d"),
+        end=endDT.ceil("1d"),
+        freq="1d"
     )
 
-    # Sites to download
-    logger.info("Reading routelinks")
-    sites = {d: df.select("usgs_site_code").collect()["usgs_site_code"].to_numpy() for d, df in routelinks.items()}
+    # Cache
+    nwis_cache = root / "nwisiv_cache.sqlite"
 
-    # File details
-    logger.info("Generating file details")
-    temporary_directory = root / "temp"
-    temporary_directory.mkdir(exist_ok=True)
-    logger.info(f"Saving TSV files to {temporary_directory}")
-    for idx in range(len(months)-1):
-        filename = months[idx].strftime("usgs.%Y%m.parquet")
-
-        for d in sites:
-            ofile = root / "parquet" / d / filename
-            logger.info(f"Building {ofile}")
-            if ofile.exists():
-                logger.info(f"Found {ofile}")
+    # Download data by state and reference day
+    for rd in reference_dates:
+        for s in STATE_LIST:
+            # Generate file path and check for existence
+            fp = generate_usgs_filepath(root, rd, s.abbr.lower())
+            if fp.exists():
+                logger.info(f"{fp} exists, skipping download")
                 continue
-            urls = generate_usgs_urls(sites[d], months[idx], months[idx+1])
-            file_paths = [temporary_directory / f"usgs-{s}.tsv.gz" for s in sites[d]]
 
-            logger.info("Downloading USGS data")
-            download_files(
-                *list(zip(urls, file_paths)),
-                limit=10,
-                timeout=3600, 
-                headers={"Accept-Encoding": "gzip"},
-                auto_decompress=False,
-                file_validator=tsv_gz_validator,
-                retries=retries
-            )
+            # Download
+            p = generate_usgs_download_parameters(rd, s.abbr.lower())
+            download_usgs_file(p, fp, nwis_cache)
+    
+    # Clean-up cache
+    logger.info(f"Cleaning up {nwis_cache}")
+    if nwis_cache.exists():
+        nwis_cache.unlink()
 
-            logger.info("Processing USGS data")
-            file_paths = list(temporary_directory.glob("*.tsv.gz"))
-            try:
-                data = process_nwis_tsv_parallel(
-                    file_paths,
-                    jobs
-                )
-                logger.info(f"Saving {ofile}")
-                pl.DataFrame(data).write_parquet(ofile)
-            except ValueError:
-                logger.info("Unable to process files")
-            except KeyError:
-                logger.info("Unable to process files")
+def get_usgs_reader(
+    root: Path,
+    domain: ModelDomain,
+    reference_dates: list[pd.Timestamp]
+    ) -> pl.LazyFrame:
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+    
+    # Get file path
+    logger.info(f"Scanning {domain} {reference_dates[0]} to {reference_dates[-1]}")
 
-            logger.info("Cleaning up TSV files")
-            for fp in file_paths:
-                if fp.exists():
-                    logger.info(str(fp))
-                    fp.unlink()
+    # Look-up state
+    state = DOMAIN_STATE_LOOKUP.get(domain, None)
 
-    # Clean-up
-    logger.info(f"Cleaning up {temporary_directory}")
-    try:
-        temporary_directory.rmdir()
-    except OSError:
-        logger.info(f"Unable to clean-up {temporary_directory}")
+    # Assume CONUS, otherwise
+    if state is None:
+        state_list = us.states.STATES_CONTIGUOUS
+    else:
+        state_list = [state]
+    
+    # Build file paths
+    file_paths = []
+    for s in state_list:
+        for rd in reference_dates:
+            file_paths.append(generate_usgs_filepath(root, rd, s.abbr.lower()))
+
+    # Scan
+    return pl.scan_parquet([fp for fp in file_paths if fp.exists()])
+
+def get_usgs_readers(
+    startDT: pd.Timestamp,
+    endDT: pd.Timestamp,
+    root: Path
+    ) -> dict[ModelDomain, pl.LazyFrame]:
+    """Returns mapping from ModelDomain to polars.LazyFrame."""
+    # List of dates to retrieve
+    reference_dates = pd.date_range(
+        start=startDT.floor("1d"),
+        end=endDT.ceil("1d"),
+        freq="1d"
+    ).to_list()
+
+    return {d: get_usgs_reader(root, d, reference_dates) for d in list(ModelDomain)}

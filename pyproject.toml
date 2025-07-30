@@ -37,7 +37,9 @@ dependencies = [
     "geopandas",
     "plotly",
     "colorcet",
-    "arch"
+    "arch",
+    "us",
+    "hydrotools.nwis_client"
 ]
 dynamic = ["version"]
 
