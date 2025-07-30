@@ -10,7 +10,28 @@ import polars as pl
 from nwm_explorer.data.download import download_files
 from nwm_explorer.logging.logger import get_logger
 from nwm_explorer.data.mapping import ModelDomain
-from nwm_explorer.data.usgs import tsv_gz_validator
+
+def tsv_gz_validator(filepath: Path) -> None:
+    """
+    Validate that given filepath opens and closes without raising.
+
+    Parameters
+    ----------
+    filepath: Path
+        Path to file.
+    
+    Returns
+    -------
+    None
+    """
+    pd.read_csv(
+        filepath,
+        comment="#", 
+        dtype=str,
+        sep="\t",
+        header=None,
+        nrows=1
+        )
 
 HUC_URL: str = "https://waterservices.usgs.gov/nwis/site/?format=rdb&siteOutput=expanded&siteStatus=all&parameterCd=00060&huc="
 SITE_URL: str = "https://waterservices.usgs.gov/nwis/site/?format=rdb&siteOutput=expanded&siteStatus=all&parameterCd=00060&sites="
