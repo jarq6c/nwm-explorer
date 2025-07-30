@@ -38,6 +38,15 @@ PREDICTION_RESAMPLING: dict[ModelConfiguration, tuple[pl.Duration, str]] = {
 }
 """Mapping used for computing lead time and sampling frequency."""
 
+def build_pairs_filepath(
+    root: Path,
+    domain: ModelDomain,
+    configuration: ModelConfiguration,
+    reference_date: pd.Timestamp
+    ) -> Path:
+    date_string = reference_date.strftime("nwm.%Y%m%d")
+    return root / "parquet" / domain / date_string / f"{configuration}_pairs_cfs.parquet"
+
 def generate_pairs(
     startDT: pd.Timestamp,
     endDT: pd.Timestamp,
@@ -60,25 +69,27 @@ def generate_pairs(
     logger.info("Generating file details")
     file_details = build_nwm_file_details(root, reference_dates)
 
-    # Download
+    # Pair and rescale data
     logger.info("Pairing NWM data")
     for fd in file_details:
         if fd.path.exists():
-            ofile = Path(fd.path.parent) / fd.path.name.replace("streamflow", "pairs")
+            ofile = build_pairs_filepath(root, fd.domain, fd.configuration, fd.reference_date)
             if ofile.exists():
                 logger.info(f"Found {ofile}")
                 continue
             logger.info(f"Building {ofile}")
             logger.info(f"Loading {fd.path}")
             sim = pl.read_parquet(fd.path)
-            first = sim["value_time"].min()
-            last = sim["value_time"].max()
+            first = pd.Timestamp(sim["value_time"].min()).floor("1d")
+            last = pd.Timestamp(sim["value_time"].max()).ceil("1d")
+            reference_dates = pd.date_range(first, last, freq="1d").to_list()
 
             logger.info("Loading observations")
-            obs = get_usgs_reader(root, fd.domain, first, last).with_columns(
-                pl.col("observed").cast(pl.Float32)
-            ).collect()
             xwalk = crosswalk[fd.domain]
+            obs = get_usgs_reader(root, fd.domain, reference_dates).select(
+                ["value_time", "observed", "usgs_site_code"]).filter(
+                pl.col("usgs_site_code").is_in(xwalk["usgs_site_code"])
+            ).unique(subset=["value_time", "usgs_site_code"]).collect()
 
             logger.info(f"Resampling")
             if fd.configuration in PREDICTION_RESAMPLING:
@@ -140,15 +151,6 @@ def generate_pairs(
             
             logger.info(f"Saving {ofile}")
             pairs.write_parquet(ofile)
-
-def build_pairs_filepath(
-    root: Path,
-    domain: ModelDomain,
-    configuration: ModelConfiguration,
-    reference_date: pd.Timestamp
-    ) -> Path:
-    date_string = reference_date.strftime("nwm.%Y%m%d")
-    return root / "parquet" / domain / date_string / f"{configuration}_pairs_cfs.parquet"
 
 def get_pairs_reader(
     root: Path,
