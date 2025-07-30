@@ -122,7 +122,7 @@ def build(
 
     Example:
     
-    nwm-explorer export build -s 2023-10-01 -e 2023-10-03
+    nwm-explorer build -s 2023-10-01 -e 2023-10-03 -j 4
     """
     # Download routelink, if missing
     download_routelinks(directory, retries=retries)
@@ -252,7 +252,7 @@ def evaluations(
 
     Example:
     
-    nwm-explorer export evaluations alaska analysis_assim_extend_alaska_no_da -s 2023-10-01 -e 2023-12-31 -o alaska_analysis_metrics.csv
+    nwm-explorer export evaluations alaska analysis_assim_extend_alaska_no_da -s 2023-10-01 -e 2023-10-03 -o alaska_analysis_eval.csv
     """
     results = get_evaluation_reader(domain, configuration, startDT, endDT, directory)
     try:
@@ -261,8 +261,8 @@ def evaluations(
         print(f"Data are unavailble for {domain} {configuration}", file=stderr)
 
 @evaluation_group.command()
-@click.option("-s", "--startDT", "startDT", nargs=1, required=True, type=TimestampParamType(), help="Start datetime")
-@click.option("-e", "--endDT", "endDT", nargs=1, required=True, type=TimestampParamType(), help="End datetime")
+@click.option("-s", "--startDT", "startDT", nargs=1, required=True, type=TimestampParamType(), help="Start date")
+@click.option("-e", "--endDT", "endDT", nargs=1, required=True, type=TimestampParamType(), help="End date")
 @click.option("-l", "--label", "label", nargs=1, type=click.STRING, default=None, help="Evaluation label")
 @click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
 @click.option("-j", "--jobs", "jobs", nargs=1, required=False, type=click.INT, default=1, help="Maximum number of parallel processes (1)")
@@ -273,12 +273,21 @@ def evaluate(
     directory: Path = Path("data"),
     jobs: int = 1
     ) -> None:
-    """Run standard evaluations."""
+    """Run a standard evaluation. Assumes build has already run and data are available.
+
+    Example:
+    
+    nwm-explorer evaluate -s 2023-10-01 -e 2023-10-03 -j 4
+    """
     # NOTE July 8th 12Z, after 40 hour MRF mem1 was corrupted (incorrect reference time), add validation
+    # Expand date range
+    startDT = startDT.floor("1d")
+    endDT = endDT.ceil("1d")
+
     # Set label
     if label is None:
-        start_string = startDT.strftime("%Y%m%dT%H%M")
-        end_string = endDT.strftime("%Y%m%dT%H%M")
+        start_string = startDT.strftime("%Y%m%d")
+        end_string = endDT.strftime("%Y%m%d")
         label = f"evaluation_{start_string}_{end_string}"
 
     # Scan routelinks
