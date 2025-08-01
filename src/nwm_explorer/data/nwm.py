@@ -659,7 +659,9 @@ def download_nwm(
             jobs
         )
         logger.info(f"Saving {fd.path}")
-        pl.DataFrame(data).write_parquet(fd.path)
+        pl.DataFrame(data).with_columns(
+            pl.col("value_time").dt.cast_time_unit("ms")
+        ).write_parquet(fd.path)
 
         logger.info("Cleaning up NetCDF files")
         for fp in file_paths:
