@@ -152,7 +152,8 @@ def build(
     download_usgs(
         pd.Timestamp(first),
         pd.Timestamp(last),
-        directory
+        directory,
+        retries
     )
 
 @export_group.group()
