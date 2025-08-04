@@ -170,27 +170,27 @@ def generate_pairs(
             logger.info(f"Saving {ofile}")
             pairs.write_parquet(ofile)
 
-# def get_pairs_reader(
-#     root: Path,
-#     domain: ModelDomain,
-#     configuration: ModelConfiguration,
-#     reference_dates: list[pd.Timestamp]
-#     ) -> pl.LazyFrame:
-#     # Get logger
-#     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
-#     logger = get_logger(name)
+def get_pairs_reader(
+    root: Path,
+    domain: ModelDomain,
+    configuration: ModelConfiguration,
+    reference_dates: list[pd.Timestamp]
+    ) -> pl.LazyFrame:
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
     
-#     # Get file path
-#     logger.info(f"Scanning {domain} {configuration} {reference_dates[0]} to {reference_dates[-1]}")
-#     file_paths = [build_pairs_filepath(root, domain, configuration, rd) for rd in reference_dates]
-#     return pl.scan_parquet([fp for fp in file_paths if fp.exists()])
+    # Get file path
+    logger.info(f"Scanning {domain} {configuration} {reference_dates[0]} to {reference_dates[-1]}")
+    file_paths = [build_pairs_filepath(root, domain, configuration, rd) for rd in reference_dates]
+    return pl.scan_parquet([fp for fp in file_paths if fp.exists()])
 
-# def get_pairs_readers(
-#     startDT: pd.Timestamp,
-#     endDT: pd.Timestamp,
-#     root: Path
-#     ) -> dict[tuple[ModelDomain, ModelConfiguration], pl.LazyFrame]:
-#     """Returns mapping from ModelDomain to polars.LazyFrame."""
-#     # Generate reference dates
-#     reference_dates = generate_reference_dates(startDT, endDT)
-#     return {(d, c): get_pairs_reader(root, d, c, reference_dates) for d, c in NWM_URL_BUILDERS}
+def get_pairs_readers(
+    startDT: pd.Timestamp,
+    endDT: pd.Timestamp,
+    root: Path
+    ) -> dict[tuple[ModelDomain, ModelConfiguration], pl.LazyFrame]:
+    """Returns mapping from ModelDomain to polars.LazyFrame."""
+    # Generate reference dates
+    reference_dates = generate_reference_dates(startDT, endDT)
+    return {(d, c): get_pairs_reader(root, d, c, reference_dates) for d, c in NWM_URL_BUILDERS}
