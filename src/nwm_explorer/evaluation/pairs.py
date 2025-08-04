@@ -7,8 +7,8 @@ import pandas as pd
 
 from nwm_explorer.logging.logger import get_logger
 from nwm_explorer.data.mapping import ModelDomain, ModelConfiguration
-from nwm_explorer.data.nwm import generate_reference_dates, build_nwm_file_details, NWM_URL_BUILDERS
-from nwm_explorer.data.usgs import get_usgs_reader
+from nwm_explorer.data.nwm import generate_reference_dates, get_nwm_readers, NWM_URL_BUILDERS, build_nwm_filepath
+from nwm_explorer.data.usgs import get_usgs_readers
 
 PREDICTION_RESAMPLING: dict[ModelConfiguration, tuple[pl.Duration, str]] = {
     ModelConfiguration.medium_range_mem1: (pl.duration(hours=24), "1d"),
@@ -32,7 +32,7 @@ def build_pairs_filepath(
     configuration: ModelConfiguration,
     reference_date: pd.Timestamp
     ) -> Path:
-    date_string = reference_date.strftime("nwm.%Y%m%d")
+    date_string = reference_date.strftime("pairs.%Y%m%d")
     return root / "parquet" / domain / date_string / f"{configuration}_pairs_cfs.parquet"
 
 def generate_pairs(
@@ -53,36 +53,70 @@ def generate_pairs(
     logger.info("Reading routelinks")
     crosswalk = {d: df.select(["usgs_site_code", "nwm_feature_id"]).collect() for d, df in routelinks.items()}
 
-    # File details
-    logger.info("Generating file details")
-    file_details = build_nwm_file_details(root, reference_dates)
+    # Scan NWM data
+    logger.info("Scanning model output")
+    predictions = get_nwm_readers(startDT, endDT, root)
 
-    # Pair and rescale data
-    logger.info("Pairing NWM data")
-    for fd in file_details:
-        if fd.path.exists():
-            ofile = build_pairs_filepath(root, fd.domain, fd.configuration, fd.reference_date)
-            if ofile.exists():
-                logger.info(f"Found {ofile}")
-                continue
+    # Determine date range for observations
+    first = startDT
+    last = endDT
+    for df in predictions.values():
+        first = min(first, df.select("value_time").min().collect().item(0, 0))
+        last = max(last, df.select("value_time").max().collect().item(0, 0))
+
+    # Scan USGS data
+    logger.info("Scanning observations")
+    observations = get_usgs_readers(
+        pd.Timestamp(first),
+        pd.Timestamp(last),
+        root
+        )
+
+    # Process files, one at a time
+    logger.info("Pairing model output")
+    for (d, c) in NWM_URL_BUILDERS.keys():
+        for rd in reference_dates:
+            # Build output file path
+            ofile = build_pairs_filepath(root, d, c, rd)
             logger.info(f"Building {ofile}")
-            logger.info(f"Loading {fd.path}")
-            sim = pl.read_parquet(fd.path)
-            first = pd.Timestamp(sim["value_time"].min()).floor("1d")
-            last = pd.Timestamp(sim["value_time"].max()).ceil("1d")
-            reference_dates = pd.date_range(first, last, freq="1d").to_list()
 
+            # Do not overwrite
+            if ofile.exists():
+                logger.info(f"Found {ofile}, skipping")
+                continue
+
+            # Handling file system details
+            ofile.parent.mkdir(exist_ok=True, parents=True)
+            ifile = build_nwm_filepath(root, d, c, rd)
+
+            # Load model output
+            logger.info(f"Loading {ifile}")
+            sim = pl.read_parquet(ifile)
+
+            # Set crosswalk
+            xwalk = crosswalk[d]
+
+            # Load corresponding observations
             logger.info("Loading observations")
-            xwalk = crosswalk[fd.domain]
-            obs = get_usgs_reader(root, fd.domain, reference_dates).select(
-                ["value_time", "observed", "usgs_site_code"]).filter(
+            first = sim["value_time"].min()
+            last = sim["value_time"].max()
+            obs = observations[d].filter(
+                pl.col("value_time") >= first,
+                pl.col("value_time") <= last,
                 pl.col("usgs_site_code").is_in(xwalk["usgs_site_code"])
-            ).unique(subset=["value_time", "usgs_site_code"]).collect()
+            ).select(
+                ["value_time", "usgs_site_code", "observed"]
+            ).unique(
+                subset=["value_time", "usgs_site_code"]
+            ).sort(
+                ("usgs_site_code", "value_time")
+            ).collect()
 
-            logger.info(f"Resampling")
-            if fd.configuration in PREDICTION_RESAMPLING:
-                sampling_duration = PREDICTION_RESAMPLING[fd.configuration][0]
-                resampling_frequency = PREDICTION_RESAMPLING[fd.configuration][1]
+            # Resample
+            logger.info("Resampling")
+            if c in PREDICTION_RESAMPLING:
+                sampling_duration = PREDICTION_RESAMPLING[c][0]
+                resampling_frequency = PREDICTION_RESAMPLING[c][1]
                 hours = sampling_duration / pl.duration(hours=1)
                 sim = sim.sort(
                     ("nwm_feature_id", "reference_time", "value_time")
@@ -99,9 +133,7 @@ def generate_pairs(
                     pl.col("predicted").max(),
                     pl.col("lead_time_hours_min").min()
                 )
-                obs = obs.sort(
-                    ("usgs_site_code", "value_time")
-                ).group_by_dynamic(
+                obs = obs.group_by_dynamic(
                     "value_time",
                     every=resampling_frequency,
                     group_by="usgs_site_code"
@@ -120,9 +152,7 @@ def generate_pairs(
                 ).agg(
                     pl.col("predicted").max()
                 )
-                obs = obs.sort(
-                    ("usgs_site_code", "value_time")
-                ).group_by_dynamic(
+                obs = obs.group_by_dynamic(
                     "value_time",
                     every="1d",
                     group_by="usgs_site_code"
@@ -138,29 +168,30 @@ def generate_pairs(
                 how="left").drop_nulls()
             
             logger.info(f"Saving {ofile}")
-            pairs.write_parquet(ofile)
+            # pairs.write_parquet(ofile)
+            print(pairs.head())
 
-def get_pairs_reader(
-    root: Path,
-    domain: ModelDomain,
-    configuration: ModelConfiguration,
-    reference_dates: list[pd.Timestamp]
-    ) -> pl.LazyFrame:
-    # Get logger
-    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
-    logger = get_logger(name)
+# def get_pairs_reader(
+#     root: Path,
+#     domain: ModelDomain,
+#     configuration: ModelConfiguration,
+#     reference_dates: list[pd.Timestamp]
+#     ) -> pl.LazyFrame:
+#     # Get logger
+#     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+#     logger = get_logger(name)
     
-    # Get file path
-    logger.info(f"Scanning {domain} {configuration} {reference_dates[0]} to {reference_dates[-1]}")
-    file_paths = [build_pairs_filepath(root, domain, configuration, rd) for rd in reference_dates]
-    return pl.scan_parquet([fp for fp in file_paths if fp.exists()])
+#     # Get file path
+#     logger.info(f"Scanning {domain} {configuration} {reference_dates[0]} to {reference_dates[-1]}")
+#     file_paths = [build_pairs_filepath(root, domain, configuration, rd) for rd in reference_dates]
+#     return pl.scan_parquet([fp for fp in file_paths if fp.exists()])
 
-def get_pairs_readers(
-    startDT: pd.Timestamp,
-    endDT: pd.Timestamp,
-    root: Path
-    ) -> dict[tuple[ModelDomain, ModelConfiguration], pl.LazyFrame]:
-    """Returns mapping from ModelDomain to polars.LazyFrame."""
-    # Generate reference dates
-    reference_dates = generate_reference_dates(startDT, endDT)
-    return {(d, c): get_pairs_reader(root, d, c, reference_dates) for d, c in NWM_URL_BUILDERS}
+# def get_pairs_readers(
+#     startDT: pd.Timestamp,
+#     endDT: pd.Timestamp,
+#     root: Path
+#     ) -> dict[tuple[ModelDomain, ModelConfiguration], pl.LazyFrame]:
+#     """Returns mapping from ModelDomain to polars.LazyFrame."""
+#     # Generate reference dates
+#     reference_dates = generate_reference_dates(startDT, endDT)
+#     return {(d, c): get_pairs_reader(root, d, c, reference_dates) for d, c in NWM_URL_BUILDERS}
