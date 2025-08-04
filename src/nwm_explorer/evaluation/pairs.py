@@ -85,9 +85,14 @@ def generate_pairs(
                 logger.info(f"Found {ofile}, skipping")
                 continue
 
+            # Check for ifile
+            ifile = build_nwm_filepath(root, d, c, rd)
+            if not ifile.exists():
+                logger.info(f"{ifile} does not exist")
+                continue
+
             # Handling file system details
             ofile.parent.mkdir(exist_ok=True, parents=True)
-            ifile = build_nwm_filepath(root, d, c, rd)
 
             # Load model output
             logger.info(f"Loading {ifile}")
