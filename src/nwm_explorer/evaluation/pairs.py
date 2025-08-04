@@ -141,8 +141,6 @@ def generate_pairs(
                     pl.col("observed").max()
                 )
             else:
-                # NOTE This will result in two simulation values per
-                #  reference day. Handle this in reader methods.
                 sim = sim.sort(
                     ("nwm_feature_id", "value_time")
                 ).group_by_dynamic(
@@ -183,7 +181,21 @@ def get_pairs_reader(
     # Get file path
     logger.info(f"Scanning {domain} {configuration} {reference_dates[0]} to {reference_dates[-1]}")
     file_paths = [build_pairs_filepath(root, domain, configuration, rd) for rd in reference_dates]
-    return pl.scan_parquet([fp for fp in file_paths if fp.exists()])
+    if configuration in PREDICTION_RESAMPLING:
+        return pl.scan_parquet([fp for fp in file_paths if fp.exists()])
+    return pl.scan_parquet(
+        [fp for fp in file_paths if fp.exists()]
+    ).sort(
+        ("nwm_feature_id", "value_time")
+    ).group_by_dynamic(
+        "value_time",
+        every="1d",
+        group_by="nwm_feature_id"
+    ).agg(
+        pl.col("predicted").max(),
+        pl.col("observed").max(),
+        pl.col("usgs_site_code").first()
+    )
 
 def get_pairs_readers(
     startDT: pd.Timestamp,
