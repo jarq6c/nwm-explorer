@@ -168,8 +168,7 @@ def generate_pairs(
                 how="left").drop_nulls()
             
             logger.info(f"Saving {ofile}")
-            # pairs.write_parquet(ofile)
-            print(pairs.head())
+            pairs.write_parquet(ofile)
 
 # def get_pairs_reader(
 #     root: Path,
