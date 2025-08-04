@@ -62,7 +62,6 @@ def run_standard_evaluation(
     startDT: pd.Timestamp,
     endDT: pd.Timestamp,
     root: Path,
-    routelinks: dict[ModelDomain, pl.LazyFrame],
     jobs: int,
     label: str
     ) -> None:
@@ -124,19 +123,11 @@ def run_standard_evaluation(
             dataframes = [df for _, df in data.groupby(["nwm_feature_id", "lead_time_hours_min"])]
         else:
             # Handle simulations
-            # Resolve duplicate predictions
+            # Group by feature id
             logger.info("Loading pairs")
-            data = data.sort(
-                    ("nwm_feature_id", "value_time")
-                ).group_by_dynamic(
-                    "value_time",
-                    every="1d",
-                    group_by="nwm_feature_id"
-                ).agg(
-                    pl.col("predicted").max(),
-                    pl.col("observed").max(),
-                    pl.col("usgs_site_code").first()
-                ).with_columns(pl.col("usgs_site_code").cast(pl.String)).collect().to_pandas()
+            data = data.with_columns(
+                pl.col("usgs_site_code").cast(pl.String)
+            ).collect().to_pandas()
 
             logger.info("Grouping pairs")
             dataframes = [df for _, df in data.groupby("nwm_feature_id")]
