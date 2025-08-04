@@ -35,13 +35,20 @@ def load_nid(ifile: Path) -> gpd.GeoDataFrame | None:
             "latitude",
             "longitude",
             "name",
-            "volume",
+            "riverName",
             "maxStorage",
             "normalStorage",
             "maxDischarge",
-            "damStatusId"
+            "drainageArea"
             ]
-    )
+    ).rename(columns={
+        "name": "Dam Name",
+        "riverName": "River Name",
+        "drainageArea": "Drainage Area (sq.mi.)",
+        "maxStorage": "Maximum Storage (ac-ft)",
+        "normalStorage": "Normal Storage (ac-ft)",
+        "maxDischarge": "Maximum Discharge (CFS)"
+    })
 
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
