@@ -289,7 +289,7 @@ def evaluate(
     
     nwm-explorer evaluate -s 2023-10-01 -e 2023-10-03 -j 4
     """
-    # NOTE July 8th 12Z, after 40 hour MRF mem1 was corrupted (incorrect reference time), add validation
+    # NOTE July 8th 12Z 2025, after 40 hour MRF mem1 was corrupted (incorrect reference time), add validation
     # Expand date range
     startDT = startDT.floor("1d")
     endDT = endDT.ceil("1d")
@@ -300,11 +300,8 @@ def evaluate(
         end_string = endDT.strftime("%Y%m%d")
         label = f"evaluation_{start_string}_{end_string}"
 
-    # Scan routelinks
-    routelinks = get_routelink_readers(directory)
-
     # Download NWM data, if needed
-    run_standard_evaluation(startDT, endDT, directory, routelinks, jobs, label)
+    run_standard_evaluation(startDT, endDT, directory, jobs, label)
 
 @display_group.command()
 @click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
