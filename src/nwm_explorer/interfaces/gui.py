@@ -5,6 +5,7 @@ import inspect
 import polars as pl
 import panel as pn
 import pandas as pd
+import geopandas as gpd
 import numpy as np
 from panel.template import BootstrapTemplate
 
@@ -24,6 +25,23 @@ from nwm_explorer.data.usgs_site_info import scan_site_info
 from nwm_explorer.interfaces.configuration import ConfigurationWidgets, CMS_FACTOR, MeasurementUnits, INH_FACTOR
 
 pn.extension("plotly")
+
+def load_nid(ifile: Path) -> gpd.GeoDataFrame | None:
+    if not ifile.exists():
+        return None
+    return gpd.read_file(
+        ifile,
+        columns=[
+            "latitude",
+            "longitude",
+            "name",
+            "volume",
+            "maxStorage",
+            "normalStorage",
+            "maxDischarge",
+            "damStatusId"
+            ]
+    )
 
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
@@ -85,6 +103,11 @@ class Dashboard:
                         configuration,
                         reference_dates
                     )
+        
+        # Load additional map data
+        self.additional_layers: dict[str, gpd.GeoDataFrame | None] = {
+            "National Inventory of Dams": load_nid(root / "NID.gpkg")
+        }
 
         # Widgets
         self.filters = FilteringWidgets(self.evaluation_registry)
