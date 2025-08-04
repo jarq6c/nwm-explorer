@@ -15,6 +15,7 @@ from nwm_explorer.logging.logger import get_logger
 from nwm_explorer.evaluation.compute import run_standard_evaluation, get_evaluation_reader
 from nwm_explorer.interfaces.gui import serve_dashboard
 from nwm_explorer.data.usgs_site_info import download_site_info
+from nwm_explorer.evaluation.pairs import generate_pairs
 
 CSV_HEADERS: dict[str, str] = {
     "value_time": "Valid time of observation or prediction (UTC).",
@@ -154,6 +155,14 @@ def build(
         pd.Timestamp(last),
         directory,
         retries
+    )
+
+    # Pair data, if needed
+    generate_pairs(
+        startDT,
+        endDT,
+        directory,
+        routelinks
     )
 
 @export_group.group()
