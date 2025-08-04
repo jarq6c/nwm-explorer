@@ -316,13 +316,16 @@ class Dashboard:
             state = self.filters.state
             units = self.site_options.state.units
 
-            # Scan observations
-            observations = self.observations[state.evaluation][state.domain].filter(
-                pl.col("usgs_site_code") == self.usgs_site_code).collect()
-
             # Scan model output
             predictions = self.predictions[state.evaluation][state.domain][state.configuration].filter(
                 pl.col("nwm_feature_id") == self.nwm_feature_id).collect()
+
+            # Scan observations
+            observations = self.observations[state.evaluation][state.domain].filter(
+                pl.col("usgs_site_code") == self.usgs_site_code,
+                pl.col("value_time") >= predictions["value_time"].min(),
+                pl.col("value_time") <= predictions["value_time"].max(),
+            ).collect()
             
             # Apply conversion factors
             ylabel = "CFS"
