@@ -41,6 +41,10 @@ class ConfigurationWidgets:
             name="Discharge Units",
             options=list(MEASUREMENT_UNIT_STRINGS.keys())
         )
+        self.layer_selector = pn.widgets.CheckBoxGroup(
+            name="Additional Map Layers",
+            options=["National Inventory of Dams"]
+        )
 
     @property
     def state(self) -> SiteConfigurationState:
@@ -56,10 +60,16 @@ class ConfigurationWidgets:
                 self.units_selector,
                 title="Measurement Units",
                 collapsible=False
+            ),
+            pn.Card(
+                self.layer_selector,
+                title="Additional Map Layers",
+                collapsible=False
             )
         )
 
     def register_callback(self, func: Callable) -> None:
         """Register callback function."""
         pn.bind(func, self.units_selector, callback_type=CallbackType.measurement_units, watch=True)
+        pn.bind(func, self.layer_selector, callback_type=CallbackType.layers, watch=True)
         self.callbacks.append(func)

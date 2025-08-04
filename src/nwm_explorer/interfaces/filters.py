@@ -130,6 +130,7 @@ class CallbackType(StrEnum):
     relayout = "relayout"
     double_click = "double_click"
     measurement_units = "measurement_units"
+    layers = "layers"
 
 EventHandler = Callable[[Any, CallbackType], None]
 """Type hint for callback functions."""
