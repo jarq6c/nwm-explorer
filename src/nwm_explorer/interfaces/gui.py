@@ -72,7 +72,7 @@ class Dashboard:
                 self.observations[label][domain] = get_usgs_reader(
                     root,
                     domain,
-                    pd.date_range(startDT, endDT+pd.Timedelta("10d"), freq="1d").to_list()
+                    pd.date_range(startDT-pd.Timedelta("1d"), endDT+pd.Timedelta("10d"), freq="1d").to_list()
                 )
 
                 # Scan predictions
