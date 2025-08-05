@@ -167,7 +167,7 @@ def build(
 
 @export_group.group()
 def export():
-    """Export predictions or observations to CSV."""
+    """Export predictions, observations, or evaluations to CSV."""
     pass
 
 @export.command()

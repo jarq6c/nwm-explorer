@@ -1,6 +1,6 @@
 # National Water Model Evaluation Explorer
 
-A web-based application used to explore National Water Model output and evaluation metrics.
+A web-based application used to explore National Water Model output and evaluation metrics. This package includes a command-line interface (CLI) for data retrieval and analysis, as well as a graphical user interface (GUI) for exploring evaluation results. The primary intended use-case is generating ad-hoc evaluations of National Water Model forecasts and analyses.
 
 ## Installation
 ```bash
@@ -10,88 +10,38 @@ $ source env/bin/activate
 (env) $ pip install nwm_explorer
 ```
 
-## Usage
-
+## Command-line Interface
+Once installed, the CLI is accessible from an activated python environment using `nwm-explorer`. For example,
+```bash
+$ nwm-explorer --help
+```
 ```console
-(env) $ nwm-explorer --help
 Usage: nwm-explorer [OPTIONS] COMMAND [ARGS]...
 
 Options:
   --help  Show this message and exit.
 
 Commands:
-  evaluate  Run standard evaluation and generate parquet files.
-  export    Export NWM evaluation data to CSV format.
-  metrics   Export NWM evaluation metrics to CSV format.
+  build     Download and process data required by evaluations.
+  display   Visualize and explore evaluation data.
+  evaluate  Run a standard evaluation.
+  export    Export predictions, observations, or evaluations to CSV.
 ```
+Note that each command (`build`, `display`, `evaluate`, `export` will show additional information using `--help`)
 
-```console
-(env) $ nwm-explorer evaluate --help
-Usage: nwm-explorer evaluate [OPTIONS]
+### Standard Usage
+Generally, users will want to run the `build`, `evaluate` and `display` commands in sequence to generate and explore NWM evaluations. Suppose we wanted to perform an ad-hoc evaluation of NWM forecasts issued from 2023-10-01 to 2023-10-03. We would run perform the following operations to achieve this:
+```bash
+# First, retrieve and pair the required data
+# This command will retrieve model output and matching observations.
+# It will use up to 4 cores (j) to for data processing and retry retrievals up to twice (r).
+$ nwm-explorer build -s 2023-10-01 -e 2023-10-03 -j 4 -r 2
 
-  Run standard evaluation and generate parquet files.
+# Second, run the standard evaluation over the same period.
+# Note here we give this evaluation a special label (l). If a label isn't specified,
+# The software will assign a generic label.
+$ nwm-explorer evaluate -s 2023-10-01 -e 2023-10-03 -j 4 -l my_evaluation
 
-  Example:
-
-  nwm-explorer evaluate -s 20231001 -e 20240101
-
-Options:
-  -s, --startDT TIMESTAMP  Start datetime  [required]
-  -e, --endDT TIMESTAMP    End datetime  [required]
-  -d, --directory PATH     Data directory (./data)
-  --help                   Show this message and exit.
-```
-
-```console
-(env) $ nwm-explorer export --help
-Usage: nwm-explorer export [OPTIONS] {alaska|conus|hawaii|puertorico} {analysi
-                           s_assim_extend_alaska_no_da|analysis_assim_extend_n
-                           o_da|analysis_assim_hawaii_no_da|analysis_assim_pue
-                           rtorico_no_da|medium_range_mem1|medium_range_blend|
-                           medium_range_no_da|usgs}
-
-  Export NWM evaluation data to CSV format.
-
-  Example:
-
-  nwm-explorer export alaska analysis_assim_extend_alaska_no_da -s 20231001 -e
-  20240101 -o alaska_analysis_data.csv
-
-Options:
-  -o, --output FILENAME       Output file path
-  -s, --startDT TIMESTAMP     Start datetime  [required]
-  -e, --endDT TIMESTAMP       End datetime  [required]
-  --comments / --no-comments  Enable/disable comments in output, enabled by
-                              default
-  --header / --no-header      Enable/disable header in output, enabled by
-                              default
-  -d, --directory PATH        Data directory (./data)
-  --help                      Show this message and exit.
-```
-
-```console
-(env) $ nwm-explorer metrics --help
-Usage: nwm-explorer metrics [OPTIONS] {alaska|conus|hawaii|puertorico} {analys
-                            is_assim_extend_alaska_no_da|analysis_assim_extend
-                            _no_da|analysis_assim_hawaii_no_da|analysis_assim_
-                            puertorico_no_da|medium_range_mem1|medium_range_bl
-                            end|medium_range_no_da}
-
-  Export NWM evaluation metrics to CSV format.
-
-  Example:
-
-  nwm-explorer metrics alaska analysis_assim_extend_alaska_no_da -s 20231001
-  -e 20240101 -o alaska_analysis_metrics.csv
-
-Options:
-  -o, --output FILENAME       Output file path
-  -s, --startDT TIMESTAMP     Start datetime  [required]
-  -e, --endDT TIMESTAMP       End datetime  [required]
-  --comments / --no-comments  Enable/disable comments in output, enabled by
-                              default
-  --header / --no-header      Enable/disable header in output, enabled by
-                              default
-  -d, --directory PATH        Data directory (./data)
-  --help                      Show this message and exit.
+# Lastly, we can view the results of this evaluation using the GUI
+$ nwm-explorer display
 ```
