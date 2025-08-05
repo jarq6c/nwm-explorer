@@ -45,13 +45,17 @@ def load_nid(ifile: Path) -> BaseTraceType:
             "drainageArea"
         ])
     return go.Scattermap(
-        marker=dict(size=15),
+        marker=dict(
+            size=15,
+            color="rgba(255, 141, 0, 0.75)"
+            ),
         showlegend=False,
         name="",
         mode="markers",
         lat=gdf.latitude,
         lon=gdf.longitude,
-        visible=True
+        visible=True,
+        cluster=dict(enabled=True, step=50, maxzoom=12)
         # customdata=custom_data,
         # hovertemplate=(
         #     f"<br>{value_label}: "
@@ -357,6 +361,9 @@ class Dashboard:
 
             # Update selected feature
             if callback_type == CallbackType.click:
+                # Ignore non-metric clicks
+                if "customdata" not in event["points"][0]:
+                    return
                 data = event["points"][0]["customdata"]
                 self.nwm_feature_id = data[0]
                 self.usgs_site_code = data[1]
