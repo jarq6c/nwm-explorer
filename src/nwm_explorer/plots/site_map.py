@@ -3,10 +3,19 @@ import numpy.typing as npt
 import pandas as pd
 import panel as pn
 import plotly.graph_objects as go
+from plotly.basedatatypes import BaseTraceType
 import colorcet as cc
 
 class SiteMap:
-    def __init__(self, center: dict[str, float], zoom: float):
+    def __init__(
+            self,
+            center: dict[str, float],
+            zoom: float,
+            additional_layers: dict[str, BaseTraceType] | None = None
+            ):
+        # Extra layers
+        self.additional_layers = additional_layers
+
         # Map data
         self.data = [go.Scattermap(
             marker=dict(
@@ -44,7 +53,7 @@ class SiteMap:
 
         # Map figure
         self.figure = dict(
-            data=self.data,
+            data=self.data+list(self.additional_layers.values()),
             layout=self.layout
         )
 
@@ -85,7 +94,10 @@ class SiteMap:
         self.data[0]["marker"]["colorbar"]["title"].update(dict(text=value_label))
     
     def refresh(self) -> None:
-        self.figure.update(dict(data=self.data, layout=self.layout))
+        self.figure.update(dict(
+            data=self.data+list(self.additional_layers.values()),
+            layout=self.layout
+        ))
         self.pane.object = self.figure
     
     def servable(self) -> pn.Card:

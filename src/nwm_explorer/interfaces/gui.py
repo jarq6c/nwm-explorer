@@ -26,10 +26,13 @@ from nwm_explorer.interfaces.configuration import ConfigurationWidgets, CMS_FACT
 
 pn.extension("plotly")
 
-def load_nid(ifile: Path) -> gpd.GeoDataFrame | None:
+import plotly.graph_objects as go
+from plotly.basedatatypes import BaseTraceType
+
+def load_nid(ifile: Path) -> BaseTraceType:
     if not ifile.exists():
-        return None
-    return gpd.read_file(
+        return go.Scattermap()
+    gdf = gpd.read_file(
         ifile,
         columns=[
             "latitude",
@@ -40,15 +43,36 @@ def load_nid(ifile: Path) -> gpd.GeoDataFrame | None:
             "normalStorage",
             "maxDischarge",
             "drainageArea"
-            ]
-    ).rename(columns={
-        "name": "Dam Name",
-        "riverName": "River Name",
-        "drainageArea": "Drainage Area (sq.mi.)",
-        "maxStorage": "Maximum Storage (ac-ft)",
-        "normalStorage": "Normal Storage (ac-ft)",
-        "maxDischarge": "Maximum Discharge (CFS)"
-    })
+        ])
+    return go.Scattermap(
+        marker=dict(size=15),
+        showlegend=False,
+        name="",
+        mode="markers",
+        lat=gdf.latitude,
+        lon=gdf.longitude,
+        visible=True
+        # customdata=custom_data,
+        # hovertemplate=(
+        #     f"<br>{value_label}: "
+        #     "%{marker.color:.2f}<br>"
+        #     "NWM Feature ID: %{customdata[0]}<br>"
+        #     "USGS Site Code: %{customdata[1]}<br>"
+        #     "Start Date: %{customdata[2]}<br>"
+        #     "End Date: %{customdata[3]}<br>"
+        #     "Samples: %{customdata[4]}<br>"
+        #     "Longitude: %{lon}<br>"
+        #     "Latitude: %{lat}"
+    )
+
+    # .rename(columns={
+    #     "name": "Dam Name",
+    #     "riverName": "River Name",
+    #     "drainageArea": "Drainage Area (sq.mi.)",
+    #     "maxStorage": "Maximum Storage (ac-ft)",
+    #     "normalStorage": "Normal Storage (ac-ft)",
+    #     "maxDischarge": "Maximum Discharge (CFS)"
+    # })
 
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
@@ -112,7 +136,7 @@ class Dashboard:
                     )
         
         # Load additional map data
-        self.additional_layers: dict[str, gpd.GeoDataFrame | None] = {
+        additional_layers: dict[str, BaseTraceType] = {
             "National Inventory of Dams": load_nid(root / "NID.gpkg")
         }
 
@@ -122,7 +146,8 @@ class Dashboard:
         self.map_zoom = DEFAULT_ZOOM[self.filters.state.domain]
         self.map = SiteMap(
             center=self.map_center,
-            zoom=self.map_zoom
+            zoom=self.map_zoom,
+            additional_layers=additional_layers
         )
         self.double_click = False
         self.histogram = Histogram([
@@ -146,7 +171,8 @@ class Dashboard:
         self.site_table = SiteInformationTable(
             scan_site_info(root)
         )
-        self.site_options = ConfigurationWidgets()
+        self.site_options = ConfigurationWidgets(
+            layers=list(additional_layers.keys()))
 
         # Callbacks
         def update_barplot() -> None:

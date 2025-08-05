@@ -34,7 +34,7 @@ class SiteConfigurationState:
     units: MeasurementUnits
 
 class ConfigurationWidgets:
-    def __init__(self):
+    def __init__(self, layers: list[str] | None = None):
         # Filtering options
         self.callbacks: list[EventHandler] = []
         self.units_selector = pn.widgets.RadioBoxGroup(
@@ -43,7 +43,7 @@ class ConfigurationWidgets:
         )
         self.layer_selector = pn.widgets.CheckBoxGroup(
             name="Additional Map Layers",
-            options=["National Inventory of Dams"]
+            options=layers if layers is not None else []
         )
 
     @property
