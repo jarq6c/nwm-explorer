@@ -30,7 +30,7 @@ Commands:
 Note that each command (`build`, `display`, `evaluate`, `export` will show additional information using `--help`)
 
 ### Standard Usage
-Generally, users will want to run the `build`, `evaluate` and `display` commands in sequence to generate and explore NWM evaluations. Suppose we wanted to perform an ad-hoc evaluation of NWM forecasts issued from 2023-10-01 to 2023-10-03. We would run perform the following operations to achieve this:
+Generally, users will want to run the `build`, `evaluate` and `display` commands in sequence to generate and explore NWM evaluations. Suppose we wanted to perform an ad-hoc evaluation of NWM forecasts issued from 2023-10-01 to 2023-10-03. We would run the following operations to achieve this:
 ```bash
 # First, retrieve and pair the required data
 # This command will retrieve model output and matching observations.
