@@ -54,7 +54,7 @@ def load_nid(ifile: Path) -> BaseTraceType:
         mode="markers",
         lat=gdf.latitude,
         lon=gdf.longitude,
-        visible=True,
+        visible=False,
         cluster=dict(enabled=True, step=1000, maxzoom=8),
         customdata=gdf[[
             "name",
@@ -454,6 +454,22 @@ class Dashboard:
         )
         self.filters.register_callback(update_hydrograph)
         self.site_options.register_callback(update_hydrograph)
+
+        def toggle_visibility(event, callback_type: CallbackType) -> None:
+            if callback_type is not CallbackType.layers:
+                return
+            
+            # Toggle layer visibility
+            for k, v in self.map.additional_layers.items():
+                v.update(dict(visible=k in event))
+
+            # Maintain layout
+            self.map.layout["map"].update(dict(
+                center=self.map_center,
+                zoom=self.map_zoom
+            ))
+            self.map.refresh()
+        self.site_options.register_callback(toggle_visibility)
 
         # Layout
         controls = pn.Column(
