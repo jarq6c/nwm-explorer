@@ -75,6 +75,40 @@ def load_nid(ifile: Path) -> BaseTraceType:
             "Latitude: %{lat}"
     ))
 
+def load_gages(ifile: Path) -> BaseTraceType:
+    if not ifile.exists():
+        return go.Scattermap()
+    df = pl.read_parquet(ifile)
+    return go.Scattermap(
+        marker=dict(
+            size=10,
+            color="rgba(23, 225, 189, 0.75)"
+            ),
+        showlegend=False,
+        name="",
+        mode="markers",
+        lat=df["latitude"].to_numpy(),
+        lon=df["longitude"].to_numpy(),
+        visible=False,
+        cluster=dict(enabled=True, step=1000, maxzoom=8),
+        customdata=df[[
+            "usgs_site_code",
+            "site_name",
+            "HUC",
+            "drainage_area",
+            "contributing_drainage_area"
+        ]],
+        hovertemplate=(
+            "USGS Site Code: %{customdata[0]}<br>"
+            "Site Name: %{customdata[1]}<br>"
+            "HUC: %{customdata[2]}<br>"
+            "Drainage Area (sq.mi.): %{customdata[3]}<br>"
+            "Contrib. Drain. Area (sq.mi.): %{customdata[4]}<br>"
+            "Longitude: %{lon}<br>"
+            "Latitude: %{lat}"
+    )
+    )
+
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
     def __init__(self, root: Path, title: str):
@@ -138,7 +172,8 @@ class Dashboard:
         
         # Load additional map data
         additional_layers: dict[str, BaseTraceType] = {
-            "National Inventory of Dams": load_nid(root / "NID.gpkg")
+            "National Inventory of Dams": load_nid(root / "NID.gpkg"),
+            "USGS Streamflow Gages": load_gages(root / "site_information.parquet")
         }
 
         # Widgets
