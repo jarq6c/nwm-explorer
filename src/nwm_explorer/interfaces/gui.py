@@ -46,7 +46,7 @@ def load_nid(ifile: Path) -> BaseTraceType:
         ])
     return go.Scattermap(
         marker=dict(
-            size=15,
+            size=10,
             color="rgba(255, 141, 0, 0.75)"
             ),
         showlegend=False,
@@ -55,28 +55,25 @@ def load_nid(ifile: Path) -> BaseTraceType:
         lat=gdf.latitude,
         lon=gdf.longitude,
         visible=True,
-        cluster=dict(enabled=True, step=50, maxzoom=12)
-        # customdata=custom_data,
-        # hovertemplate=(
-        #     f"<br>{value_label}: "
-        #     "%{marker.color:.2f}<br>"
-        #     "NWM Feature ID: %{customdata[0]}<br>"
-        #     "USGS Site Code: %{customdata[1]}<br>"
-        #     "Start Date: %{customdata[2]}<br>"
-        #     "End Date: %{customdata[3]}<br>"
-        #     "Samples: %{customdata[4]}<br>"
-        #     "Longitude: %{lon}<br>"
-        #     "Latitude: %{lat}"
-    )
-
-    # .rename(columns={
-    #     "name": "Dam Name",
-    #     "riverName": "River Name",
-    #     "drainageArea": "Drainage Area (sq.mi.)",
-    #     "maxStorage": "Maximum Storage (ac-ft)",
-    #     "normalStorage": "Normal Storage (ac-ft)",
-    #     "maxDischarge": "Maximum Discharge (CFS)"
-    # })
+        cluster=dict(enabled=True, step=1000, maxzoom=8),
+        customdata=gdf[[
+            "name",
+            "riverName",
+            "maxStorage",
+            "normalStorage",
+            "maxDischarge",
+            "drainageArea"
+        ]],
+        hovertemplate=(
+            "Dam Name: %{customdata[0]}<br>"
+            "River Name: %{customdata[1]}<br>"
+            "Drainage Area (sq.mi.): %{customdata[2]}<br>"
+            "Maximum Storage (ac-ft): %{customdata[3]}<br>"
+            "Normal Storage (ac-ft): %{customdata[4]}<br>"
+            "Maximum Discharge (CFS): %{customdata[5]}<br>"
+            "Longitude: %{lon}<br>"
+            "Latitude: %{lat}"
+    ))
 
 class Dashboard:
     """Build a dashboard for exploring National Water Model output."""
