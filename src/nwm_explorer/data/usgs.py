@@ -127,7 +127,8 @@ def download_usgs(
         # Partition by state
         for s in STATE_LIST:
             # Generate file path and check for existence
-            fp = generate_usgs_filepath(root, rd, s.abbr.lower())
+            s_abbr = s.abbr.lower()
+            fp = generate_usgs_filepath(root, rd, s_abbr)
             if fp.exists():
                 logger.info(f"{fp} exists, skipping download")
                 continue
@@ -136,10 +137,10 @@ def download_usgs(
             fp.parent.mkdir(exist_ok=True, parents=True)
 
             # Set download parameters
-            urls.append(generate_usgs_url(rd, s.abbr.lower()))
+            urls.append(generate_usgs_url(rd, s_abbr))
 
             # Processing
-            tfile = tdir / f"{date_string}_{s}.json"
+            tfile = tdir / f"{date_string}_{s_abbr}.json"
             temp_files.append(tfile)
             json_jobs.append(JSONJob(tfile, fp))
         
