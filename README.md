@@ -45,3 +45,8 @@ $ nwm-explorer evaluate -s 2023-10-01 -e 2023-10-03 -j 4 -l my_evaluation
 # Lastly, we can view the results of this evaluation using the GUI
 $ nwm-explorer display
 ```
+
+## Graphical User Interface
+
+The GUI includes many options for exploring evaluation results including mapping of metrics, filtering by lead time or confidence bounds, regional histograms, hydrographs, and site information.
+![GUI](https://raw.githubusercontent.com/jarq6c/nwm-explorer/main/images/gui.JPG)
