@@ -49,4 +49,5 @@ $ nwm-explorer display
 ## Graphical User Interface
 
 The GUI includes many options for exploring evaluation results including mapping of metrics, filtering by lead time or confidence bounds, regional histograms, hydrographs, and site information.
+
 ![GUI](https://raw.githubusercontent.com/jarq6c/nwm-explorer/main/images/gui.JPG)
