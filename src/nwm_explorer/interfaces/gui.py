@@ -359,8 +359,10 @@ class Dashboard:
             # Update selected feature
             if callback_type == CallbackType.click:
                 # Ignore non-metric clicks
-                if "customdata" not in event["points"][0]:
+                if event["points"][0]["curveNumber"] != 0:
                     return
+                
+                # Update
                 data = event["points"][0]["customdata"]
                 self.nwm_feature_id = data[0]
                 self.usgs_site_code = data[1]
