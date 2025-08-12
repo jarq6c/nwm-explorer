@@ -171,6 +171,11 @@ class Dashboard:
                     )
         
         # Load additional map data
+        # TODO Handle clicks from USGS gage layer (no predictions)
+        # TODO Implement delete command in CLI (evaluations)
+        # TODO Add NHD layer, USGS basins, HUCs
+        # TODO Research high-performance plotly options
+        # TODO Additional metadata (wfo, rfc, state, county, timezone)
         additional_layers: dict[str, BaseTraceType] = {
             "National Inventory of Dams": load_nid(root / "NID.gpkg"),
             "USGS Streamflow Gages": load_gages(root / "site_information.parquet")
