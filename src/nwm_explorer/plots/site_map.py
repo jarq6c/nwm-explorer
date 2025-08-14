@@ -16,6 +16,17 @@ class SiteMap:
         # Extra layers
         self.additional_layers = additional_layers
 
+        # Highlighter
+        self.highlighter = go.Scattermap(
+            marker=dict(
+                size=20,
+                color="magenta"
+            ),
+            showlegend=False,
+            name="",
+            mode="markers"
+        )
+
         # Map data
         self.data = [go.Scattermap(
             marker=dict(
@@ -52,8 +63,9 @@ class SiteMap:
         )
 
         # Map figure
+        data = [self.highlighter] + self.data + list(self.additional_layers.values())
         self.figure = dict(
-            data=self.data+list(self.additional_layers.values()),
+            data=data,
             layout=self.layout
         )
 
@@ -94,8 +106,9 @@ class SiteMap:
         self.data[0]["marker"]["colorbar"]["title"].update(dict(text=value_label))
     
     def refresh(self) -> None:
+        data = [self.highlighter] + self.data + list(self.additional_layers.values())
         self.figure.update(dict(
-            data=self.data+list(self.additional_layers.values()),
+            data=data,
             layout=self.layout
         ))
         self.pane.object = self.figure

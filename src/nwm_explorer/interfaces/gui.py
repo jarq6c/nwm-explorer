@@ -176,6 +176,7 @@ class Dashboard:
         # TODO Add NHD layer, USGS basins, HUCs
         # TODO Research high-performance plotly options
         # TODO Additional metadata (wfo, rfc, state, county, timezone)
+        # TODO karst map, landcover, soils, contour lines
         additional_layers: dict[str, BaseTraceType] = {
             "National Inventory of Dams": load_nid(root / "NID.gpkg"),
             "USGS Streamflow Gages": load_gages(root / "site_information.parquet")
@@ -399,13 +400,18 @@ class Dashboard:
             # Update selected feature
             if callback_type == CallbackType.click:
                 # Ignore non-metric clicks
-                if event["points"][0]["curveNumber"] != 0:
+                if event["points"][0]["curveNumber"] != 1:
                     return
                 
                 # Update
                 data = event["points"][0]["customdata"]
                 self.nwm_feature_id = data[0]
                 self.usgs_site_code = data[1]
+                self.map.highlighter.update(dict(
+                    lat=[event["points"][0]["lat"]],
+                    lon=[event["points"][0]["lon"]]
+                ))
+                self.map.refresh()
                 update_site_info()
 
             # Check for selected feature
