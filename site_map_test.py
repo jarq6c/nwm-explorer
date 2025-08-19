@@ -138,9 +138,9 @@ class MapLayer:
     marker_color: str = "black"
     colorbar_title: str | None = None
     colorbar_limits: tuple[float, float] | None = None
-    visible: bool = True
+    _trace: go.Scattermap | None = None
 
-    def render(self) -> go.Scattermap:
+    def __post_init__(self) -> None:
         # Set columns
         columns = [
             self.latitude_column,
@@ -188,16 +188,82 @@ class MapLayer:
             ))
 
         # Instantiate map
-        return go.Scattermap(
+        self._trace = go.Scattermap(
             lon=df[self.longitude_column],
             lat=df[self.latitude_column],
             showlegend=False,
             name="",
             mode="markers",
             marker=markers,
-            customdata=df[self.custom_data_columns],
-            visible=self.visible
+            customdata=df[self.custom_data_columns]
         )
+
+    def update(
+            self, 
+            latitude_column: str | None = None,
+            longitude_column: str | None = None,
+            color_column: str | None = None,
+            custom_data_columns: list[str] | None = None,
+            size_column: str | None = None,
+            color_scale: list[str] | None = None,
+            marker_size: float | None = None,
+            marker_color: str | None = None,
+            colorbar_title: str | None = None,
+            colorbar_limits: tuple[float, float] | None = None
+        ) -> None:
+        # Set columns
+        columns = []
+        if latitude_column:
+            self.latitude_column = latitude_column
+            columns.append(latitude_column)
+        if longitude_column:
+            self.longitude_column = longitude_column
+            columns.append(longitude_column)
+        if color_column:
+            self.color_column = color_column
+            columns.append(color_column)
+        if size_column:
+            self.size_column = size_column
+            columns.append(size_column)
+        if custom_data_columns:
+            self.custom_data_columns = custom_data_columns
+            columns += custom_data_columns
+
+        # Load data
+        if columns:
+            df = self.data.select(columns).collect()
+
+        # Build update
+        if latitude_column:
+            self._trace.update({"lat": df[latitude_column]})
+        if longitude_column:
+            self._trace.update({"lon": df[longitude_column]})
+        if color_column:
+            self._trace["marker"].update({"color": df[color_column]})
+        if size_column:
+            self._trace["marker"].update({"size": df[size_column]})
+        if custom_data_columns:
+            self._trace.update({"customdata": df[custom_data_columns]})
+        if color_scale:
+            self.color_scale = color_scale
+            self._trace["marker"].update({"colorscale": color_scale})
+        if marker_size:
+            self.marker_size = marker_size
+            self._trace["marker"].update({"size": marker_size})
+        if marker_color:
+            self.marker_color = marker_color
+            self._trace["marker"].update({"color": marker_color})
+        if colorbar_title:
+            self.colorbar_title = colorbar_title
+            self._trace["marker"]["colorbar"]["title"]["text"] = colorbar_title
+        if colorbar_limits:
+            self.colorbar_limits = colorbar_limits
+            self._trace["marker"].update({"cmin": colorbar_limits[0]})
+            self._trace["marker"].update({"cmax": colorbar_limits[0]})
+
+    @property
+    def trace(self) -> go.Scattermap:
+        return self._trace
 
 class SiteMap(Viewer):
     """
@@ -235,7 +301,7 @@ class SiteMap(Viewer):
 
         # Main figure (map)
         self.pane = pn.pane.Plotly({
-            "data": [v.render() for v in self.layers.values() if v.visible],
+            "data": [v.trace for v in self.layers.values()],
             "layout": self.layout
         })
 
@@ -254,13 +320,26 @@ class SiteMap(Viewer):
             DomainView label.
         """
         self.layout = self.layouts[label]
+    
+    def update_layer(self, layer: str, **kwargs) -> None:
+        """
+        Update map layer.
+
+        Parameters
+        ----------
+        layer: str
+            Layer key.
+        kwargs: any
+            Keyword arguments sent to MapLayer.update.
+        """
+        self.layers[layer].update(**kwargs)
 
     def refresh(self) -> None:
         """
         Send current state of data and layout to frontend.
         """
         self.pane.object = {
-            "data": [v.render() for v in self.layers.values() if v.visible],
+            "data": [v.trace for v in self.layers.values()],
             "layout": self.layout
         }
 
@@ -287,7 +366,7 @@ def main():
         "Latitude": [35.16444444],
         "Longitude": [-80.8530556],
         "Nash-Sutcliffe efficiency": [0.55],
-        "Kling-Gupta Efficiency": [0.75]
+        "Relative mean": [1.75]
     }).write_parquet("fake_data.parquet")
     df = pl.scan_parquet("fake_data.parquet")
 
@@ -319,8 +398,19 @@ def main():
         domain_selector.value = site_map.default_domain
     pn.bind(reset_selector, site_map.pane.param.doubleclick_data, watch=True)
 
+    # Metric selector
+    metric_selector = pn.widgets.Select(name="Metric", options=["Nash-Sutcliffe efficiency", "Relative mean"])
+    def update_metric(event) -> None:
+        site_map.update_layer(
+            "metrics",
+            color_column=event,
+            colorbar_title=event
+        )
+        site_map.refresh()
+    pn.bind(update_metric, metric_selector.param.value, watch=True)
+
     # Serve the dashboard
-    pn.serve(pn.Column(site_map, domain_selector))
+    pn.serve(pn.Column(site_map, domain_selector, metric_selector))
 
 if __name__ == "__main__":
     main()
