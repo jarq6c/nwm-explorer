@@ -134,8 +134,15 @@ class MapLayer:
     colorbar_limits: tuple[float, float] | None = None
     _trace: go.Scattermap | None = None
 
-    def render(self) -> go.Scatter:
-        # Check for rendered trace
+    def render(self) -> go.Scattermap:
+        """
+        Renders the layer using plotly.
+
+        Returns
+        -------
+        plotly.graph_objects.Scattermap
+        """
+        # Warn for uncleared trace
         if self._trace is not None:
             warnings.warn("Overwriting layer", RuntimeWarning)
 
@@ -210,6 +217,32 @@ class MapLayer:
             colorbar_title: str | None = None,
             colorbar_limits: tuple[float, float] | None = None
         ) -> None:
+        """
+        Update layer properties. Assumes render has already been called.
+    
+        Parameters
+        ----------
+        latitude_column: str, optional
+            Column in data to use as latitude.
+        longitude_column: str, optional
+            Column in data to use as longitude.
+        color_column: str, optional
+            Column in data used to color markers.
+        custom_data_columns: list[str], optional
+            Columns in data to display on hover.
+        size_column: str, optional
+            Column in data used to set marker size.
+        color_scale: list[str], optional
+            Default colorscale.
+        marker_size: float, optional
+            Marker size used for uniform sizing.
+        marker_color: str, optional
+            Marker color used for uniform color.
+        colorbar_title: str, optional
+            Title to display next to colorbar.
+        colorbar_limits: tuple[float, float], optional
+            Colorbar range.
+        """
         # Check for trace
         if self._trace is None:
             raise RuntimeError("Cannot update unrendered layer")
@@ -265,10 +298,21 @@ class MapLayer:
             self._trace["marker"].update({"cmax": colorbar_limits[1]})
 
     def clear(self) -> None:
+        """
+        Reset rendered layer. Sets self.trace to None.
+        """
         self._trace = None
 
     @property
     def trace(self) -> go.Scattermap | None:
+        """
+        Returns underlying plotly object. Returns None if layer has not been
+        rendered.
+
+        Returns
+        -------
+        plotly.graph_objects.Scattermap | None
+        """
         return self._trace
 
 class SiteMap(Viewer):
