@@ -108,6 +108,8 @@ class MapLayer:
         Column in data used to color markers.
     custom_data_columns: list[str], optional
         Columns in data to display on hover.
+    custom_data_labels: list[str], optional
+        Labels to use with custom data on hover.
     size_column: str, optional
         Column in data used to set marker size.
     color_scale: list[str], default colorcet.gouldian
@@ -126,6 +128,7 @@ class MapLayer:
     longitude_column: str = "longitude"
     color_column: str | None = None
     custom_data_columns: list[str] | None = None
+    custom_data_labels: list[str] | None = None
     size_column: str | None = None
     color_scale: list[str] = field(default_factory=lambda: cc.gouldian)
     marker_size: float = 15.0
@@ -159,7 +162,11 @@ class MapLayer:
         if self.custom_data_columns:
             columns += self.custom_data_columns
             for idx, c in enumerate(self.custom_data_columns):
-                hover_template = f"{c}: " +  "%{customdata[" + str(idx) + "]}<br>" + hover_template
+                if self.custom_data_labels:
+                    l = self.custom_data_labels[idx]
+                else:
+                    l = c
+                hover_template = f"{l}: " +  "%{customdata[" + str(idx) + "]}<br>" + hover_template
         if self.color_column:
             columns.append(self.color_column)
             hover_template = (
@@ -505,20 +512,26 @@ def main():
         site_map.refresh()
     pn.bind(update_metric, metric_selector.param.value, watch=True)
 
-    # Additional data
-    # pl.DataFrame({
-    #     "USGS site code": ["02"+str(i) for i in range(N)],
-    #     "latitude": rng.uniform(24, 52, N),
-    #     "longitude": rng.uniform(-124, -67, N)
-    # }).write_parquet("extra_fake_data.parquet")
-    data_extra = pl.scan_parquet("extra_fake_data.parquet")
-
     # Layers
     extra_layers = {
         "USGS streamflow gages": MapLayer(
-        store=data_extra,
-        custom_data_columns=["USGS site code"],
-        marker_color="magenta"
+        store=pl.scan_parquet("data/site_information.parquet"),
+        custom_data_columns=[
+            "contributing_drainage_area",
+            "drainage_area",
+            "HUC",
+            "site_name",
+            "usgs_site_code"
+        ],
+        custom_data_labels=[
+            "Contrib. Drain. Area (sq.mi.)",
+            "Drainage Area (sq.mi.)",
+            "HUC",
+            "Site name",
+            "USGS site code"
+        ],
+        marker_color="rgba(23, 225, 189, 0.75)",
+        marker_size=10
     )}
     checkbox = pn.widgets.CheckBoxGroup(
         name="Additional layers",
