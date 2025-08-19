@@ -1,19 +1,14 @@
 """
 An interactive mapping interface.
 """
-from typing import TypedDict, Protocol
+from typing import TypedDict
 from dataclasses import dataclass, field
 
 import polars as pl
-
-import numpy.typing as npt
 import panel as pn
 from panel.viewable import Viewer
 import plotly.graph_objects as go
 import colorcet as cc
-
-class ColorString(Protocol):
-    "Plotly compatible color string."
 
 class Coordinates(TypedDict):
     """
@@ -98,7 +93,7 @@ def generate_domain_view(label: str, focus: MapFocus) -> DomainView:
 @dataclass
 class MapLayer:
     """
-    Dataclass containing parameters needed to generate a single map layer.
+    Defines a single map layer.
     
     Attributes
     ----------
@@ -124,8 +119,6 @@ class MapLayer:
         Title to display next to colorbar.
     colorbar_limits: tuple[float, float], optional
         Colorbar range.
-    visible: bool, default True
-        Whether the layer is visible or not.
     """
     data: pl.LazyFrame
     latitude_column: str = "latitude"
@@ -271,10 +264,14 @@ class SiteMap(Viewer):
 
     Parameters
     ----------
+    layers: dict[str, MapLayer]
+        Dict of MapLayer keyed to labels.
     domains: dict[str, MapFocus]
-        Dict of MapFocus keyed to domain labels.
+        Dict of MapFocus keyed to labels.
     default_domain: str, optional
         Sets default domain returned to when resetting map.
+    params: any
+        Additional keyword arguments passed to panel.viewable.Viewer.
     """
     def __init__(
             self,
