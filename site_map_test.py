@@ -2,7 +2,7 @@
 An interactive mapping interface.
 """
 from typing import TypedDict, Protocol
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import polars as pl
 
@@ -10,7 +10,6 @@ import numpy.typing as npt
 import panel as pn
 from panel.viewable import Viewer
 import plotly.graph_objects as go
-from plotly.basedatatypes import BaseTraceType
 import colorcet as cc
 
 class ColorString(Protocol):
@@ -96,47 +95,105 @@ def generate_domain_view(label: str, focus: MapFocus) -> DomainView:
             uirevision=label
     ))
 
-def generate_scatter_map(
-        longitude: npt.ArrayLike,
-        latitude: npt.ArrayLike,
-        color: ColorString | npt.ArrayLike | None = None,
-        colorbar_title: str | None = None,
-        colorbar_limits: tuple[float, float] | None = None,
-        custom_data: pl.DataFrame | None = None
-        ) -> go.Scattermap:
-    # Set default color
-    if color is None:
-        color = "black"
+@dataclass
+class MapLayer:
+    """
+    Dataclass containing parameters needed to generate a single map layer.
+    
+    Attributes
+    ----------
+    data: pl.LazyFrame
+        Polars LazyFrame pointing at data to plot.
+    latitude_column: str, default 'latitude'
+        Column in data to use as latitude.
+    longitude_column: str, default 'longitude'
+        Column in data to use as longitude.
+    color_column: str, optional
+        Column in data used to color markers.
+    custom_data_columns: list[str], optional
+        Columns in data to display on hover.
+    size_column: str, optional
+        Column in data used to set marker size.
+    color_scale: list[str], default colorcet.gouldian
+        Default colorscale.
+    marker_size: float, default 15
+        Marker size used for uniform sizing.
+    marker_color: str, default 'black'
+        Marker color used for uniform color.
+    colorbar_title: str, optional
+        Title to display next to colorbar.
+    colorbar_limits: tuple[float, float], optional
+        Colorbar range.
+    """
+    data: pl.LazyFrame
+    latitude_column: str = "latitude"
+    longitude_column: str = "longitude"
+    color_column: str | None = None
+    custom_data_columns: list[str] | None = None
+    size_column: str | None = None
+    color_scale: list[str] = field(default_factory=lambda: cc.gouldian)
+    marker_size: float = 15.0
+    marker_color: str = "black"
+    colorbar_title: str | None = None
+    colorbar_limits: tuple[float, float] | None = None
 
-    # Setup markers
-    if isinstance(color, str):
-        markers = dict(
-            color=color,
-            size=15
-        )
-    else:
-        markers = dict(
-            color=color,
-            colorbar=dict(title=dict(side="right", text=colorbar_title)),
-            size=15,
-            colorscale=cc.gouldian
-        )
-        if colorbar_limits is not None:
-            markers.update(dict(
-                cmin=colorbar_limits[0],
-                cmax=colorbar_limits[1]
-        ))
+    def render(self) -> go.Scattermap:
+        # Set columns
+        columns = [
+            self.latitude_column,
+            self.longitude_column
+        ]
+        if self.color_column:
+            columns.append(self.color_column)
+        if self.size_column:
+            columns.append(self.size_column)
+        if self.custom_data_columns:
+            columns += self.custom_data_columns
 
-    # Instantiate map
-    return go.Scattermap(
-        lon=longitude,
-        lat=latitude,
-        showlegend=False,
-        name="",
-        mode="markers",
-        marker=markers,
-        customdata=custom_data
-    )
+        # Load data
+        df = self.data.select(columns).collect()
+
+        # Set marker color
+        if self.color_column:
+            color = df[self.color_column]
+        else:
+            color = self.marker_color
+
+        # Set marker size
+        if self.size_column:
+            size = df[self.color_column]
+        else:
+            size = self.marker_size
+
+        # Setup markers
+        if isinstance(color, str):
+            markers = dict(
+                color=color,
+                size=size
+            )
+        else:
+            markers = dict(
+                color=color,
+                colorbar=dict(title=dict(side="right", text=self.colorbar_title)),
+                size=size,
+                colorscale=self.color_scale
+            )
+            if self.colorbar_limits:
+                markers.update(dict(
+                    cmin=self.colorbar_limits[0],
+                    cmax=self.colorbar_limits[1]
+            ))
+
+        # Instantiate map
+        return go.Scattermap(
+            lon=df[self.longitude_column],
+            lat=df[self.latitude_column],
+            showlegend=False,
+            name="",
+            mode="markers",
+            marker=markers,
+            customdata=df[self.custom_data_columns]
+        )
 
 class SiteMap(Viewer):
     """
@@ -151,7 +208,7 @@ class SiteMap(Viewer):
     """
     def __init__(
             self,
-            data: list[BaseTraceType],
+            layers: dict[str, MapLayer],
             domains: dict[str, MapFocus],
             default_domain: str | None = None,
             **params
@@ -159,7 +216,7 @@ class SiteMap(Viewer):
         super().__init__(**params)
 
         # Data
-        self.data: list[BaseTraceType] = data
+        self.data = {k: v.render() for k, v in layers.items()}
 
         # Layouts
         domain_views = [generate_domain_view(l, f) for l, f in domains.items()]
@@ -174,7 +231,7 @@ class SiteMap(Viewer):
 
         # Main figure (map)
         self.pane = pn.pane.Plotly({
-            "data": self.data,
+            "data": list(self.data.values()),
             "layout": self.layout
         })
 
@@ -199,7 +256,7 @@ class SiteMap(Viewer):
         Send current state of data and layout to frontend.
         """
         self.pane.object = {
-            "data": self.data,
+            "data": list(self.data.values()),
             "layout": self.layout
         }
 
@@ -211,7 +268,7 @@ class SiteMap(Viewer):
         )
 
 def main():
-    # Domain defaults
+    # Domains
     domains = {
         "All": MapFocus(center=Coordinates(lat=38.83348, lon=-100.97612), zoom=2),
         "Alaska": MapFocus(center=Coordinates(lat=60.84683, lon=-149.05659), zoom=5),
@@ -221,25 +278,29 @@ def main():
     }
 
     # Data
-    df = pl.DataFrame({
+    pl.DataFrame({
         "USGS site code": ["02146470"],
         "Latitude": [35.16444444],
         "Longitude": [-80.8530556],
         "Nash-Sutcliffe efficiency": [0.55]
-    })
+    }).write_parquet("fake_data.parquet")
+    df = pl.scan_parquet("fake_data.parquet")
 
-    # Scatter map
-    scatter_map = generate_scatter_map(
-        df["Longitude"],
-        df["Latitude"],
-        df["Nash-Sutcliffe efficiency"],
-        "Nash-Sutcliffe efficiency",
-        (-1.0, 1.0),
-        df[["USGS site code"]]
-    )
+    # Layers
+    layers = {
+        "Nash-Sutcliffe efficiency": MapLayer(
+            data=df,
+            latitude_column="Latitude",
+            longitude_column="Longitude",
+            color_column="Nash-Sutcliffe efficiency",
+            custom_data_columns=["USGS site code"],
+            colorbar_title="Nash-Sutcliffe efficiency",
+            colorbar_limits=(-1.0, 1.0)
+        )
+    }
 
     # Setup map
-    site_map = SiteMap([scatter_map], domains)
+    site_map = SiteMap(layers, domains)
 
     # Add domain selector
     domain_selector = pn.widgets.Select(name="Domain", options=list(domains.keys()))
