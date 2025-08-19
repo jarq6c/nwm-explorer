@@ -145,18 +145,27 @@ class MapLayer:
         # Warn for uncleared trace
         if self._trace is not None:
             warnings.warn("Overwriting layer", RuntimeWarning)
+        
+        # Hover template
+        hover_template = "Longitude: %{lon}<br>Latitude: %{lat}"
 
         # Set columns
         columns = [
             self.latitude_column,
             self.longitude_column
         ]
-        if self.color_column:
-            columns.append(self.color_column)
         if self.size_column:
             columns.append(self.size_column)
         if self.custom_data_columns:
             columns += self.custom_data_columns
+            for idx, c in enumerate(self.custom_data_columns):
+                hover_template = f"{c}: " +  "%{customdata[" + str(idx) + "]}<br>" + hover_template
+        if self.color_column:
+            columns.append(self.color_column)
+            hover_template = (
+                f"{self.colorbar_title}: "
+                "%{marker.color:.2f}<br>" + hover_template
+                )
 
         # Load data
         data = self.store.select(columns).collect()
@@ -200,7 +209,8 @@ class MapLayer:
             name="",
             mode="markers",
             marker=markers,
-            customdata=data[self.custom_data_columns]
+            customdata=data[self.custom_data_columns],
+            hovertemplate=hover_template
         )
         return self._trace
 
