@@ -3,6 +3,7 @@ An interactive mapping interface.
 """
 from typing import TypedDict
 from dataclasses import dataclass, field
+import warnings
 
 import polars as pl
 import panel as pn
@@ -133,7 +134,11 @@ class MapLayer:
     colorbar_limits: tuple[float, float] | None = None
     _trace: go.Scattermap | None = None
 
-    def __post_init__(self) -> None:
+    def render(self) -> go.Scatter:
+        # Check for rendered trace
+        if self._trace is not None:
+            warnings.warn("Overwriting layer", RuntimeWarning)
+
         # Set columns
         columns = [
             self.latitude_column,
@@ -190,6 +195,7 @@ class MapLayer:
             marker=markers,
             customdata=df[self.custom_data_columns]
         )
+        return self._trace
 
     def update(
             self, 
@@ -204,6 +210,10 @@ class MapLayer:
             colorbar_title: str | None = None,
             colorbar_limits: tuple[float, float] | None = None
         ) -> None:
+        # Check for trace
+        if self._trace is None:
+            raise RuntimeError("Cannot update unrendered layer")
+
         # Set columns
         columns = []
         if latitude_column:
@@ -254,8 +264,11 @@ class MapLayer:
             self._trace["marker"].update({"cmin": colorbar_limits[0]})
             self._trace["marker"].update({"cmax": colorbar_limits[1]})
 
+    def clear(self) -> None:
+        self._trace = None
+
     @property
-    def trace(self) -> go.Scattermap:
+    def trace(self) -> go.Scattermap | None:
         return self._trace
 
 class SiteMap(Viewer):
@@ -298,7 +311,7 @@ class SiteMap(Viewer):
 
         # Main figure (map)
         self.pane = pn.pane.Plotly({
-            "data": [v.trace for v in self.layers.values()],
+            "data": [v.render() for v in self.layers.values()],
             "layout": self.layout
         })
 
@@ -318,18 +331,42 @@ class SiteMap(Viewer):
         """
         self.layout = self.layouts[label]
     
-    def update_layer(self, layer: str, **kwargs) -> None:
+    def update_layer(self, layer_label: str, **kwargs) -> None:
         """
         Update map layer.
 
         Parameters
         ----------
-        layer: str
+        layer_label: str
             Layer key.
         kwargs: any
             Keyword arguments passed directly to MapLayer.update.
         """
-        self.layers[layer].update(**kwargs)
+        self.layers[layer_label].update(**kwargs)
+    
+    def add_layer(self, layer_label: str, layer: MapLayer) -> None:
+        """
+        Add map layer.
+
+        Parameters
+        ----------
+        layer_label: str
+            Layer key.
+        layer: MapLayer
+            MapLayer object.
+        """
+        self.layers[layer_label] = layer
+    
+    def remove_layer(self, layer_label: str) -> None:
+        """
+        Remove map layer.
+
+        Parameters
+        ----------
+        layer_label: str
+            Layer key.
+        """
+        self.layers.pop(layer_label)
 
     def refresh(self) -> None:
         """
@@ -411,8 +448,49 @@ def main():
         site_map.refresh()
     pn.bind(update_metric, metric_selector.param.value, watch=True)
 
+    # Additional data
+    pl.DataFrame({
+        "USGS site code": ["01013500"],
+        "latitude": [47.2375],
+        "longitude": [-68.58277778]
+    }).write_parquet("extra_fake_data.parquet")
+    df_extra = pl.scan_parquet("extra_fake_data.parquet")
+
+    # Layers
+    extra_layers = {
+        "USGS streamflow gages": MapLayer(
+        data=df_extra,
+        custom_data_columns=["USGS site code"],
+        marker_color="magenta"
+    )}
+    checkbox = pn.widgets.CheckBoxGroup(
+        name="Additional layers",
+        options=list(extra_layers.keys()),
+        inline=True
+    )
+    def update_layers(event) -> None:
+        # Check each layer
+        for k, v in extra_layers.items():
+            # Add layer
+            if k in event:
+                # Render layer
+                v.render()
+
+                # Add to map
+                site_map.add_layer(k, v)
+            else:
+                # Remove from map
+                site_map.remove_layer(k)
+
+                # Clear layer
+                v.clear()
+        
+        # Refresh
+        site_map.refresh()
+    pn.bind(update_layers, checkbox.param.value, watch=True)
+
     # Serve the dashboard
-    pn.serve(pn.Column(site_map, domain_selector, metric_selector))
+    pn.serve(pn.Column(site_map, domain_selector, metric_selector, checkbox))
 
 if __name__ == "__main__":
     main()
