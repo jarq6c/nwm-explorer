@@ -439,13 +439,16 @@ def main():
     }
 
     # Data
-    pl.DataFrame({
-        "USGS site code": ["02146470"],
-        "Latitude": [35.16444444],
-        "Longitude": [-80.8530556],
-        "Nash-Sutcliffe efficiency": [0.55],
-        "Relative mean": [1.75]
-    }).write_parquet("fake_data.parquet")
+    # import numpy as np
+    # rng = np.random.default_rng(seed=2025)
+    # N = 10_000
+    # pl.DataFrame({
+    #     "USGS site code": ["02"+str(i) for i in range(N)],
+    #     "Latitude": rng.uniform(24, 52, N),
+    #     "Longitude": rng.uniform(-124, -67, N),
+    #     "Nash-Sutcliffe efficiency": rng.uniform(-1.0, 1.0, N),
+    #     "Relative mean": rng.uniform(0.0, 2.0, N)
+    # }).write_parquet("fake_data.parquet")
     data = pl.scan_parquet("fake_data.parquet")
 
     # Layers
@@ -493,11 +496,11 @@ def main():
     pn.bind(update_metric, metric_selector.param.value, watch=True)
 
     # Additional data
-    pl.DataFrame({
-        "USGS site code": ["01013500"],
-        "latitude": [47.2375],
-        "longitude": [-68.58277778]
-    }).write_parquet("extra_fake_data.parquet")
+    # pl.DataFrame({
+    #     "USGS site code": ["02"+str(i) for i in range(N)],
+    #     "latitude": rng.uniform(24, 52, N),
+    #     "longitude": rng.uniform(-124, -67, N)
+    # }).write_parquet("extra_fake_data.parquet")
     data_extra = pl.scan_parquet("extra_fake_data.parquet")
 
     # Layers
