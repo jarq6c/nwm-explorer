@@ -98,7 +98,7 @@ class MapLayer:
     
     Attributes
     ----------
-    data: pl.LazyFrame
+    store: pl.LazyFrame
         Polars LazyFrame pointing at data to plot.
     latitude_column: str, default 'latitude'
         Column in data to use as latitude.
@@ -121,7 +121,7 @@ class MapLayer:
     colorbar_limits: tuple[float, float], optional
         Colorbar range.
     """
-    data: pl.LazyFrame
+    store: pl.LazyFrame
     latitude_column: str = "latitude"
     longitude_column: str = "longitude"
     color_column: str | None = None
@@ -159,17 +159,17 @@ class MapLayer:
             columns += self.custom_data_columns
 
         # Load data
-        df = self.data.select(columns).collect()
+        data = self.store.select(columns).collect()
 
         # Set marker color
         if self.color_column:
-            color = df[self.color_column]
+            color = data[self.color_column]
         else:
             color = self.marker_color
 
         # Set marker size
         if self.size_column:
-            size = df[self.color_column]
+            size = data[self.color_column]
         else:
             size = self.marker_size
 
@@ -194,13 +194,13 @@ class MapLayer:
 
         # Instantiate map
         self._trace = go.Scattermap(
-            lon=df[self.longitude_column],
-            lat=df[self.latitude_column],
+            lon=data[self.longitude_column],
+            lat=data[self.latitude_column],
             showlegend=False,
             name="",
             mode="markers",
             marker=markers,
-            customdata=df[self.custom_data_columns]
+            customdata=data[self.custom_data_columns]
         )
         return self._trace
 
@@ -267,19 +267,19 @@ class MapLayer:
 
         # Load data
         if columns:
-            df = self.data.select(columns).collect()
+            data = self.store.select(columns).collect()
 
         # Build update
         if latitude_column:
-            self._trace.update({"lat": df[latitude_column]})
+            self._trace.update({"lat": data[latitude_column]})
         if longitude_column:
-            self._trace.update({"lon": df[longitude_column]})
+            self._trace.update({"lon": data[longitude_column]})
         if color_column:
-            self._trace["marker"].update({"color": df[color_column]})
+            self._trace["marker"].update({"color": data[color_column]})
         if size_column:
-            self._trace["marker"].update({"size": df[size_column]})
+            self._trace["marker"].update({"size": data[size_column]})
         if custom_data_columns:
-            self._trace.update({"customdata": df[custom_data_columns]})
+            self._trace.update({"customdata": data[custom_data_columns]})
         if color_scale:
             self.color_scale = color_scale
             self._trace["marker"].update({"colorscale": color_scale})
@@ -446,12 +446,12 @@ def main():
         "Nash-Sutcliffe efficiency": [0.55],
         "Relative mean": [1.75]
     }).write_parquet("fake_data.parquet")
-    df = pl.scan_parquet("fake_data.parquet")
+    data = pl.scan_parquet("fake_data.parquet")
 
     # Layers
     layers = {
         "metrics": MapLayer(
-            data=df,
+            store=data,
             latitude_column="Latitude",
             longitude_column="Longitude",
             color_column="Nash-Sutcliffe efficiency",
@@ -498,12 +498,12 @@ def main():
         "latitude": [47.2375],
         "longitude": [-68.58277778]
     }).write_parquet("extra_fake_data.parquet")
-    df_extra = pl.scan_parquet("extra_fake_data.parquet")
+    data_extra = pl.scan_parquet("extra_fake_data.parquet")
 
     # Layers
     extra_layers = {
         "USGS streamflow gages": MapLayer(
-        data=df_extra,
+        store=data_extra,
         custom_data_columns=["USGS site code"],
         marker_color="magenta"
     )}
