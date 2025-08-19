@@ -259,7 +259,7 @@ class MapLayer:
         if colorbar_limits:
             self.colorbar_limits = colorbar_limits
             self._trace["marker"].update({"cmin": colorbar_limits[0]})
-            self._trace["marker"].update({"cmax": colorbar_limits[0]})
+            self._trace["marker"].update({"cmax": colorbar_limits[1]})
 
     @property
     def trace(self) -> go.Scattermap:
@@ -330,7 +330,7 @@ class SiteMap(Viewer):
         layer: str
             Layer key.
         kwargs: any
-            Keyword arguments sent to MapLayer.update.
+            Keyword arguments passed directly to MapLayer.update.
         """
         self.layers[layer].update(**kwargs)
 
@@ -399,12 +399,17 @@ def main():
     pn.bind(reset_selector, site_map.pane.param.doubleclick_data, watch=True)
 
     # Metric selector
-    metric_selector = pn.widgets.Select(name="Metric", options=["Nash-Sutcliffe efficiency", "Relative mean"])
+    limits = {
+        "Nash-Sutcliffe efficiency": (-1.0, 1.0),
+        "Relative mean": (0.0, 2.0)
+    }
+    metric_selector = pn.widgets.Select(name="Metric", options=list(limits.keys()))
     def update_metric(event) -> None:
         site_map.update_layer(
             "metrics",
             color_column=event,
-            colorbar_title=event
+            colorbar_title=event,
+            colorbar_limits=limits[event]
         )
         site_map.refresh()
     pn.bind(update_metric, metric_selector.param.value, watch=True)
