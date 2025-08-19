@@ -124,6 +124,8 @@ class MapLayer:
         Title to display next to colorbar.
     colorbar_limits: tuple[float, float], optional
         Colorbar range.
+    visible: bool, default True
+        Whether the layer is visible or not.
     """
     data: pl.LazyFrame
     latitude_column: str = "latitude"
@@ -136,6 +138,7 @@ class MapLayer:
     marker_color: str = "black"
     colorbar_title: str | None = None
     colorbar_limits: tuple[float, float] | None = None
+    visible: bool = True
 
     def render(self) -> go.Scattermap:
         # Set columns
@@ -192,7 +195,8 @@ class MapLayer:
             name="",
             mode="markers",
             marker=markers,
-            customdata=df[self.custom_data_columns]
+            customdata=df[self.custom_data_columns],
+            visible=self.visible
         )
 
 class SiteMap(Viewer):
@@ -216,7 +220,7 @@ class SiteMap(Viewer):
         super().__init__(**params)
 
         # Data
-        self.data = {k: v.render() for k, v in layers.items()}
+        self.layers = layers
 
         # Layouts
         domain_views = [generate_domain_view(l, f) for l, f in domains.items()]
@@ -231,7 +235,7 @@ class SiteMap(Viewer):
 
         # Main figure (map)
         self.pane = pn.pane.Plotly({
-            "data": list(self.data.values()),
+            "data": [v.render() for v in self.layers.values() if v.visible],
             "layout": self.layout
         })
 
@@ -256,7 +260,7 @@ class SiteMap(Viewer):
         Send current state of data and layout to frontend.
         """
         self.pane.object = {
-            "data": list(self.data.values()),
+            "data": [v.render() for v in self.layers.values() if v.visible],
             "layout": self.layout
         }
 
@@ -282,13 +286,14 @@ def main():
         "USGS site code": ["02146470"],
         "Latitude": [35.16444444],
         "Longitude": [-80.8530556],
-        "Nash-Sutcliffe efficiency": [0.55]
+        "Nash-Sutcliffe efficiency": [0.55],
+        "Kling-Gupta Efficiency": [0.75]
     }).write_parquet("fake_data.parquet")
     df = pl.scan_parquet("fake_data.parquet")
 
     # Layers
     layers = {
-        "Nash-Sutcliffe efficiency": MapLayer(
+        "metrics": MapLayer(
             data=df,
             latitude_column="Latitude",
             longitude_column="Longitude",
