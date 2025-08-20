@@ -4,7 +4,7 @@ An interactive mapping interface.
 from typing import TypedDict
 from dataclasses import dataclass, field
 import warnings
-from enum import StrEnum
+from enum import StrEnum, Enum, auto
 
 import polars as pl
 import panel as pn
@@ -33,6 +33,11 @@ class MetricConfidence(StrEnum):
     _point = "Point"
     _lower = "Lower"
     _upper = "Upper"
+
+class CallbackType(Enum):
+    """Callback types."""
+    metric_update = auto()
+    confidence_update = auto()
 
 class Coordinates(TypedDict):
     """
@@ -484,22 +489,38 @@ DOMAIN_VIEWS: dict[ModelDomain, MapFocus] = {
 }
 """Default map centers and zoom levels for NWM domains."""
 
-def main():
-    # Data
-    data = pl.scan_parquet("data/parquet/conus/evaluations/analysis_assim_extend_no_da_20231001_20231003.parquet")
+METRIC_PLOTTING_LIMITS: dict[Metric, tuple[float, float]] = {
+    Metric.relative_mean_bias: (-1.0, 1.0),
+    Metric.pearson_correlation_coefficient: (-1.0, 1.0),
+    Metric.nash_sutcliffe_efficiency: (-1.0, 1.0),
+    Metric.relative_mean: (0.0, 2.0),
+    Metric.relative_standard_deviation: (0.0, 2.0),
+    Metric.kling_gupta_efficiency: (-1.0, 1.0)
+}
+"""Mapping from Metrics to plotting limits (cmin, cmax)."""
 
-    print(data.collect())
-    return
+def main():
+    # Data and geometry
+    geometry = pl.scan_parquet("data/parquet/conus/routelink.parquet").select(
+        ["nwm_feature_id", "latitude", "longitude"])
+    data = pl.scan_parquet("data/parquet/conus/evaluations/analysis_assim_extend_no_da_20231001_20231003.parquet").join(
+        geometry, on="nwm_feature_id", how="left")
 
     # Layers
+    initial_column = list(Metric)[0].name + list(MetricConfidence)[0].name
     layers = {
         "Metrics": MapLayer(
             store=data,
-            latitude_column="Latitude",
-            longitude_column="Longitude",
-            color_column="Nash-Sutcliffe efficiency",
-            custom_data_columns=["USGS site code"],
-            colorbar_title="Nash-Sutcliffe efficiency",
+            color_column=initial_column,
+            custom_data_columns=[
+                "nwm_feature_id",
+                "usgs_site_code"
+            ],
+            custom_data_labels=[
+                "NWM feature ID",
+                "USGS site code"
+            ],
+            colorbar_title=list(Metric)[0],
             colorbar_limits=(-1.0, 1.0)
         ),
         "USGS streamflow gages": MapLayer(
@@ -560,31 +581,47 @@ def main():
     pn.bind(reset_selector, site_map.pane.param.doubleclick_data, watch=True)
 
     # Metric selector
-    limits = {
-        "Nash-Sutcliffe efficiency": (-1.0, 1.0),
-        "Relative mean": (0.0, 5.0)
-    }
-    metric_selector = pn.widgets.Select(name="Metric", options=list(limits.keys()))
-    def update_metric(event) -> None:
+    metric_selector = pn.widgets.Select(name="Metric", options=list(Metric))
+    confidence_selector = pn.widgets.Select(name="Metric", options=list(MetricConfidence))
+    def update_metric(event, callback_type: CallbackType) -> None:
+        # Set metric
+        if callback_type == CallbackType.metric_update:
+            m = Metric(event)
+        else:
+            m = Metric(metric_selector.value)
+
+        # Set confidence estimate
+        if callback_type == CallbackType.confidence_update:
+            c = MetricConfidence(event)
+        else:
+            c = MetricConfidence(confidence_selector.value)
+        
+        # Set column
+        column = m.name + c.name
+        
+        # Update map
         if layers["Metrics"].trace is None:
             # Update pre-render parameters
-            layers["Metrics"].color_column = event
-            layers["Metrics"].colorbar_title = event
-            layers["Metrics"].colorbar_limits = limits[event]
+            layers["Metrics"].color_column = column
+            layers["Metrics"].colorbar_title = m
+            layers["Metrics"].colorbar_limits = METRIC_PLOTTING_LIMITS[m]
             return
         else:
             # Update rendered layer
             layers["Metrics"].update(
-                color_column=event,
-                colorbar_title=event,
-                colorbar_limits=limits[event]
+                color_column=column,
+                colorbar_title=m,
+                colorbar_limits=METRIC_PLOTTING_LIMITS[m]
             )
 
         if "Metrics" in site_map.layers:
             # Refresh site map
             site_map.set_layer("Metrics", layers["Metrics"])
             site_map.refresh()
-    pn.bind(update_metric, metric_selector.param.value, watch=True)
+    pn.bind(update_metric, metric_selector.param.value, watch=True,
+        callback_type=CallbackType.metric_update)
+    pn.bind(update_metric, confidence_selector.param.value, watch=True,
+        callback_type=CallbackType.confidence_update)
 
     # Layers
     checkbox = pn.widgets.CheckBoxGroup(
@@ -619,7 +656,13 @@ def main():
     update_layers(checkbox.value)
 
     # Serve the dashboard
-    pn.serve(pn.Column(site_map, domain_selector, metric_selector, checkbox))
+    pn.serve(pn.Column(
+        site_map,
+        domain_selector,
+        metric_selector,
+        confidence_selector,
+        checkbox
+        ))
 
 if __name__ == "__main__":
     main()
