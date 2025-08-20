@@ -351,6 +351,26 @@ class MapLayer:
             self.colorbar_limits = colorbar_limits
             self._trace["marker"].update({"cmin": colorbar_limits[0]})
             self._trace["marker"].update({"cmax": colorbar_limits[1]})
+        
+        # Hover template
+        hover_template = "Longitude: %{lon}<br>Latitude: %{lat}"
+        if self.custom_data_columns:
+            columns += self.custom_data_columns
+            for idx, c in enumerate(self.custom_data_columns):
+                if self.custom_data_labels:
+                    l = self.custom_data_labels[idx]
+                else:
+                    l = c
+                hover_template = f"{l}: " +  "%{customdata[" + str(idx) + "]}<br>" + hover_template
+        if self.color_column:
+            columns.append(self.color_column)
+            hover_template = (
+                f"{self.colorbar_title}: "
+                "%{marker.color:.2f}<br>" + hover_template
+                )
+        
+        # Update hover template
+        self._trace["hovertemplate"] = hover_template
 
     def clear(self) -> None:
         """
