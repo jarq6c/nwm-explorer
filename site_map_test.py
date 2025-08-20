@@ -4,12 +4,20 @@ An interactive mapping interface.
 from typing import TypedDict
 from dataclasses import dataclass, field
 import warnings
+from enum import StrEnum
 
 import polars as pl
 import panel as pn
 from panel.viewable import Viewer
 import plotly.graph_objects as go
 import colorcet as cc
+
+class ModelDomain(StrEnum):
+    """National Water Model domains."""
+    alaska = "Alaska"
+    conus = "CONUS"
+    hawaii = "Hawaii"
+    puertorico = "Puerto Rico"
 
 class Coordinates(TypedDict):
     """
@@ -453,28 +461,20 @@ class SiteMap(Viewer):
             hide_header=True
         )
 
-def main():
-    # Domains
-    domains = {
-        "All": MapFocus(center=Coordinates(lat=38.83348, lon=-100.97612), zoom=2),
-        "Alaska": MapFocus(center=Coordinates(lat=60.84683, lon=-149.05659), zoom=5),
-        "CONUS": MapFocus(center=Coordinates(lat=38.83348, lon=-93.97612), zoom=3),
-        "Hawaii": MapFocus(center=Coordinates(lat=21.24988, lon=-157.59606), zoom=6),
-        "Puerto Rico": MapFocus(center=Coordinates(lat=18.21807, lon=-66.32802), zoom=8)
-    }
+DOMAIN_VIEWS: dict[ModelDomain, MapFocus] = {
+    ModelDomain.conus: MapFocus(center=Coordinates(lat=38.83348, lon=-93.97612), zoom=3),
+    ModelDomain.alaska: MapFocus(center=Coordinates(lat=60.84683, lon=-149.05659), zoom=5),
+    ModelDomain.hawaii: MapFocus(center=Coordinates(lat=21.24988, lon=-157.59606), zoom=6),
+    ModelDomain.puertorico: MapFocus(center=Coordinates(lat=18.21807, lon=-66.32802), zoom=8)
+}
+"""Default map centers and zoom levels for NWM domains."""
 
+def main():
     # Data
-    # import numpy as np
-    # rng = np.random.default_rng(seed=2025)
-    # N = 10_000
-    # pl.DataFrame({
-    #     "USGS site code": ["02"+str(i) for i in range(N)],
-    #     "Latitude": rng.uniform(24, 52, N),
-    #     "Longitude": rng.uniform(-124, -67, N),
-    #     "Nash-Sutcliffe efficiency": rng.uniform(-1.0, 1.0, N),
-    #     "Relative mean": rng.uniform(0.0, 2.0, N)
-    # }).write_parquet("fake_data.parquet")
-    data = pl.scan_parquet("fake_data.parquet")
+    data = pl.scan_parquet("data/parquet/conus/evaluations/analysis_assim_extend_no_da_20231001_20231003.parquet")
+
+    print(data.collect())
+    return
 
     # Layers
     layers = {
@@ -530,10 +530,10 @@ def main():
     }
 
     # Setup map
-    site_map = SiteMap({}, domains)
+    site_map = SiteMap({}, DOMAIN_VIEWS)
 
     # Add domain selector
-    domain_selector = pn.widgets.Select(name="Domain", options=list(domains.keys()))
+    domain_selector = pn.widgets.Select(name="Domain", options=list(DOMAIN_VIEWS.keys()))
     def update_domain(domain) -> None:
         site_map.switch_domain(domain)
         site_map.refresh()
