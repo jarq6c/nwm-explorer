@@ -118,6 +118,9 @@ class MapLayer:
         Marker size used for uniform sizing.
     marker_color: str, default 'black'
         Marker color used for uniform color.
+    marker_symbol: str, default 'circle'
+        Marker symbol used for uniform symbols. Currently, plotly maps only
+        support 'circle'.
     colorbar_title: str, optional
         Title to display next to colorbar.
     colorbar_limits: tuple[float, float], optional
@@ -133,6 +136,7 @@ class MapLayer:
     color_scale: list[str] = field(default_factory=lambda: cc.gouldian)
     marker_size: float = 15.0
     marker_color: str = "black"
+    marker_symbol: str = "circle"
     colorbar_title: str | None = None
     colorbar_limits: tuple[float, float] | None = None
     _trace: go.Scattermap | None = None
@@ -193,14 +197,16 @@ class MapLayer:
         if isinstance(color, str):
             markers = dict(
                 color=color,
-                size=size
+                size=size,
+                symbol=self.marker_symbol
             )
         else:
             markers = dict(
                 color=color,
                 colorbar=dict(title=dict(side="right", text=self.colorbar_title)),
                 size=size,
-                colorscale=self.color_scale
+                colorscale=self.color_scale,
+                symbol=self.marker_symbol
             )
             if self.colorbar_limits:
                 markers.update(dict(
@@ -231,6 +237,7 @@ class MapLayer:
             color_scale: list[str] | None = None,
             marker_size: float | None = None,
             marker_color: str | None = None,
+            marker_symbol: str | None = None,
             colorbar_title: str | None = None,
             colorbar_limits: tuple[float, float] | None = None
         ) -> None:
@@ -306,6 +313,9 @@ class MapLayer:
         if marker_color:
             self.marker_color = marker_color
             self._trace["marker"].update({"color": marker_color})
+        if marker_symbol:
+            self.marker_symbol = marker_symbol
+            self._trace["marker"].update({"symbol": marker_symbol})
         if colorbar_title:
             self.colorbar_title = colorbar_title
             self._trace["marker"]["colorbar"]["title"]["text"] = colorbar_title
@@ -390,7 +400,6 @@ class SiteMap(Viewer):
             columns = self.layers[key].custom_data_columns
             self.click_data = {col: val for col, val in zip(columns, custom_data)}
             self.click_data["layer"] = key
-            print(self.click_data)
         pn.bind(log_click_event, self.pane.param.click_data, watch=True)
 
     def switch_domain(self, label: str) -> None:
