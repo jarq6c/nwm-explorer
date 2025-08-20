@@ -392,20 +392,7 @@ class SiteMap(Viewer):
         """
         self.layout = self.layouts[label]
     
-    def update_layer(self, layer_label: str, **kwargs) -> None:
-        """
-        Update map layer.
-
-        Parameters
-        ----------
-        layer_label: str
-            Layer key.
-        kwargs: any
-            Keyword arguments passed directly to MapLayer.update.
-        """
-        self.layers[layer_label].update(**kwargs)
-    
-    def add_layer(self, layer_label: str, layer: MapLayer) -> None:
+    def set_layer(self, layer_label: str, layer: MapLayer) -> None:
         """
         Add map layer.
 
@@ -539,18 +526,29 @@ def main():
     # Metric selector
     limits = {
         "Nash-Sutcliffe efficiency": (-1.0, 1.0),
-        "Relative mean": (0.0, 2.0)
+        "Relative mean": (0.0, 5.0)
     }
     metric_selector = pn.widgets.Select(name="Metric", options=list(limits.keys()))
-    # def update_metric(event) -> None:
-    #     site_map.update_layer(
-    #         "Metrics",
-    #         color_column=event,
-    #         colorbar_title=event,
-    #         colorbar_limits=limits[event]
-    #     )
-    #     site_map.refresh()
-    # pn.bind(update_metric, metric_selector.param.value, watch=True)
+    def update_metric(event) -> None:
+        if layers["Metrics"].trace is None:
+            # Update pre-render parameters
+            layers["Metrics"].color_column = event
+            layers["Metrics"].colorbar_title = event
+            layers["Metrics"].colorbar_limits = limits[event]
+            return
+        else:
+            # Update rendered layer
+            layers["Metrics"].update(
+                color_column=event,
+                colorbar_title=event,
+                colorbar_limits=limits[event]
+            )
+
+        if "Metrics" in site_map.layers:
+            # Refresh site map
+            site_map.set_layer("Metrics", layers["Metrics"])
+            site_map.refresh()
+    pn.bind(update_metric, metric_selector.param.value, watch=True)
 
     # Layers
     checkbox = pn.widgets.CheckBoxGroup(
@@ -569,7 +567,7 @@ def main():
                     v.render()
 
                 # Add to map
-                site_map.add_layer(k, v)
+                site_map.set_layer(k, v)
             else:
                 # Remove from map
                 site_map.remove_layer(k)
