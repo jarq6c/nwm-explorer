@@ -19,6 +19,56 @@ class ModelDomain(StrEnum):
     hawaii = "Hawaii"
     puertorico = "Puerto Rico"
 
+class ModelConfiguration(StrEnum):
+    """National Water Model configurations."""
+    analysis_assim_extend_alaska_no_da = "analysis_assim_extend_alaska_no_da"
+    analysis_assim_extend_no_da = "analysis_assim_extend_no_da"
+    analysis_assim_hawaii_no_da = "analysis_assim_hawaii_no_da"
+    analysis_assim_puertorico_no_da = "analysis_assim_puertorico_no_da"
+    medium_range_mem1 = "medium_range_mem1"
+    medium_range_blend = "medium_range_blend"
+    medium_range_no_da = "medium_range_no_da"
+    medium_range_alaska_mem1 = "medium_range_alaska_mem1"
+    medium_range_blend_alaska = "medium_range_blend_alaska"
+    medium_range_alaska_no_da = "medium_range_alaska_no_da"
+    short_range = "short_range"
+    short_range_alaska = "short_range_alaska"
+    short_range_hawaii = "short_range_hawaii"
+    short_range_hawaii_no_da = "short_range_hawaii_no_da"
+    short_range_puertorico = "short_range_puertorico"
+    short_range_puertorico_no_da = "short_range_puertorico_no_da"
+
+DOMAIN_CONFIGURATIONS: dict[ModelDomain, dict[str, ModelConfiguration]] = {
+    ModelDomain.alaska: {
+        "Extended Analysis (MRMS, No-DA)": ModelConfiguration.analysis_assim_extend_alaska_no_da,
+        "Medium Range Forecast (GFS, Deterministic)": ModelConfiguration.medium_range_alaska_mem1,
+        "Medium Range Forecast (NBM, Deterministic)": ModelConfiguration.medium_range_blend_alaska,
+        "Medium Range Forecast (GFS, Deterministic, No-DA)": ModelConfiguration.medium_range_alaska_no_da,
+        "Short Range Forecast (HRRR)": ModelConfiguration.short_range_alaska
+    },
+    ModelDomain.conus: {
+        "Extended Analysis (MRMS, No-DA)": ModelConfiguration.analysis_assim_extend_no_da,
+        "Medium Range Forecast (GFS, Deterministic)": ModelConfiguration.medium_range_mem1,
+        "Medium Range Forecast (NBM, Deterministic)": ModelConfiguration.medium_range_blend,
+        "Medium Range Forecast (GFS, Deterministic, No-DA)": ModelConfiguration.medium_range_no_da,
+        "Short Range Forecast (HRRR)": ModelConfiguration.short_range
+    },
+    ModelDomain.hawaii: {
+        "Analysis (MRMS, No-DA)": ModelConfiguration.analysis_assim_hawaii_no_da,
+        "Short Range Forecast (WRF-ARW)": ModelConfiguration.short_range_hawaii,
+        "Short Range Forecast (WRF-ARW, No-DA)": ModelConfiguration.short_range_hawaii_no_da
+    },
+    ModelDomain.puertorico: {
+        "Analysis (MRMS, No-DA)": ModelConfiguration.analysis_assim_puertorico_no_da,
+        "Short Range Forecast (WRF-ARW)": ModelConfiguration.short_range_puertorico,
+        "Short Range Forecast (WRF-ARW, No-DA)": ModelConfiguration.short_range_puertorico_no_da
+    }
+}
+"""
+Mapping from ModelDomain to pretty string representations of model configurations.
+Pretty strings map to model ModelConfiguration enums.
+"""
+
 class Metric(StrEnum):
     """Metric names."""
     nash_sutcliffe_efficiency = "Nash-Sutcliffe efficiency"
