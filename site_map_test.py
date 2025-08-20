@@ -418,7 +418,7 @@ class SiteMap(Viewer):
         """
         self.layers[layer_label] = layer
     
-    def remove_layer(self, layer_label: str) -> None:
+    def remove_layer(self, layer_label: str) -> MapLayer | None:
         """
         Remove map layer.
 
@@ -427,7 +427,7 @@ class SiteMap(Viewer):
         layer_label: str
             Layer key.
         """
-        self.layers.pop(layer_label)
+        return self.layers.pop(layer_label, None)
 
     def refresh(self) -> None:
         """
@@ -515,24 +515,46 @@ def main():
     # Layers
     extra_layers = {
         "USGS streamflow gages": MapLayer(
-        store=pl.scan_parquet("data/site_information.parquet"),
-        custom_data_columns=[
-            "contributing_drainage_area",
-            "drainage_area",
-            "HUC",
-            "site_name",
-            "usgs_site_code"
-        ],
-        custom_data_labels=[
-            "Contrib. Drain. Area (sq.mi.)",
-            "Drainage Area (sq.mi.)",
-            "HUC",
-            "Site name",
-            "USGS site code"
-        ],
-        marker_color="rgba(23, 225, 189, 0.75)",
-        marker_size=10
-    )}
+            store=pl.scan_parquet("data/site_information.parquet"),
+            custom_data_columns=[
+                "contributing_drainage_area",
+                "drainage_area",
+                "HUC",
+                "site_name",
+                "usgs_site_code"
+            ],
+            custom_data_labels=[
+                "Contrib. Drain. Area (sq.mi.)",
+                "Drainage Area (sq.mi.)",
+                "HUC",
+                "Site name",
+                "USGS site code"
+            ],
+            marker_color="rgba(23, 225, 189, 0.75)",
+            marker_size=10
+        ),
+        "National Inventory of Dams": MapLayer(
+            store=pl.scan_parquet("data/NID.parquet"),
+            custom_data_columns=[
+                "name",
+                "riverName",
+                "maxStorage",
+                "normalStorage",
+                "maxDischarge",
+                "drainageArea"
+            ],
+            custom_data_labels=[
+                "Dam Name",
+                "River Name",
+                "Drainage Area (sq.mi.)",
+                "Maximum Storage (ac-ft)",
+                "Normal Storage (ac-ft)",
+                "Maximum Discharge (CFS)"
+            ],
+            marker_color="rgba(255, 141, 0, 0.75)",
+            marker_size=10
+        )
+    }
     checkbox = pn.widgets.CheckBoxGroup(
         name="Additional layers",
         options=list(extra_layers.keys()),
@@ -544,7 +566,8 @@ def main():
             # Add layer
             if k in event:
                 # Render layer
-                v.render()
+                if v.trace is None:
+                    v.render()
 
                 # Add to map
                 site_map.add_layer(k, v)
