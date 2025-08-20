@@ -19,6 +19,21 @@ class ModelDomain(StrEnum):
     hawaii = "Hawaii"
     puertorico = "Puerto Rico"
 
+class Metric(StrEnum):
+    """Metric names."""
+    nash_sutcliffe_efficiency = "Nash-Sutcliffe efficiency"
+    relative_mean_bias = "Relative mean bias"
+    pearson_correlation_coefficient = "Pearson correlation coefficient"
+    relative_mean = "Relative mean"
+    relative_standard_deviation = "Relative standard deviation"
+    kling_gupta_efficiency = "Kling-Gupta efficiency"
+
+class MetricConfidence(StrEnum):
+    """Metric value estimations (typically 95% confidence)."""
+    _point = "Point"
+    _lower = "Lower"
+    _upper = "Upper"
+
 class Coordinates(TypedDict):
     """
     TypedDict specifying a point location in WGS84 decimal coordinates.
