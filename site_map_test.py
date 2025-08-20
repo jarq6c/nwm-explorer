@@ -470,7 +470,7 @@ def main():
 
     # Layers
     layers = {
-        "metrics": MapLayer(
+        "Metrics": MapLayer(
             store=data,
             latitude_column="Latitude",
             longitude_column="Longitude",
@@ -478,42 +478,7 @@ def main():
             custom_data_columns=["USGS site code"],
             colorbar_title="Nash-Sutcliffe efficiency",
             colorbar_limits=(-1.0, 1.0)
-        )
-    }
-
-    # Setup map
-    site_map = SiteMap(layers, domains)
-
-    # Add domain selector
-    domain_selector = pn.widgets.Select(name="Domain", options=list(domains.keys()))
-    def update_domain(domain) -> None:
-        site_map.switch_domain(domain)
-        site_map.refresh()
-    pn.bind(update_domain, domain_selector.param.value, watch=True)
-
-    # Update selector when map is reset
-    def reset_selector(event) -> None:
-        domain_selector.value = site_map.default_domain
-    pn.bind(reset_selector, site_map.pane.param.doubleclick_data, watch=True)
-
-    # Metric selector
-    limits = {
-        "Nash-Sutcliffe efficiency": (-1.0, 1.0),
-        "Relative mean": (0.0, 2.0)
-    }
-    metric_selector = pn.widgets.Select(name="Metric", options=list(limits.keys()))
-    def update_metric(event) -> None:
-        site_map.update_layer(
-            "metrics",
-            color_column=event,
-            colorbar_title=event,
-            colorbar_limits=limits[event]
-        )
-        site_map.refresh()
-    pn.bind(update_metric, metric_selector.param.value, watch=True)
-
-    # Layers
-    extra_layers = {
+        ),
         "USGS streamflow gages": MapLayer(
             store=pl.scan_parquet("data/site_information.parquet"),
             custom_data_columns=[
@@ -555,14 +520,48 @@ def main():
             marker_size=10
         )
     }
+
+    # Setup map
+    site_map = SiteMap({}, domains)
+
+    # Add domain selector
+    domain_selector = pn.widgets.Select(name="Domain", options=list(domains.keys()))
+    def update_domain(domain) -> None:
+        site_map.switch_domain(domain)
+        site_map.refresh()
+    pn.bind(update_domain, domain_selector.param.value, watch=True)
+
+    # Update selector when map is reset
+    def reset_selector(event) -> None:
+        domain_selector.value = site_map.default_domain
+    pn.bind(reset_selector, site_map.pane.param.doubleclick_data, watch=True)
+
+    # Metric selector
+    limits = {
+        "Nash-Sutcliffe efficiency": (-1.0, 1.0),
+        "Relative mean": (0.0, 2.0)
+    }
+    metric_selector = pn.widgets.Select(name="Metric", options=list(limits.keys()))
+    # def update_metric(event) -> None:
+    #     site_map.update_layer(
+    #         "Metrics",
+    #         color_column=event,
+    #         colorbar_title=event,
+    #         colorbar_limits=limits[event]
+    #     )
+    #     site_map.refresh()
+    # pn.bind(update_metric, metric_selector.param.value, watch=True)
+
+    # Layers
     checkbox = pn.widgets.CheckBoxGroup(
         name="Additional layers",
-        options=list(extra_layers.keys()),
-        inline=True
+        options=list(layers.keys()),
+        inline=True,
+        value=list(layers.keys())[0:1]
     )
     def update_layers(event) -> None:
         # Check each layer
-        for k, v in extra_layers.items():
+        for k, v in layers.items():
             # Add layer
             if k in event:
                 # Render layer
@@ -581,6 +580,9 @@ def main():
         # Refresh
         site_map.refresh()
     pn.bind(update_layers, checkbox.param.value, watch=True)
+
+    # Trigger update
+    update_layers(checkbox.value)
 
     # Serve the dashboard
     pn.serve(pn.Column(site_map, domain_selector, metric_selector, checkbox))
