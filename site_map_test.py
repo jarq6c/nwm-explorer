@@ -381,6 +381,16 @@ class SiteMap(Viewer):
             self.layout = self.layouts[self.default_domain]
         pn.bind(reset_layout, self.pane.param.doubleclick_data, watch=True)
 
+        # Handle single click
+        def log_click_event(event) -> None:
+            data = event["points"][0]
+            key = list(self.layers.keys())[data["curveNumber"]]
+            custom_data = data["customdata"]
+            columns = self.layers[key].custom_data_columns
+            for col, val in zip(columns, custom_data):
+                print(f"{col}: {val}")
+        pn.bind(log_click_event, self.pane.param.click_data, watch=True)
+
     def switch_domain(self, label: str) -> None:
         """
         Change map layout to another domain.
@@ -472,15 +482,15 @@ def main():
                 "contributing_drainage_area",
                 "drainage_area",
                 "HUC",
-                "site_name",
-                "usgs_site_code"
+                "usgs_site_code",
+                "site_name"
             ],
             custom_data_labels=[
                 "Contrib. Drain. Area (sq.mi.)",
                 "Drainage Area (sq.mi.)",
                 "HUC",
-                "Site name",
-                "USGS site code"
+                "USGS site code",
+                "Site name"
             ],
             marker_color="rgba(23, 225, 189, 0.75)",
             marker_size=10
@@ -488,20 +498,20 @@ def main():
         "National Inventory of Dams": MapLayer(
             store=pl.scan_parquet("data/NID.parquet"),
             custom_data_columns=[
-                "name",
-                "riverName",
+                "drainageArea",
                 "maxStorage",
                 "normalStorage",
                 "maxDischarge",
-                "drainageArea"
+                "name",
+                "riverName"
             ],
             custom_data_labels=[
-                "Dam Name",
-                "River Name",
                 "Drainage Area (sq.mi.)",
                 "Maximum Storage (ac-ft)",
                 "Normal Storage (ac-ft)",
-                "Maximum Discharge (CFS)"
+                "Maximum Discharge (CFS)",
+                "Dam Name",
+                "River Name"
             ],
             marker_color="rgba(255, 141, 0, 0.75)",
             marker_size=10
