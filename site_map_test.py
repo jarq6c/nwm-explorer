@@ -382,13 +382,15 @@ class SiteMap(Viewer):
         pn.bind(reset_layout, self.pane.param.doubleclick_data, watch=True)
 
         # Handle single click
+        self.click_data = None
         def log_click_event(event) -> None:
             data = event["points"][0]
             key = list(self.layers.keys())[data["curveNumber"]]
             custom_data = data["customdata"]
             columns = self.layers[key].custom_data_columns
-            for col, val in zip(columns, custom_data):
-                print(f"{col}: {val}")
+            self.click_data = {col: val for col, val in zip(columns, custom_data)}
+            self.click_data["layer"] = key
+            print(self.click_data)
         pn.bind(log_click_event, self.pane.param.click_data, watch=True)
 
     def switch_domain(self, label: str) -> None:
