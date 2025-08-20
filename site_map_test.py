@@ -82,7 +82,7 @@ def generate_domain_view(label: str, focus: MapFocus) -> DomainView:
                 style="satellite-streets",
                 **focus
             ),
-            clickmode="event",
+            clickmode="event+select",
             modebar=dict(
                 remove=["lasso", "select", "resetview"],
                 orientation="v"
