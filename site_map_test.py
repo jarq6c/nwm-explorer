@@ -465,6 +465,7 @@ class SiteMap(Viewer):
         super().__init__(**params)
 
         # Data
+        self._stub_layer = go.Scattermap()
         self.layers = layers
 
         # Layouts
@@ -541,7 +542,7 @@ class SiteMap(Viewer):
         """
         # Check for layers
         if not self.layers:
-            data = [go.Scattermap()]
+            data = [self._stub_layer]
         else:
             data = [v.trace for v in self.layers.values()]
 
