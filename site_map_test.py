@@ -539,8 +539,15 @@ class SiteMap(Viewer):
         """
         Send current state of data and layout to frontend.
         """
+        # Check for layers
+        if not self.layers:
+            data = [go.Scattermap()]
+        else:
+            data = [v.trace for v in self.layers.values()]
+
+        # Update view
         self.pane.object = {
-            "data": [v.trace for v in self.layers.values()],
+            "data": data,
             "layout": self.layout
         }
 
