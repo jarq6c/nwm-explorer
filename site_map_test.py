@@ -84,11 +84,6 @@ class MetricConfidence(StrEnum):
     _lower = "Lower"
     _upper = "Upper"
 
-class CallbackType(Enum):
-    """Callback types."""
-    metric_update = auto()
-    confidence_update = auto()
-
 class Coordinates(TypedDict):
     """
     TypedDict specifying a point location in WGS84 decimal coordinates.
@@ -577,6 +572,20 @@ METRIC_PLOTTING_LIMITS: dict[Metric, tuple[float, float]] = {
 }
 """Mapping from Metrics to plotting limits (cmin, cmax)."""
 
+def update_domain(domain: str, site_map: SiteMap) -> None:
+    """
+    Callback function use to update the map view.
+    
+    Parameters
+    ----------
+    domain: str
+        Domain key used to reference layout by SiteMap.
+    site_map: SiteMap
+        Instance of SiteMap to update.
+    """
+    site_map.switch_domain(domain)
+    site_map.refresh()
+
 def main():
     # Data and geometry
     geometry = pl.scan_parquet("data/parquet/conus/routelink.parquet").select(
@@ -648,10 +657,8 @@ def main():
 
     # Add domain selector
     domain_selector = pn.widgets.Select(name="Domain", options=list(DOMAIN_VIEWS.keys()))
-    def update_domain(domain) -> None:
-        site_map.switch_domain(domain)
-        site_map.refresh()
-    pn.bind(update_domain, domain_selector.param.value, watch=True)
+    pn.bind(update_domain, domain_selector.param.value, watch=True,
+        site_map=site_map)
 
     # Update selector when map is reset
     def reset_selector(event) -> None:
