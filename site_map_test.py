@@ -227,7 +227,7 @@ class MapLayer:
             warnings.warn("Overwriting layer", RuntimeWarning)
         
         # Hover template
-        hover_template = "Longitude: %{lon}<br>Latitude: %{lat}"
+        hover_template = ""
 
         # Set columns
         columns = [
@@ -236,6 +236,12 @@ class MapLayer:
         ]
         if self.size_column:
             columns.append(self.size_column)
+        if self.color_column:
+            columns.append(self.color_column)
+            hover_template += (
+                f"{self.colorbar_title}: "
+                "%{marker.color:.2f}<br>"
+                )
         if self.custom_data_columns:
             columns += self.custom_data_columns
             for idx, c in enumerate(self.custom_data_columns):
@@ -243,13 +249,8 @@ class MapLayer:
                     l = self.custom_data_labels[idx]
                 else:
                     l = c
-                hover_template = f"{l}: " +  "%{customdata[" + str(idx) + "]}<br>" + hover_template
-        if self.color_column:
-            columns.append(self.color_column)
-            hover_template = (
-                f"{self.colorbar_title}: "
-                "%{marker.color:.2f}<br>" + hover_template
-                )
+                hover_template += f"{l}: " +  "%{customdata[" + str(idx) + "]}<br>"
+        hover_template += "Longitude: %{lon}<br>Latitude: %{lat}"
 
         # Load data
         data = self.store.select(columns).collect()
@@ -394,11 +395,16 @@ class MapLayer:
             data = self.store.select(columns).collect()
 
         # Build update
+        hover_template = ""
         if latitude_column:
             self._trace.update({"lat": data[latitude_column]})
         if longitude_column:
             self._trace.update({"lon": data[longitude_column]})
         if color_column:
+            hover_template += (
+                f"{self.colorbar_title}: "
+                "%{marker.color:.2f}<br>"
+                )
             self._trace["marker"].update({"color": data[color_column]})
         if size_column:
             self._trace["marker"].update({"size": data[size_column]})
@@ -419,21 +425,15 @@ class MapLayer:
             self._trace["marker"].update({"cmax": colorbar_limits[1]})
 
         # Hover template
-        hover_template = "Longitude: %{lon}<br>Latitude: %{lat}"
         if self.custom_data_columns:
-            columns += self.custom_data_columns
             for idx, c in enumerate(self.custom_data_columns):
                 if self.custom_data_labels:
                     l = self.custom_data_labels[idx]
                 else:
                     l = c
-                hover_template = f"{l}: " +  "%{customdata[" + str(idx) + "]}<br>" + hover_template
-        if self.color_column:
-            columns.append(self.color_column)
-            hover_template = (
-                f"{self.colorbar_title}: "
-                "%{marker.color:.2f}<br>" + hover_template
-                )
+                print(l)
+                hover_template += f"{l}: " +  "%{customdata[" + str(idx) + "]}<br>"
+        hover_template += "Longitude: %{lon}<br>Latitude: %{lat}"
 
         # Update hover template
         self._trace["hovertemplate"] = hover_template
@@ -596,18 +596,19 @@ def main():
     initial_column = list(Metric)[0].name + list(MetricConfidence)[0].name
 
     # Setup map
+    metrics_key = "Metrics"
     site_map = SiteMap(
         layers={
-            "Metrics": MapLayer(
+            metrics_key: MapLayer(
                 store=data,
                 color_column=initial_column,
                 custom_data_columns=[
-                    "nwm_feature_id",
-                    "usgs_site_code"
+                    "usgs_site_code",
+                    "nwm_feature_id"
                 ],
                 custom_data_labels=[
-                    "NWM feature ID",
-                    "USGS site code"
+                    "USGS site code",
+                    "NWM feature ID"
                 ],
                 colorbar_title=list(Metric)[0],
                 colorbar_limits=(-1.0, 1.0)
@@ -615,18 +616,18 @@ def main():
             "USGS streamflow gages": MapLayer(
                 store=pl.scan_parquet("data/site_information.parquet"),
                 custom_data_columns=[
-                    "contributing_drainage_area",
-                    "drainage_area",
-                    "HUC",
+                    "site_name",
                     "usgs_site_code",
-                    "site_name"
+                    "HUC",
+                    "drainage_area",
+                    "contributing_drainage_area"
                 ],
                 custom_data_labels=[
-                    "Contrib. Drain. Area (sq.mi.)",
-                    "Drainage Area (sq.mi.)",
-                    "HUC",
+                    "Site name",
                     "USGS site code",
-                    "Site name"
+                    "HUC",
+                    "Drainage Area (sq.mi.)",
+                    "Contrib. Drain. Area (sq.mi.)"
                 ],
                 marker_color="rgba(23, 225, 189, 0.75)",
                 marker_size=10
@@ -634,20 +635,20 @@ def main():
             "National Inventory of Dams": MapLayer(
                 store=pl.scan_parquet("data/NID.parquet"),
                 custom_data_columns=[
-                    "drainageArea",
-                    "maxStorage",
-                    "normalStorage",
-                    "maxDischarge",
+                    "riverName",
                     "name",
-                    "riverName"
+                    "maxDischarge",
+                    "normalStorage",
+                    "maxStorage",
+                    "drainageArea"
                 ],
                 custom_data_labels=[
-                    "Drainage Area (sq.mi.)",
-                    "Maximum Storage (ac-ft)",
-                    "Normal Storage (ac-ft)",
-                    "Maximum Discharge (CFS)",
+                    "River Name",
                     "Dam Name",
-                    "River Name"
+                    "Maximum Discharge (CFS)",
+                    "Normal Storage (ac-ft)",
+                    "Maximum Storage (ac-ft)",
+                    "Drainage Area (sq.mi.)"
                 ],
                 marker_color="rgba(255, 141, 0, 0.75)",
                 marker_size=10
@@ -657,7 +658,7 @@ def main():
     )
 
     # Metric selector
-    metric_selector = pn.widgets.Select(name="Metric", options=list(Metric))
+    metric_selector = pn.widgets.Select(name=metrics_key, options=list(Metric))
     confidence_selector = pn.widgets.Select(name="95% confidence interval", options=list(MetricConfidence))
     def update_metric(metric: str, confidence: str) -> None:
         # Set column
@@ -665,14 +666,14 @@ def main():
         column = m.name + MetricConfidence(confidence).name
 
         # Update rendered layer
-        site_map.layers["Metrics"].update(
+        site_map.layers[metrics_key].update(
             color_column=column,
             colorbar_title=m,
             colorbar_limits=METRIC_PLOTTING_LIMITS[m]
         )
-        
+
         # Update map
-        if site_map.layers["Metrics"].trace is not None:
+        if site_map.layers[metrics_key].trace is not None:
             site_map.refresh()
     pn.bind(update_metric, metric=metric_selector.param.value,
         confidence=confidence_selector.param.value, watch=True)
