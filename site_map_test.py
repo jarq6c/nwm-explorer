@@ -442,11 +442,12 @@ class SiteMap(Viewer):
     Parameters
     ----------
     layers: dict[str, MapLayer]
-        Dict of MapLayer keyed to labels.
+        Dict of MapLayer keyed to hashable labels for each layer.
     domains: dict[str, MapFocus]
-        Dict of MapFocus keyed to labels.
+        Dict of MapFocus keyed to hashable labels for each focus area.
     default_domain: str, optional
-        Sets default domain returned to when resetting map.
+        Sets default domain returned to when resetting map. Defaults to the
+        first key in domains.
     params: any
         Additional keyword arguments passed to panel.viewable.Viewer.
     """
@@ -476,13 +477,40 @@ class SiteMap(Viewer):
 
         # Main figure (map)
         self.pane = pn.pane.Plotly({
-            "data": [v.render() for v in self.layers.values()],
+            "data": [list(layers.values())[0].render()],
             "layout": self.layout
         })
+
+        # Widgets
+        self.domain_selector = pn.widgets.Select(name="Domain",
+            options=list(domains.keys()))
+        self.layer_selector = pn.widgets.CheckBoxGroup(
+            name="Layers",
+            options=list(layers.keys()),
+            value=list(layers.keys())[0:1]
+        )
+
+        # Add/Remove layers
+        def update_layers(layer_keys: list[str]) -> None:
+            for k, v in self.layers.items():
+                if k in layer_keys:
+                    if v.trace is None:
+                        v.render()
+                else:
+                    v.clear()
+            self.refresh()
+        pn.bind(update_layers, self.layer_selector.param.value, watch=True)
+
+        # Switch domain view
+        def switch_domain(domain: str) -> None:
+            self.layout = self.layouts[domain]
+            self.refresh()
+        pn.bind(switch_domain, self.domain_selector.param.value, watch=True)
 
         # Handle double click
         def reset_layout(event) -> None:
             self.layout = self.layouts[self.default_domain]
+            self.domain_selector.value = self.default_domain
         pn.bind(reset_layout, self.pane.param.doubleclick_data, watch=True)
 
         # Handle single click
@@ -496,50 +524,14 @@ class SiteMap(Viewer):
             self.click_data["layer"] = key
         pn.bind(log_click_event, self.pane.param.click_data, watch=True)
 
-    def switch_domain(self, label: str) -> None:
-        """
-        Change map layout to another domain.
-
-        Parameters
-        ----------
-        label: str
-            DomainView label.
-        """
-        self.layout = self.layouts[label]
-    
-    def set_layer(self, layer_label: str, layer: MapLayer) -> None:
-        """
-        Add map layer.
-
-        Parameters
-        ----------
-        layer_label: str
-            Layer key.
-        layer: MapLayer
-            MapLayer object.
-        """
-        self.layers[layer_label] = layer
-    
-    def remove_layer(self, layer_label: str) -> MapLayer | None:
-        """
-        Remove map layer.
-
-        Parameters
-        ----------
-        layer_label: str
-            Layer key.
-        """
-        return self.layers.pop(layer_label, None)
-
     def refresh(self) -> None:
         """
         Send current state of data and layout to frontend.
         """
         # Check for layers
-        if not self.layers:
+        data = [v.trace for v in self.layers.values() if v.trace]
+        if not data:
             data = [self._stub_layer]
-        else:
-            data = [v.trace for v in self.layers.values()]
 
         # Update view
         self.pane.object = {
@@ -571,20 +563,6 @@ METRIC_PLOTTING_LIMITS: dict[Metric, tuple[float, float]] = {
     Metric.kling_gupta_efficiency: (-1.0, 1.0)
 }
 """Mapping from Metrics to plotting limits (cmin, cmax)."""
-
-def update_domain(domain: str, site_map: SiteMap) -> None:
-    """
-    Callback function use to update the map view.
-    
-    Parameters
-    ----------
-    domain: str
-        Domain key used to reference layout by SiteMap.
-    site_map: SiteMap
-        Instance of SiteMap to update.
-    """
-    site_map.switch_domain(domain)
-    site_map.refresh()
 
 def main():
     # Data and geometry
@@ -653,100 +631,58 @@ def main():
     }
 
     # Setup map
-    site_map = SiteMap({}, DOMAIN_VIEWS)
-
-    # Add domain selector
-    domain_selector = pn.widgets.Select(name="Domain", options=list(DOMAIN_VIEWS.keys()))
-    pn.bind(update_domain, domain_selector.param.value, watch=True,
-        site_map=site_map)
-
-    # Update selector when map is reset
-    def reset_selector(event) -> None:
-        domain_selector.value = site_map.default_domain
-    pn.bind(reset_selector, site_map.pane.param.doubleclick_data, watch=True)
+    site_map = SiteMap(layers, DOMAIN_VIEWS)
 
     # Metric selector
     metric_selector = pn.widgets.Select(name="Metric", options=list(Metric))
     confidence_selector = pn.widgets.Select(name="Metric", options=list(MetricConfidence))
-    def update_metric(event, callback_type: CallbackType) -> None:
-        # Set metric
-        if callback_type == CallbackType.metric_update:
-            m = Metric(event)
-        else:
-            m = Metric(metric_selector.value)
+    # def update_metric(event, callback_type: CallbackType) -> None:
+    #     # Set metric
+    #     if callback_type == CallbackType.metric_update:
+    #         m = Metric(event)
+    #     else:
+    #         m = Metric(metric_selector.value)
 
-        # Set confidence estimate
-        if callback_type == CallbackType.confidence_update:
-            c = MetricConfidence(event)
-        else:
-            c = MetricConfidence(confidence_selector.value)
+    #     # Set confidence estimate
+    #     if callback_type == CallbackType.confidence_update:
+    #         c = MetricConfidence(event)
+    #     else:
+    #         c = MetricConfidence(confidence_selector.value)
         
-        # Set column
-        column = m.name + c.name
+    #     # Set column
+    #     column = m.name + c.name
         
-        # Update map
-        if layers["Metrics"].trace is None:
-            # Update pre-render parameters
-            layers["Metrics"].color_column = column
-            layers["Metrics"].colorbar_title = m
-            layers["Metrics"].colorbar_limits = METRIC_PLOTTING_LIMITS[m]
-            return
-        else:
-            # Update rendered layer
-            layers["Metrics"].update(
-                color_column=column,
-                colorbar_title=m,
-                colorbar_limits=METRIC_PLOTTING_LIMITS[m]
-            )
+    #     # Update map
+    #     if layers["Metrics"].trace is None:
+    #         # Update pre-render parameters
+    #         layers["Metrics"].color_column = column
+    #         layers["Metrics"].colorbar_title = m
+    #         layers["Metrics"].colorbar_limits = METRIC_PLOTTING_LIMITS[m]
+    #         return
+    #     else:
+    #         # Update rendered layer
+    #         layers["Metrics"].update(
+    #             color_column=column,
+    #             colorbar_title=m,
+    #             colorbar_limits=METRIC_PLOTTING_LIMITS[m]
+    #         )
 
-        if "Metrics" in site_map.layers:
-            # Refresh site map
-            site_map.set_layer("Metrics", layers["Metrics"])
-            site_map.refresh()
-    pn.bind(update_metric, metric_selector.param.value, watch=True,
-        callback_type=CallbackType.metric_update)
-    pn.bind(update_metric, confidence_selector.param.value, watch=True,
-        callback_type=CallbackType.confidence_update)
-
-    # Layers
-    checkbox = pn.widgets.CheckBoxGroup(
-        name="Additional layers",
-        options=list(layers.keys()),
-        inline=True,
-        value=list(layers.keys())[0:1]
-    )
-    def update_layers(event) -> None:
-        # Check each layer
-        for k, v in layers.items():
-            # Add layer
-            if k in event:
-                # Render layer
-                if v.trace is None:
-                    v.render()
-
-                # Add to map
-                site_map.set_layer(k, v)
-            else:
-                # Remove from map
-                site_map.remove_layer(k)
-
-                # Clear layer
-                v.clear()
-        
-        # Refresh
-        site_map.refresh()
-    pn.bind(update_layers, checkbox.param.value, watch=True)
-
-    # Trigger update
-    update_layers(checkbox.value)
+    #     if "Metrics" in site_map.layers:
+    #         # Refresh site map
+    #         site_map.set_layer("Metrics", layers["Metrics"])
+    #         site_map.refresh()
+    # pn.bind(update_metric, metric_selector.param.value, watch=True,
+    #     callback_type=CallbackType.metric_update)
+    # pn.bind(update_metric, confidence_selector.param.value, watch=True,
+    #     callback_type=CallbackType.confidence_update)
 
     # Serve the dashboard
     pn.serve(pn.Column(
         site_map,
-        domain_selector,
+        site_map.domain_selector,
         metric_selector,
         confidence_selector,
-        checkbox
+        site_map.layer_selector
         ))
 
 if __name__ == "__main__":
