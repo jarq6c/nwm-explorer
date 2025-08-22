@@ -4,7 +4,7 @@ An interactive mapping interface.
 from typing import TypedDict
 from dataclasses import dataclass, field
 import warnings
-from enum import StrEnum, Enum, auto
+from enum import StrEnum
 
 import polars as pl
 import panel as pn
@@ -571,110 +571,95 @@ def main():
     data = pl.scan_parquet("data/parquet/conus/evaluations/analysis_assim_extend_no_da_20231001_20231003.parquet").join(
         geometry, on="nwm_feature_id", how="left")
 
-    # Layers
+    # Initial metric layer
     initial_column = list(Metric)[0].name + list(MetricConfidence)[0].name
-    layers = {
-        "Metrics": MapLayer(
-            store=data,
-            color_column=initial_column,
-            custom_data_columns=[
-                "nwm_feature_id",
-                "usgs_site_code"
-            ],
-            custom_data_labels=[
-                "NWM feature ID",
-                "USGS site code"
-            ],
-            colorbar_title=list(Metric)[0],
-            colorbar_limits=(-1.0, 1.0)
-        ),
-        "USGS streamflow gages": MapLayer(
-            store=pl.scan_parquet("data/site_information.parquet"),
-            custom_data_columns=[
-                "contributing_drainage_area",
-                "drainage_area",
-                "HUC",
-                "usgs_site_code",
-                "site_name"
-            ],
-            custom_data_labels=[
-                "Contrib. Drain. Area (sq.mi.)",
-                "Drainage Area (sq.mi.)",
-                "HUC",
-                "USGS site code",
-                "Site name"
-            ],
-            marker_color="rgba(23, 225, 189, 0.75)",
-            marker_size=10
-        ),
-        "National Inventory of Dams": MapLayer(
-            store=pl.scan_parquet("data/NID.parquet"),
-            custom_data_columns=[
-                "drainageArea",
-                "maxStorage",
-                "normalStorage",
-                "maxDischarge",
-                "name",
-                "riverName"
-            ],
-            custom_data_labels=[
-                "Drainage Area (sq.mi.)",
-                "Maximum Storage (ac-ft)",
-                "Normal Storage (ac-ft)",
-                "Maximum Discharge (CFS)",
-                "Dam Name",
-                "River Name"
-            ],
-            marker_color="rgba(255, 141, 0, 0.75)",
-            marker_size=10
-        )
-    }
 
     # Setup map
-    site_map = SiteMap(layers, DOMAIN_VIEWS)
+    site_map = SiteMap(
+        layers={
+            "Metrics": MapLayer(
+                store=data,
+                color_column=initial_column,
+                custom_data_columns=[
+                    "nwm_feature_id",
+                    "usgs_site_code"
+                ],
+                custom_data_labels=[
+                    "NWM feature ID",
+                    "USGS site code"
+                ],
+                colorbar_title=list(Metric)[0],
+                colorbar_limits=(-1.0, 1.0)
+            ),
+            "USGS streamflow gages": MapLayer(
+                store=pl.scan_parquet("data/site_information.parquet"),
+                custom_data_columns=[
+                    "contributing_drainage_area",
+                    "drainage_area",
+                    "HUC",
+                    "usgs_site_code",
+                    "site_name"
+                ],
+                custom_data_labels=[
+                    "Contrib. Drain. Area (sq.mi.)",
+                    "Drainage Area (sq.mi.)",
+                    "HUC",
+                    "USGS site code",
+                    "Site name"
+                ],
+                marker_color="rgba(23, 225, 189, 0.75)",
+                marker_size=10
+            ),
+            "National Inventory of Dams": MapLayer(
+                store=pl.scan_parquet("data/NID.parquet"),
+                custom_data_columns=[
+                    "drainageArea",
+                    "maxStorage",
+                    "normalStorage",
+                    "maxDischarge",
+                    "name",
+                    "riverName"
+                ],
+                custom_data_labels=[
+                    "Drainage Area (sq.mi.)",
+                    "Maximum Storage (ac-ft)",
+                    "Normal Storage (ac-ft)",
+                    "Maximum Discharge (CFS)",
+                    "Dam Name",
+                    "River Name"
+                ],
+                marker_color="rgba(255, 141, 0, 0.75)",
+                marker_size=10
+            )
+        },
+        domains=DOMAIN_VIEWS
+    )
 
     # Metric selector
     metric_selector = pn.widgets.Select(name="Metric", options=list(Metric))
     confidence_selector = pn.widgets.Select(name="Metric", options=list(MetricConfidence))
-    # def update_metric(event, callback_type: CallbackType) -> None:
-    #     # Set metric
-    #     if callback_type == CallbackType.metric_update:
-    #         m = Metric(event)
-    #     else:
-    #         m = Metric(metric_selector.value)
-
-    #     # Set confidence estimate
-    #     if callback_type == CallbackType.confidence_update:
-    #         c = MetricConfidence(event)
-    #     else:
-    #         c = MetricConfidence(confidence_selector.value)
+    def update_metric(metric: str, confidence: str) -> None:
+        # Set column
+        m = Metric(metric)
+        column = m.name + MetricConfidence(confidence).name
         
-    #     # Set column
-    #     column = m.name + c.name
-        
-    #     # Update map
-    #     if layers["Metrics"].trace is None:
-    #         # Update pre-render parameters
-    #         layers["Metrics"].color_column = column
-    #         layers["Metrics"].colorbar_title = m
-    #         layers["Metrics"].colorbar_limits = METRIC_PLOTTING_LIMITS[m]
-    #         return
-    #     else:
-    #         # Update rendered layer
-    #         layers["Metrics"].update(
-    #             color_column=column,
-    #             colorbar_title=m,
-    #             colorbar_limits=METRIC_PLOTTING_LIMITS[m]
-    #         )
-
-    #     if "Metrics" in site_map.layers:
-    #         # Refresh site map
-    #         site_map.set_layer("Metrics", layers["Metrics"])
-    #         site_map.refresh()
-    # pn.bind(update_metric, metric_selector.param.value, watch=True,
-    #     callback_type=CallbackType.metric_update)
-    # pn.bind(update_metric, confidence_selector.param.value, watch=True,
-    #     callback_type=CallbackType.confidence_update)
+        # Update map
+        if site_map.layers["Metrics"].trace is None:
+            # Update pre-render parameters
+            site_map.layers["Metrics"].color_column = column
+            site_map.layers["Metrics"].colorbar_title = m
+            site_map.layers["Metrics"].colorbar_limits = METRIC_PLOTTING_LIMITS[m]
+            return
+        else:
+            # Update rendered layer
+            site_map.layers["Metrics"].update(
+                color_column=column,
+                colorbar_title=m,
+                colorbar_limits=METRIC_PLOTTING_LIMITS[m]
+            )
+        site_map.refresh()
+    pn.bind(update_metric, metric=metric_selector.param.value,
+        confidence=confidence_selector.param.value, watch=True)
 
     # Serve the dashboard
     pn.serve(pn.Column(
