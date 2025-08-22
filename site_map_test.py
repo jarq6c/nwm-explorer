@@ -301,11 +301,13 @@ class MapLayer:
         return self._trace
 
     def update(
-            self, 
+            self,
+            store: pl.LazyFrame | None = None,
             latitude_column: str | None = None,
             longitude_column: str | None = None,
             color_column: str | None = None,
             custom_data_columns: list[str] | None = None,
+            custom_data_labels: list[str] | None = None,
             size_column: str | None = None,
             color_scale: list[str] | None = None,
             marker_size: float | None = None,
@@ -319,6 +321,8 @@ class MapLayer:
     
         Parameters
         ----------
+        store: pl.LazyFrame, optional
+            Polars LazyFrame pointing at data to plot.
         latitude_column: str, optional
             Column in data to use as latitude.
         longitude_column: str, optional
@@ -327,6 +331,8 @@ class MapLayer:
             Column in data used to color markers.
         custom_data_columns: list[str], optional
             Columns in data to display on hover.
+        custom_data_labels: list[str], optional
+            Labels to use with custom data on hover.
         size_column: str, optional
             Column in data used to set marker size.
         color_scale: list[str], optional
@@ -335,15 +341,14 @@ class MapLayer:
             Marker size used for uniform sizing.
         marker_color: str, optional
             Marker color used for uniform color.
+        marker_symbol: str, optional
+            Marker symbol used for uniform symbols. Currently, plotly maps only
+            support 'circle'.
         colorbar_title: str, optional
             Title to display next to colorbar.
         colorbar_limits: tuple[float, float], optional
             Colorbar range.
         """
-        # Check for trace
-        if self._trace is None:
-            raise RuntimeError("Cannot update unrendered layer")
-
         # Set columns
         columns = []
         if latitude_column:
@@ -362,6 +367,28 @@ class MapLayer:
             self.custom_data_columns = custom_data_columns
             columns += custom_data_columns
 
+        # Additional attributes
+        if store:
+            self.store = store
+        if custom_data_labels:
+            self.custom_data_labels = custom_data_labels
+        if color_scale:
+            self.color_scale = color_scale
+        if marker_size:
+            self.marker_size = marker_size
+        if marker_color:
+            self.marker_color = marker_color
+        if marker_symbol:
+            self.marker_symbol = marker_symbol
+        if colorbar_title:
+            self.colorbar_title = colorbar_title
+        if colorbar_limits:
+            self.colorbar_limits = colorbar_limits
+
+        # Check for trace
+        if self._trace is None:
+            return
+
         # Load data
         if columns:
             data = self.store.select(columns).collect()
@@ -378,25 +405,19 @@ class MapLayer:
         if custom_data_columns:
             self._trace.update({"customdata": data[custom_data_columns]})
         if color_scale:
-            self.color_scale = color_scale
             self._trace["marker"].update({"colorscale": color_scale})
         if marker_size:
-            self.marker_size = marker_size
             self._trace["marker"].update({"size": marker_size})
         if marker_color:
-            self.marker_color = marker_color
             self._trace["marker"].update({"color": marker_color})
         if marker_symbol:
-            self.marker_symbol = marker_symbol
             self._trace["marker"].update({"symbol": marker_symbol})
         if colorbar_title:
-            self.colorbar_title = colorbar_title
             self._trace["marker"]["colorbar"]["title"]["text"] = colorbar_title
         if colorbar_limits:
-            self.colorbar_limits = colorbar_limits
             self._trace["marker"].update({"cmin": colorbar_limits[0]})
             self._trace["marker"].update({"cmax": colorbar_limits[1]})
-        
+
         # Hover template
         hover_template = "Longitude: %{lon}<br>Latitude: %{lat}"
         if self.custom_data_columns:
@@ -413,7 +434,7 @@ class MapLayer:
                 f"{self.colorbar_title}: "
                 "%{marker.color:.2f}<br>" + hover_template
                 )
-        
+
         # Update hover template
         self._trace["hovertemplate"] = hover_template
 
@@ -637,27 +658,22 @@ def main():
 
     # Metric selector
     metric_selector = pn.widgets.Select(name="Metric", options=list(Metric))
-    confidence_selector = pn.widgets.Select(name="Metric", options=list(MetricConfidence))
+    confidence_selector = pn.widgets.Select(name="95% confidence interval", options=list(MetricConfidence))
     def update_metric(metric: str, confidence: str) -> None:
         # Set column
         m = Metric(metric)
         column = m.name + MetricConfidence(confidence).name
+
+        # Update rendered layer
+        site_map.layers["Metrics"].update(
+            color_column=column,
+            colorbar_title=m,
+            colorbar_limits=METRIC_PLOTTING_LIMITS[m]
+        )
         
         # Update map
-        if site_map.layers["Metrics"].trace is None:
-            # Update pre-render parameters
-            site_map.layers["Metrics"].color_column = column
-            site_map.layers["Metrics"].colorbar_title = m
-            site_map.layers["Metrics"].colorbar_limits = METRIC_PLOTTING_LIMITS[m]
-            return
-        else:
-            # Update rendered layer
-            site_map.layers["Metrics"].update(
-                color_column=column,
-                colorbar_title=m,
-                colorbar_limits=METRIC_PLOTTING_LIMITS[m]
-            )
-        site_map.refresh()
+        if site_map.layers["Metrics"].trace is not None:
+            site_map.refresh()
     pn.bind(update_metric, metric=metric_selector.param.value,
         confidence=confidence_selector.param.value, watch=True)
 
