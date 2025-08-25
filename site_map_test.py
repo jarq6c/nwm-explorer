@@ -649,23 +649,38 @@ class EditablePlayer(Viewer):
 
     def __panel__(self) -> pn.pane.Placeholder:
         return self._container
-    
-    @property
-    def options(self) -> list[Any]:
-        return self._container.object.options
-    
-    @options.setter
-    def options(self, values: list[Any]) -> None:
-        v = self._container.object.value
-        self.update({
-            "options": values,
-            "value": v if v in values else values[0]
-        })
 
     def update(self, **params) -> None:
-        """Use this method to update underlying parameters of DiscretePlayer."""
+        """
+        Use this method to update underlying parameters of DiscretePlayer.
+        """
+        # Handle options
+        if ("options" in params) and ("value" not in params):
+            values = params["options"]
+            v = self._container.object.value
+            self._params.update({"value": v if v in values else values[0]})
+
+        # Apply remaining updates
         self._params.update(params)
+
+        # Refresh widget
         self._container.object = pn.widgets.DiscretePlayer(**self._params)
+
+LEAD_TIME_VALUES: dict[ModelConfiguration, list[int]] = {
+    ModelConfiguration.medium_range_mem1: [l for l in range(0, 240, 24)],
+    ModelConfiguration.medium_range_blend: [l for l in range(0, 240, 24)],
+    ModelConfiguration.medium_range_no_da: [l for l in range(0, 240, 24)],
+    ModelConfiguration.medium_range_alaska_mem1: [l for l in range(0, 240, 24)],
+    ModelConfiguration.medium_range_blend_alaska: [l for l in range(0, 240, 24)],
+    ModelConfiguration.medium_range_alaska_no_da: [l for l in range(0, 240, 24)],
+    ModelConfiguration.short_range: [l for l in range(0, 18, 6)],
+    ModelConfiguration.short_range_alaska: [l for l in range(0, 45, 5)],
+    ModelConfiguration.short_range_hawaii: [l for l in range(0, 48, 6)],
+    ModelConfiguration.short_range_hawaii_no_da: [l for l in range(0, 48, 6)],
+    ModelConfiguration.short_range_puertorico: [l for l in range(0, 48, 6)],
+    ModelConfiguration.short_range_puertorico_no_da: [l for l in range(0, 48, 6)]
+}
+"""Mapping from model ModelConfiguration enums to lists of lead time integers (hours)."""
 
 def main(root: Path = Path("./data")):
     # Setup registry
@@ -692,17 +707,12 @@ def main(root: Path = Path("./data")):
         options=list(
         DOMAIN_CONFIGURATIONS[default_domain].keys()
         ))
-    lead_time_selector = EditablePlayer(
-        name="Minimum lead time (hours)",
-        options=[i for i in range(10)],
-        show_loop_controls=False,
-        visible_buttons=["previous", "next"],
-        width=300,
-        value=0
-    )
-    lead_time_selector.options = [1, 2, 3]
     evaluation = evaluation_registry.evaluations[evaluation_selector.value]
     configuration = DOMAIN_CONFIGURATIONS[default_domain][configuration_selector.value]
+    if configuration in LEAD_TIME_VALUES:
+        lead_time_options = LEAD_TIME_VALUES[configuration]
+    else:
+        lead_time_options = [0]
 
     # Data and geometry
     geometry_file = root / "parquet" / default_domain.name / "routelink.parquet"
@@ -784,6 +794,24 @@ def main(root: Path = Path("./data")):
             DOMAIN_CONFIGURATIONS[domain].keys()
         )
     site_map.register_domain_callback(update_configurations)
+
+    # Lead times
+    lead_time_selector = EditablePlayer(
+        name="Minimum lead time (hours)",
+        options=lead_time_options,
+        show_loop_controls=False,
+        visible_buttons=["previous", "next"],
+        width=300,
+        value=lead_time_options[0]
+    )
+    def update_lead_times(configuration_selection: str) -> None:
+        configuration = DOMAIN_CONFIGURATIONS[site_map.domain][configuration_selection]
+        if configuration in LEAD_TIME_VALUES:
+            lead_time_options = LEAD_TIME_VALUES[configuration]
+        else:
+            lead_time_options = [0]
+        lead_time_selector.update(options=lead_time_options)
+    pn.bind(update_lead_times, configuration_selector.param.value, watch=True)
 
     # Metric selector
     metric_selector = pn.widgets.Select(name=metrics_key, options=list(Metric))
