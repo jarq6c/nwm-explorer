@@ -634,10 +634,20 @@ def main(root: Path = Path("./data")):
         ]
     )
 
+    # Initialize state
+    default_domain = ModelDomain.conus
+    configuration_selector = pn.widgets.Select(
+        name="Model Configuration",
+        options=list(
+        DOMAIN_CONFIGURATIONS[default_domain].keys()
+        ))
+    evaluation = evaluation_registry.evaluations[evaluation_selector.value]
+    configuration = DOMAIN_CONFIGURATIONS[default_domain][configuration_selector.value]
+
     # Data and geometry
     geometry = pl.scan_parquet("data/parquet/conus/routelink.parquet").select(
         ["nwm_feature_id", "latitude", "longitude"])
-    data = pl.scan_parquet("data/parquet/conus/evaluations/analysis_assim_extend_no_da_20231001_20231003.parquet").join(
+    data = pl.scan_parquet(evaluation.files[default_domain][configuration]).join(
         geometry, on="nwm_feature_id", how="left")
 
     # Initial metric layer
@@ -705,16 +715,11 @@ def main(root: Path = Path("./data")):
         domains=DOMAIN_VIEWS
     )
 
-    # Configuration selector
-    configuration_filter = pn.widgets.Select(
-        name="Model Configuration",
-        options=list(
-        DOMAIN_CONFIGURATIONS[site_map.domain].keys()
-        ))
+    # Update configurations
     def update_configurations(domain):
         if domain is None:
             return
-        configuration_filter.options = list(
+        configuration_selector.options = list(
             DOMAIN_CONFIGURATIONS[domain].keys()
         )
     site_map.register_domain_callback(update_configurations)
@@ -745,7 +750,7 @@ def main(root: Path = Path("./data")):
         site_map,
         evaluation_selector,
         site_map.domain_selector,
-        configuration_filter,
+        configuration_selector,
         metric_selector,
         confidence_selector,
         site_map.layer_selector
