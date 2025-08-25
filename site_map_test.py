@@ -5,12 +5,16 @@ from typing import TypedDict
 from dataclasses import dataclass, field
 import warnings
 from enum import StrEnum
+from pathlib import Path
+from datetime import datetime
+from collections.abc import Callable
 
 import polars as pl
 import panel as pn
 from panel.viewable import Viewer
 import plotly.graph_objects as go
 import colorcet as cc
+from pydantic import BaseModel
 
 class ModelDomain(StrEnum):
     """National Water Model domains."""
@@ -431,7 +435,6 @@ class MapLayer:
                     l = self.custom_data_labels[idx]
                 else:
                     l = c
-                print(l)
                 hover_template += f"{l}: " +  "%{customdata[" + str(idx) + "]}<br>"
         hover_template += "Longitude: %{lon}<br>Latitude: %{lat}"
 
@@ -559,6 +562,20 @@ class SiteMap(Viewer):
             "data": data,
             "layout": self.layout
         }
+    
+    def register_domain_callback(self, function: Callable[..., None], **params) -> None:
+        """
+        Register a callback that triggers when the domain changes.
+        
+        Parameters
+        ----------
+        function: Callable
+            Function called when domain is updated. First argument must accept a
+            string (domain).
+        params:
+            Additional keyword arguments passed to function.
+        """
+        pn.bind(function, self.domain_selector.param.value, **params, watch=True)
 
     def __panel__(self) -> pn.Card:
         return pn.Card(
@@ -566,6 +583,11 @@ class SiteMap(Viewer):
             collapsible=False,
             hide_header=True
         )
+    
+    @property
+    def domain(self) -> str:
+        """Currently selected domain."""
+        return self.domain_selector.value
 
 DOMAIN_VIEWS: dict[ModelDomain, MapFocus] = {
     ModelDomain.conus: MapFocus(center=Coordinates(lat=38.83348, lon=-93.97612), zoom=3),
@@ -585,7 +607,33 @@ METRIC_PLOTTING_LIMITS: dict[Metric, tuple[float, float]] = {
 }
 """Mapping from Metrics to plotting limits (cmin, cmax)."""
 
-def main():
+class EvaluationSpec(BaseModel):
+    startDT: datetime
+    endDT: datetime
+    directory: Path
+    files: dict[ModelDomain, dict[ModelConfiguration, Path]]
+
+class EvaluationRegistry(BaseModel):
+    evaluations: dict[str, EvaluationSpec]
+
+def main(root: Path = Path("./data")):
+    # Setup registry
+    registry_file = root / "test_registry.json"
+    with registry_file.open("r") as fo:
+        evaluation_registry = EvaluationRegistry.model_validate_json(fo.read())
+
+    # Evaluation selector
+    evaluation_selector = pn.widgets.Select(
+        name="Evaluation",
+        options=list(evaluation_registry.evaluations.keys())
+    )
+    threshold_filter = pn.widgets.Select(
+        name="Streamflow Threshold (≥)",
+        options=[
+            "100% AEP-USGS (All data)"
+        ]
+    )
+
     # Data and geometry
     geometry = pl.scan_parquet("data/parquet/conus/routelink.parquet").select(
         ["nwm_feature_id", "latitude", "longitude"])
@@ -657,6 +705,20 @@ def main():
         domains=DOMAIN_VIEWS
     )
 
+    # Configuration selector
+    configuration_filter = pn.widgets.Select(
+        name="Model Configuration",
+        options=list(
+        DOMAIN_CONFIGURATIONS[site_map.domain].keys()
+        ))
+    def update_configurations(domain):
+        if domain is None:
+            return
+        configuration_filter.options = list(
+            DOMAIN_CONFIGURATIONS[domain].keys()
+        )
+    site_map.register_domain_callback(update_configurations)
+
     # Metric selector
     metric_selector = pn.widgets.Select(name=metrics_key, options=list(Metric))
     confidence_selector = pn.widgets.Select(name="95% confidence interval", options=list(MetricConfidence))
@@ -681,7 +743,9 @@ def main():
     # Serve the dashboard
     pn.serve(pn.Column(
         site_map,
+        evaluation_selector,
         site_map.domain_selector,
+        configuration_filter,
         metric_selector,
         confidence_selector,
         site_map.layer_selector
