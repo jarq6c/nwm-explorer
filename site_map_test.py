@@ -1,7 +1,7 @@
 """
 An interactive mapping interface.
 """
-from typing import TypedDict
+from typing import TypedDict, Any
 from dataclasses import dataclass, field
 import warnings
 from enum import StrEnum
@@ -177,6 +177,8 @@ class MapLayer:
     ----------
     store: pl.LazyFrame
         Polars LazyFrame pointing at data to plot.
+    filters: list[pl.Expr]
+        List of polars.Expr applied to store.
     latitude_column: str, default 'latitude'
         Column in data to use as latitude.
     longitude_column: str, default 'longitude'
@@ -204,6 +206,7 @@ class MapLayer:
         Colorbar range.
     """
     store: pl.LazyFrame
+    filters: list[pl.Expr] | None = None
     latitude_column: str = "latitude"
     longitude_column: str = "longitude"
     color_column: str | None = None
@@ -257,7 +260,10 @@ class MapLayer:
         hover_template += "Longitude: %{lon}<br>Latitude: %{lat}"
 
         # Load data
-        data = self.store.select(columns).collect()
+        if self.filters:
+            data = self.store.select(columns).filter(*self.filters).collect()
+        else:
+            data = self.store.select(columns).collect()
 
         # Set marker color
         if self.color_column:
@@ -308,6 +314,7 @@ class MapLayer:
     def update(
             self,
             store: pl.LazyFrame | None = None,
+            filters: list[pl.Expr] | None = None,
             latitude_column: str | None = None,
             longitude_column: str | None = None,
             color_column: str | None = None,
@@ -389,6 +396,8 @@ class MapLayer:
             self.colorbar_title = colorbar_title
         if colorbar_limits:
             self.colorbar_limits = colorbar_limits
+        if filters:
+            self.filters = filters
 
         # Check for trace
         if self._trace is None:
@@ -396,7 +405,10 @@ class MapLayer:
 
         # Load data
         if columns:
-            data = self.store.select(columns).collect()
+            if self.filters:
+                data = self.store.select(columns).filter(*self.filters).collect()
+            else:
+                data = self.store.select(columns).collect()
 
         # Build update
         hover_template = ""
@@ -616,6 +628,45 @@ class EvaluationSpec(BaseModel):
 class EvaluationRegistry(BaseModel):
     evaluations: dict[str, EvaluationSpec]
 
+class EditablePlayer(Viewer):
+    """
+    DiscretePlayer that refreshes when changing options.
+
+    Parameters
+    ----------
+    params: any
+        Keyword arguments passed to pn.widgets.DiscretePlayer.
+    """
+    def __init__(
+            self,
+            **params
+        ) -> None:
+        # Initialize
+        self._params: dict[str, Any] = params
+        self._container = pn.pane.Placeholder(
+            pn.widgets.DiscretePlayer(**params)
+        )
+
+    def __panel__(self) -> pn.pane.Placeholder:
+        return self._container
+    
+    @property
+    def options(self) -> list[Any]:
+        return self._container.object.options
+    
+    @options.setter
+    def options(self, values: list[Any]) -> None:
+        v = self._container.object.value
+        self.update({
+            "options": values,
+            "value": v if v in values else values[0]
+        })
+
+    def update(self, **params) -> None:
+        """Use this method to update underlying parameters of DiscretePlayer."""
+        self._params.update(params)
+        self._container.object = pn.widgets.DiscretePlayer(**self._params)
+
 def main(root: Path = Path("./data")):
     # Setup registry
     registry_file = root / "test_registry.json"
@@ -641,11 +692,21 @@ def main(root: Path = Path("./data")):
         options=list(
         DOMAIN_CONFIGURATIONS[default_domain].keys()
         ))
+    lead_time_selector = EditablePlayer(
+        name="Minimum lead time (hours)",
+        options=[i for i in range(10)],
+        show_loop_controls=False,
+        visible_buttons=["previous", "next"],
+        width=300,
+        value=0
+    )
+    lead_time_selector.options = [1, 2, 3]
     evaluation = evaluation_registry.evaluations[evaluation_selector.value]
     configuration = DOMAIN_CONFIGURATIONS[default_domain][configuration_selector.value]
 
     # Data and geometry
-    geometry = pl.scan_parquet("data/parquet/conus/routelink.parquet").select(
+    geometry_file = root / "parquet" / default_domain.name / "routelink.parquet"
+    geometry = pl.scan_parquet(geometry_file).select(
         ["nwm_feature_id", "latitude", "longitude"])
     data = pl.scan_parquet(evaluation.files[default_domain][configuration]).join(
         geometry, on="nwm_feature_id", how="left")
@@ -751,8 +812,10 @@ def main(root: Path = Path("./data")):
         evaluation_selector,
         site_map.domain_selector,
         configuration_selector,
+        threshold_filter,
         metric_selector,
         confidence_selector,
+        lead_time_selector,
         site_map.layer_selector
         ))
 
