@@ -628,6 +628,72 @@ class EvaluationSpec(BaseModel):
 class EvaluationRegistry(BaseModel):
     evaluations: dict[str, EvaluationSpec]
 
+@dataclass
+class EvaluationStore:
+    """
+    Manages access to evaluation metrics.
+
+    Attributes
+    ----------
+    registry: pathlib.Path
+        Path to evaluation registry file.
+    domain: ModelDomain
+        Model domain used to select evaluation metrics.
+    configuration: ModelConfiguration
+        Model configuration used to select evaluation metrics.
+    """
+    registry: Path
+    domain: ModelDomain
+    configuration: ModelConfiguration
+
+    def __post_init__(self) -> None:
+        # Parse registry
+        with self.registry.open("r") as fo:
+            self._evaluation_registry = EvaluationRegistry.model_validate_json(fo.read())
+
+        # Evaluation selector
+        self.evaluation_selector = pn.widgets.Select(
+            name="Evaluation",
+            options=self.evaluation_labels
+        )
+        self.evaluation = self._evaluation_registry.evaluations[self.evaluation_selector.value]
+
+        # Geometry
+        geometry_file = self.evaluation.directory / "parquet" / self.domain.name / "routelink.parquet"
+        self.geometry = pl.scan_parquet(geometry_file).select(
+            ["nwm_feature_id", "latitude", "longitude"])
+
+        # Configuration selector
+        self.configuration_selector = pn.widgets.Select(
+            name="Model Configuration",
+            options=list(DOMAIN_CONFIGURATIONS[self.domain].keys()
+            ))
+        
+        # Data
+        self.data = pl.scan_parquet(self.evaluation.files[self.domain][self.configuration]).join(
+            self.geometry, on="nwm_feature_id", how="left")
+
+        # Handle evaluation update
+        def update_evaluation(evaluation) -> None:
+            self.evaluation = self._evaluation_registry.evaluations[evaluation]
+            geometry_file = self.evaluation.directory / "parquet" / self.domain.name / "routelink.parquet"
+            self.geometry = pl.scan_parquet(geometry_file).select(
+                ["nwm_feature_id", "latitude", "longitude"])
+            self.data = pl.scan_parquet(self.evaluation.files[self.domain][self.configuration]).join(
+                self.geometry, on="nwm_feature_id", how="left")
+        pn.bind(update_evaluation, self.evaluation_selector.param.value, watch=True)
+
+        # Handle configuration change
+        def update_configuration(configuration) -> None:
+            self.configuration = DOMAIN_CONFIGURATIONS[self.domain][configuration]
+            self.data = pl.scan_parquet(self.evaluation.files[self.domain][self.configuration]).join(
+                self.geometry, on="nwm_feature_id", how="left")
+        pn.bind(update_configuration, self.configuration_selector.param.value, watch=True)
+
+    @property
+    def evaluation_labels(self) -> list[str]:
+        return list(self._evaluation_registry.evaluations.keys())
+
 class EditablePlayer(Viewer):
     """
     DiscretePlayer that refreshes when changing options.
@@ -683,16 +749,14 @@ LEAD_TIME_VALUES: dict[ModelConfiguration, list[int]] = {
 """Mapping from model ModelConfiguration enums to lists of lead time integers (hours)."""
 
 def main(root: Path = Path("./data")):
-    # Setup registry
-    registry_file = root / "test_registry.json"
-    with registry_file.open("r") as fo:
-        evaluation_registry = EvaluationRegistry.model_validate_json(fo.read())
+    # Setup data store
+    evaluation_store = EvaluationStore(
+        registry=root/"test_registry.json",
+        domain=ModelDomain.conus,
+        configuration=ModelConfiguration.analysis_assim_extend_no_da
+    )
 
     # Evaluation selector
-    evaluation_selector = pn.widgets.Select(
-        name="Evaluation",
-        options=list(evaluation_registry.evaluations.keys())
-    )
     threshold_filter = pn.widgets.Select(
         name="Streamflow Threshold (≥)",
         options=[
@@ -701,25 +765,10 @@ def main(root: Path = Path("./data")):
     )
 
     # Initialize state
-    default_domain = ModelDomain.conus
-    configuration_selector = pn.widgets.Select(
-        name="Model Configuration",
-        options=list(
-        DOMAIN_CONFIGURATIONS[default_domain].keys()
-        ))
-    evaluation = evaluation_registry.evaluations[evaluation_selector.value]
-    configuration = DOMAIN_CONFIGURATIONS[default_domain][configuration_selector.value]
-    if configuration in LEAD_TIME_VALUES:
-        lead_time_options = LEAD_TIME_VALUES[configuration]
+    if evaluation_store.configuration in LEAD_TIME_VALUES:
+        lead_time_options = LEAD_TIME_VALUES[evaluation_store.configuration]
     else:
         lead_time_options = [0]
-
-    # Data and geometry
-    geometry_file = root / "parquet" / default_domain.name / "routelink.parquet"
-    geometry = pl.scan_parquet(geometry_file).select(
-        ["nwm_feature_id", "latitude", "longitude"])
-    data = pl.scan_parquet(evaluation.files[default_domain][configuration]).join(
-        geometry, on="nwm_feature_id", how="left")
 
     # Initial metric layer
     initial_column = list(Metric)[0].name + list(MetricConfidence)[0].name
@@ -729,7 +778,7 @@ def main(root: Path = Path("./data")):
     site_map = SiteMap(
         layers={
             metrics_key: MapLayer(
-                store=data,
+                store=evaluation_store.data,
                 color_column=initial_column,
                 custom_data_columns=[
                     "usgs_site_code",
@@ -790,7 +839,7 @@ def main(root: Path = Path("./data")):
     def update_configurations(domain):
         if domain is None:
             return
-        configuration_selector.options = list(
+        evaluation_store.configuration_selector.options = list(
             DOMAIN_CONFIGURATIONS[domain].keys()
         )
     site_map.register_domain_callback(update_configurations)
@@ -811,7 +860,7 @@ def main(root: Path = Path("./data")):
         else:
             lead_time_options = [0]
         lead_time_selector.update(options=lead_time_options)
-    pn.bind(update_lead_times, configuration_selector.param.value, watch=True)
+    pn.bind(update_lead_times, evaluation_store.configuration_selector.param.value, watch=True)
 
     # Metric selector
     metric_selector = pn.widgets.Select(name=metrics_key, options=list(Metric))
@@ -837,9 +886,9 @@ def main(root: Path = Path("./data")):
     # Serve the dashboard
     pn.serve(pn.Column(
         site_map,
-        evaluation_selector,
+        evaluation_store.evaluation_selector,
         site_map.domain_selector,
-        configuration_selector,
+        evaluation_store.configuration_selector,
         threshold_filter,
         metric_selector,
         confidence_selector,
