@@ -9,6 +9,8 @@ from panel.viewable import Viewer
 from panel.template import BootstrapTemplate
 
 from nwm_explorer.logging.loggers import get_logger
+from nwm_explorer.layouts.post_event_evaluations import PostEventEvaluationLayout
+from nwm_explorer.layouts.routine_operational_evaluations import RoutineOperationalEvaluationLayout
 
 class Dashboard(Viewer):
     """
@@ -37,7 +39,11 @@ class Dashboard(Viewer):
             title=title,
             collapsed_sidebar=True
         )
-    
+
+        # Add post-event evaluations
+        self.template.main.append(PostEventEvaluationLayout())
+        self.template.main.append(RoutineOperationalEvaluationLayout())
+
     def __panel__(self) -> BootstrapTemplate:
         return self.template
 
