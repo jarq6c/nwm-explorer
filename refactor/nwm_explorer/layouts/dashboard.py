@@ -5,12 +5,14 @@ import inspect
 from pathlib import Path
 from typing import Any
 
+import panel as pn
 from panel.viewable import Viewer
 from panel.template import BootstrapTemplate
 
 from nwm_explorer.logging.loggers import get_logger
 from nwm_explorer.layouts.post_event_evaluations import PostEventEvaluationLayout
 from nwm_explorer.layouts.routine_operational_evaluations import RoutineOperationalEvaluationLayout
+from nwm_explorer.panes.configuration import ConfigurationPane
 
 class Dashboard(Viewer):
     """
@@ -37,12 +39,33 @@ class Dashboard(Viewer):
         logger.info("Build template")
         self.template = BootstrapTemplate(
             title=title,
-            collapsed_sidebar=True
+            collapsed_sidebar=True,
+            sidebar_width=380
         )
 
-        # Add post-event evaluations
-        self.template.main.append(PostEventEvaluationLayout())
-        self.template.main.append(RoutineOperationalEvaluationLayout())
+        # Dashboard modes
+        self.modes = {
+            "Routine Operational": RoutineOperationalEvaluationLayout(),
+            "Post-event": PostEventEvaluationLayout()
+        }
+        self.template.main.append(pn.pane.Placeholder(
+            object=list(self.modes.values())[0]
+        ))
+
+        # Dashboard configuration
+        self.configuration = ConfigurationPane(
+            mode_options=list(self.modes.keys())
+        )
+        self.template.sidebar.append(self.configuration)
+
+        # Update main area
+        def change_dashboard_mode(mode_key) -> None:
+            self.template.main[0].object = self.modes[mode_key]
+        pn.bind(
+            change_dashboard_mode,
+            self.configuration.mode_selector.param.value,
+            watch=True
+            )
 
     def __panel__(self) -> BootstrapTemplate:
         return self.template
