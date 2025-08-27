@@ -14,7 +14,18 @@ from panel.template import BootstrapTemplate
 from nwm_explorer.logging.loggers import get_logger
 
 class Dashboard(Viewer):
-    """Build a dashboard for exploring National Water Model output."""
+    """
+    A dashboard for exploring National Water Model output.
+
+    Parameters
+    ----------
+    root: Path
+        Path to root data directory used by dashboards.
+    title: str
+        Title that appears in the dashboard header.
+    params: any
+        Additional keyword arguments passed directly to panel.viewable.Viewer.
+    """
     def __init__(self, root: Path, title: str, **params: dict[str, Any]):
         # Apply parameters
         super().__init__(**params)
@@ -38,7 +49,19 @@ def generate_dashboard(
         title: str
         ) -> Dashboard:
     """
-    Returns a new servable dashboard to requesting endpoint.
+    Generate a new dashboard. This insures that each user receives their own
+    dashboard independent of other users.
+
+    Parameters
+    ----------
+    root: Path
+        Path to root data directory used by dashboards.
+    title: str
+        Title that appears in the dashboard header.
+    
+    Returns
+    -------
+    Dashboard
     """
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
@@ -50,6 +73,22 @@ def generate_dashboard_closure(
         root: Path,
         title: str
         ) -> Callable[[], Dashboard]:
+    """
+    Generates a partial function that returns Dashboards with root and title
+    applied. This is required to generate dashboards with different parameters
+    at run time.
+
+    Parameters
+    ----------
+    root: Path
+        Path to root data directory used by dashboards.
+    title: str
+        Title that appears in the dashboard header.
+    
+    Returns
+    -------
+    Callable[[], Dashboard]
+    """
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
@@ -58,10 +97,23 @@ def generate_dashboard_closure(
         return generate_dashboard(root, title)
     return closure
 
-def serve_dashboard(
+def serve_dashboards(
         root: Path,
         title: str
         ) -> None:
+    """
+    Serve new dashboards at an endpoint determined by title.
+
+    Parameters
+    ----------
+    root: Path
+        Path to root data directory used by dashboards.
+    title: str
+        Title that appears in browser tab and dashboard header. Dashboards are
+        served at an endpoint that is a slugified version of the title. (
+        "National Water Model Evaluations" is served at
+        www.myhost.com/national-water-model-evaluations).
+    """
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
