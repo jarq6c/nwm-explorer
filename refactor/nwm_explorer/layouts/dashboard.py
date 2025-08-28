@@ -54,7 +54,10 @@ class Dashboard(Viewer):
 
         # Dashboard configuration
         self.configuration = ConfigurationPane(
-            mode_options=list(self.modes.keys())
+            mode_options=list(self.modes.keys()),
+            streamflow_options=["foot^3/s", "m^3/s", "foot^3/s/mile^2", "inch/h", "mm/h"],
+            precipitation_options=["inch/h", "mm/h"],
+            map_layers=["Metrics", "USGS streamflow gages", "National Inventory of Dams"]
         )
         self.template.sidebar.append(self.configuration)
 
