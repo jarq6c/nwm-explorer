@@ -26,6 +26,9 @@ class RoutineOperationalEvaluationLayout(Viewer):
         name = __loader__.name + "." + inspect.currentframe().f_code.co_name
         logger = get_logger(name)
         logger.info("Build routine operational evaluations")
+
+        # Main display
+        self.main = pn.pane.Markdown()
     
     def __panel__(self) -> pn.Card:
-        return pn.Card(title="Routine Operational Evaluations")
+        return pn.Card(self.main, title="Routine Operational Evaluations")
