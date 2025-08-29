@@ -27,8 +27,21 @@ class RoutineOperationalEvaluationLayout(Viewer):
         logger = get_logger(name)
         logger.info("Build routine operational evaluations")
 
-        # Main display
-        self.main = pn.pane.Markdown()
-    
+        # Cards
+        self.filters = pn.pane.Markdown("Filters")
+        self.site_map = pn.pane.Markdown("Site map")
+        self.histograms = [
+            pn.pane.Markdown("Histogram"),
+            pn.pane.Markdown("Histogram"),
+            pn.pane.Markdown("Histogram"),
+            pn.pane.Markdown("Histogram")
+            ]
+        self.site_information = pn.pane.Markdown("Site information")
+        self.hydrograph = pn.pane.Markdown("Hydrograph")
+        self.site_metrics = pn.pane.Markdown("Site metrics")
+
     def __panel__(self) -> pn.Card:
-        return pn.Card(self.main, title="Routine Operational Evaluations")
+        return pn.Column(
+            pn.Row(self.filters, self.site_map, pn.GridBox(*self.histograms, ncols=2)),
+            pn.Row(self.site_information, self.hydrograph, self.site_metrics)
+        )

@@ -48,9 +48,10 @@ class Dashboard(Viewer):
             "Routine Operational": RoutineOperationalEvaluationLayout(),
             "Post-event": PostEventEvaluationLayout()
         }
-        self.template.main.append(pn.pane.Placeholder(
+        self.main_area = pn.pane.Placeholder(
             object=list(self.modes.values())[0]
-        ))
+        )
+        self.template.main.append(self.main_area)
 
         # Dashboard configuration
         self.configuration = ConfigurationPane(
@@ -63,7 +64,7 @@ class Dashboard(Viewer):
 
         # Update main area
         def change_dashboard_mode(mode_key) -> None:
-            self.template.main[0].object = self.modes[mode_key]
+            self.main_area.object = self.modes[mode_key]
         pn.bind(
             change_dashboard_mode,
             self.configuration.mode_selector.param.value,

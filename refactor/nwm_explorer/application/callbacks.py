@@ -3,6 +3,8 @@ Centralized module that contains methods that define application behavior.
 """
 from param.parameterized import Parameters
 
-def display_map_layers(trigger):
-    """Print current list of map layers."""
+def update_map_layers(layers: list[str], site_map):
+    """
+    Update currently displayed map layers.
+    """
     ...
