@@ -79,10 +79,12 @@ class Filters(Viewer):
     
     @property
     def filepath(self) -> Path:
+        """Currently selected file path."""
         return Path(self.registry.evaluations[self.evaluation][self.domain][self.configuration])
 
     @property
     def dataframe(self) -> pl.LazyFrame:
+        """Scans current file path and returns lazy dataframe."""
         return pl.scan_parquet(self.filepath)
 
     def __panel__(self) -> pn.Card:
