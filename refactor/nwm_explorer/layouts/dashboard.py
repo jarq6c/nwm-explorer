@@ -2,7 +2,6 @@
 Dashboard layout.
 """
 import inspect
-from pathlib import Path
 from typing import Any
 
 import panel as pn
@@ -13,6 +12,7 @@ from nwm_explorer.logging.loggers import get_logger
 from nwm_explorer.layouts.post_event_evaluations import PostEventEvaluationLayout
 from nwm_explorer.layouts.routine_operational_evaluations import RoutineOperationalEvaluationLayout
 from nwm_explorer.panes.configuration import ConfigurationPane
+from nwm_explorer.application.api import EvaluationRegistry
 
 class Dashboard(Viewer):
     """
@@ -20,14 +20,12 @@ class Dashboard(Viewer):
 
     Parameters
     ----------
-    root: Path
-        Path to root data directory used by dashboards.
-    title: str
-        Title that appears in the dashboard header.
+    registry: EvaluationRegistry
+        Registry used by dashboards.
     params: any
         Additional keyword arguments passed directly to panel.viewable.Viewer.
     """
-    def __init__(self, root: Path, title: str, **params: dict[str, Any]):
+    def __init__(self, registry: EvaluationRegistry, **params: dict[str, Any]):
         # Apply parameters
         super().__init__(**params)
 
@@ -38,7 +36,7 @@ class Dashboard(Viewer):
         # Setup template
         logger.info("Build template")
         self.template = BootstrapTemplate(
-            title=title,
+            title=registry.dashboard_configuration.title,
             collapsed_sidebar=True,
             sidebar_width=380
         )
@@ -75,8 +73,7 @@ class Dashboard(Viewer):
         return self.template
 
 def generate_dashboard(
-        root: Path,
-        title: str
+        registry: EvaluationRegistry
         ) -> Dashboard:
     """
     Generate a new dashboard. This insures that each user receives their own
@@ -84,10 +81,8 @@ def generate_dashboard(
 
     Parameters
     ----------
-    root: Path
-        Path to root data directory used by dashboards.
-    title: str
-        Title that appears in the dashboard header.
+    registry: Path
+        Registry used by dashboards.
     
     Returns
     -------
@@ -97,4 +92,4 @@ def generate_dashboard(
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
     logger.info("Build dashboard")
-    return Dashboard(root, title)
+    return Dashboard(registry)

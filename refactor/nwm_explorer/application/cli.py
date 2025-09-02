@@ -10,16 +10,16 @@ from pathlib import Path
 import click
 
 from nwm_explorer.application.gui import serve_dashboards
+from nwm_explorer.application.api import EvaluationRegistry
 
 # Register sub-commands
 display_group = click.Group()
 
 @display_group.command()
-@click.option("-d", "--directory", "directory", nargs=1, type=click.Path(path_type=Path), default="data", help="Data directory (./data)")
-@click.option("-t", "--title", "title", nargs=1, type=click.STRING, default="National Water Model Evaluations", help="Dashboard title header")
+@click.option("-r", "--registry", "registry", nargs=1, type=click.Path(path_type=Path), default="evaluation_registry.json",
+    help="Path to evaluation registry (./evaluation_registry.json)")
 def display(
-    directory: Path = Path("data"),
-    title: str = "National Water Model Evaluations"
+    registry: Path = Path("evaluation_registry.json")
     ) -> None:
     """Visualize and explore evaluation data.
 
@@ -27,7 +27,10 @@ def display(
     
     nwm-explorer display
     """
-    serve_dashboards(directory, title)
+    # Validate and load registry
+    with registry.open("r") as fi:
+        evaluation_registry = EvaluationRegistry.model_validate_json(fi.read())
+    serve_dashboards(evaluation_registry)
 
 # Package commands under a single CLI
 cli = click.CommandCollection(sources=[
