@@ -43,7 +43,7 @@ class Dashboard(Viewer):
 
         # Dashboard modes
         self.modes = {
-            "Routine Operational": RoutineOperationalEvaluationLayout(),
+            "Routine Operational": RoutineOperationalEvaluationLayout(registry),
             "Post-event": PostEventEvaluationLayout()
         }
         self.main_area = pn.pane.Placeholder(

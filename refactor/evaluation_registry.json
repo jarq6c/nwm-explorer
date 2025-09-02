@@ -2,5 +2,20 @@
     "dashboard_configuration": {
         "title": "National Water Model Evaluations",
         "slug": "national-water-model-evaluations"
+    },
+    "evaluations": {
+        "FY2024 Q1": {
+            "CONUS": {
+                "Analysis (MRMS/Stage IV)": "data/parquet/conus/evaluation_ana.parquet"
+            }
+        },
+        "FY2024 Q2": {
+            "CONUS": {
+                "Short range forecast (HRRR)": "data/parquet/conus/evaluation_srf.parquet"
+            },
+            "Alaska": {
+                "Short range forecast (HRRR)": "data/parquet/conus/evaluation_srf.parquet"
+            }
+        }
     }
 }
