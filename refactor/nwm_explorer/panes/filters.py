@@ -108,10 +108,7 @@ class Filters(Viewer):
         )
 
         # Initialize lead time state
-        if self.configuration in LEAD_TIME_VALUES:
-            lead_time_options = LEAD_TIME_VALUES[self.configuration]
-        else:
-            lead_time_options = [0]
+        lead_time_options = LEAD_TIME_VALUES.get(self.configuration, [0])
         self.lead_time_selector = EditablePlayer(
             name="Minimum lead time (hours)",
             options=lead_time_options,
@@ -133,10 +130,7 @@ class Filters(Viewer):
         def update_lead_times(forcing: str) -> None:
             if forcing is None:
                 return
-            if self.configuration in LEAD_TIME_VALUES:
-                lead_time_options = LEAD_TIME_VALUES[self.configuration]
-            else:
-                lead_time_options = [0]
+            lead_time_options = LEAD_TIME_VALUES.get(self.configuration, [0])
             self.lead_time_selector.update(options=lead_time_options)
         pn.bind(update_lead_times, self.forcing_selector.param.value, watch=True)
 
