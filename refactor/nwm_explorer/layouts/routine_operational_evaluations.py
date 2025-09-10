@@ -18,7 +18,7 @@ class RoutineOperationalEvaluationLayout(Viewer):
     Parameters
     ----------
     registry: EvaluationRegistry
-        EvaluationRegistry used through dashboard.
+        EvaluationRegistry used throughout dashboard.
     params: any
         Additional keyword arguments passed directly to panel.viewable.Viewer.
     """

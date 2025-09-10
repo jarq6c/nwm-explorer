@@ -8,16 +8,18 @@ import panel as pn
 from panel.viewable import Viewer
 
 from nwm_explorer.application.api import (
-    EvaluationRegistry, ModelDomain, ModelConfiguration)
+    EvaluationRegistry, ModelDomain, ModelConfiguration, ModelForcing)
 
 class Filters(Viewer):
     """
     Houses main filtering widgets and tracks their state.
 
-    Attributes
+    Parameters
     ----------
-    evaluation: str
-        Currently selected evaluation.
+    registry: EvaluationRegistry
+        EvaluationRegistry used throughout dashboard.
+    params: any
+        Additional keyword arguments passed directly to panel.viewable.Viewer.
     """
     def __init__(self, registry: EvaluationRegistry, **params) -> None:
         super().__init__(**params)
@@ -34,9 +36,9 @@ class Filters(Viewer):
             name="Model domain",
             options=self.domain_options
         )
-        self.configuration_selector = pn.widgets.Select(
-            name="Model configuration",
-            options=self.configuration_options
+        self.forcing_selector = pn.widgets.Select(
+            name="Model forcing",
+            options=self.forcing_options
         )
 
         # Callbacks
@@ -44,7 +46,7 @@ class Filters(Viewer):
             if evaluation is None:
                 return
             self.domain_selector.options = self.domain_options
-            self.configuration_selector.options = self.configuration_options
+            self.forcing_selector.options = self.forcing_options
         pn.bind(update_selector_options, self.evaluation_selector.param.value, watch=True)
 
     @property
@@ -68,19 +70,19 @@ class Filters(Viewer):
         return ModelDomain(self.domain_selector.value)
 
     @property
-    def configuration_options(self) -> list[ModelConfiguration]:
-        """List of configuration keys."""
-        return [ModelConfiguration(c) for c in self.registry.evaluations[self.evaluation][self.domain]]
+    def forcing_options(self) -> list[ModelForcing]:
+        """List of forcing keys."""
+        return [ModelForcing(c) for c in self.registry.evaluations[self.evaluation][self.domain]]
 
     @property
-    def configuration(self) -> ModelConfiguration:
-        """Currently selected configuration."""
-        return ModelConfiguration(self.configuration_selector.value)
+    def forcing(self) -> ModelForcing:
+        """Currently selected forcing."""
+        return ModelForcing(self.forcing_selector.value)
     
     @property
     def filepath(self) -> Path:
         """Currently selected file path."""
-        return Path(self.registry.evaluations[self.evaluation][self.domain][self.configuration])
+        return Path(self.registry.evaluations[self.evaluation][self.domain][self.forcing])
 
     @property
     def dataframe(self) -> pl.LazyFrame:
@@ -92,7 +94,7 @@ class Filters(Viewer):
             pn.Column(
                 self.evaluation_selector,
                 self.domain_selector,
-                self.configuration_selector
+                self.forcing_selector
             ),
             title="Filters",
             collapsible=False
