@@ -5,6 +5,7 @@ application components.
 from pathlib import Path
 from enum import StrEnum
 from pydantic import BaseModel
+import polars as pl
 
 class ModelDomain(StrEnum):
     """Symbols that refer to model spatial domains."""
@@ -98,6 +99,38 @@ DOMAIN_FORCING_CONFIGURATION: dict[ModelDomain, dict[ModelForcing, ModelConfigur
 Mapping that specifies relationships between ModelDomain, ModelForcing, and
 ModelConfiguration.
 """
+
+PREDICTION_SAMPLING: dict[ModelConfiguration, tuple[pl.Duration, str]] = {
+    ModelConfiguration.medium_range_mem1: (pl.duration(hours=24), "1d"),
+    ModelConfiguration.medium_range_blend: (pl.duration(hours=24), "1d"),
+    ModelConfiguration.medium_range_no_da: (pl.duration(hours=24), "1d"),
+    ModelConfiguration.medium_range_alaska_mem1: (pl.duration(hours=24), "1d"),
+    ModelConfiguration.medium_range_blend_alaska: (pl.duration(hours=24), "1d"),
+    ModelConfiguration.medium_range_alaska_no_da: (pl.duration(hours=24), "1d"),
+    ModelConfiguration.short_range: (pl.duration(hours=6), "6h"),
+    ModelConfiguration.short_range_alaska: (pl.duration(hours=5), "5h"),
+    ModelConfiguration.short_range_hawaii: (pl.duration(hours=6), "6h"),
+    ModelConfiguration.short_range_hawaii_no_da: (pl.duration(hours=6), "6h"),
+    ModelConfiguration.short_range_puertorico: (pl.duration(hours=6), "6h"),
+    ModelConfiguration.short_range_puertorico_no_da: (pl.duration(hours=6), "6h")
+}
+"""Mapping used for computing lead time and sampling frequency."""
+
+LEAD_TIME_VALUES: dict[ModelConfiguration, list[int]] = {
+    ModelConfiguration.medium_range_mem1: [l for l in range(0, 240, 24)],
+    ModelConfiguration.medium_range_blend: [l for l in range(0, 240, 24)],
+    ModelConfiguration.medium_range_no_da: [l for l in range(0, 240, 24)],
+    ModelConfiguration.medium_range_alaska_mem1: [l for l in range(0, 240, 24)],
+    ModelConfiguration.medium_range_blend_alaska: [l for l in range(0, 240, 24)],
+    ModelConfiguration.medium_range_alaska_no_da: [l for l in range(0, 240, 24)],
+    ModelConfiguration.short_range: [l for l in range(0, 18, 6)],
+    ModelConfiguration.short_range_alaska: [l for l in range(0, 45, 5)],
+    ModelConfiguration.short_range_hawaii: [l for l in range(0, 48, 6)],
+    ModelConfiguration.short_range_hawaii_no_da: [l for l in range(0, 48, 6)],
+    ModelConfiguration.short_range_puertorico: [l for l in range(0, 48, 6)],
+    ModelConfiguration.short_range_puertorico_no_da: [l for l in range(0, 48, 6)]
+}
+"""Mapping from model ModelConfiguration enums to lists of lead time integers (hours)."""
 
 class DashboardConfiguration(BaseModel):
     """
