@@ -8,7 +8,8 @@ import panel as pn
 from panel.viewable import Viewer
 
 from nwm_explorer.application.api import (
-    EvaluationRegistry, ModelDomain, ModelConfiguration, ModelForcing)
+    EvaluationRegistry, ModelDomain, ModelConfiguration, ModelForcing,
+    DOMAIN_FORCING_CONFIGURATION, Threshold, Metric, Confidence)
 
 class Filters(Viewer):
     """
@@ -39,6 +40,18 @@ class Filters(Viewer):
         self.forcing_selector = pn.widgets.Select(
             name="Model forcing",
             options=self.forcing_options
+        )
+        self.threshold_selector = pn.widgets.Select(
+            name="Streamflow threshold (≥)",
+            options=list(Threshold)
+        )
+        self.metric_selector = pn.widgets.Select(
+            name="Evaluation metric",
+            options=list(Metric)
+        )
+        self.confidence_selector = pn.widgets.Select(
+            name="Confidence estimate (95%)",
+            options=list(Confidence)
         )
 
         # Callbacks
@@ -83,6 +96,11 @@ class Filters(Viewer):
     def filepath(self) -> Path:
         """Currently selected file path."""
         return Path(self.registry.evaluations[self.evaluation][self.domain][self.forcing])
+    
+    @property
+    def configuration(self) -> ModelConfiguration:
+        """Currently selected model configuration."""
+        return DOMAIN_FORCING_CONFIGURATION[self.domain][self.forcing]
 
     @property
     def dataframe(self) -> pl.LazyFrame:
@@ -94,7 +112,10 @@ class Filters(Viewer):
             pn.Column(
                 self.evaluation_selector,
                 self.domain_selector,
-                self.forcing_selector
+                self.forcing_selector,
+                self.threshold_selector,
+                self.metric_selector,
+                self.confidence_selector
             ),
             title="Filters",
             collapsible=False

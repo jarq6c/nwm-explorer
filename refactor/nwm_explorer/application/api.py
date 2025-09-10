@@ -43,6 +43,31 @@ class ModelConfiguration(StrEnum):
     short_range_puertorico = "short_range_puertorico"
     short_range_puertorico_no_da = "short_range_puertorico_no_da"
 
+class Threshold(StrEnum):
+    """Symbols that refer to different conditional flow thresholds."""
+    aep_100 = "100% AEP-USGS (All data)"
+    action = "NWS Action Stage"
+    minor = "NWS Minor Stage"
+    moderate = "NWS Moderate Stage"
+    major = "NWS Major Stage"
+    record = "NWS Record Stage"
+    high_water = "NWMv3.0 High Water"
+
+class Metric(StrEnum):
+    """Symbols that refer to model evaluation metrics."""
+    nash_sutcliffe_efficiency = "Nash-Sutcliffe Model Efficiency"
+    relative_mean_bias = "Relative mean bias"
+    pearson_correlation_coefficient = "Pearson Correlation Coefficient"
+    relative_mean = "Relative mean"
+    relative_standard_deviation = "Relative standard deviation"
+    kling_gupta_efficiency = "Kling-Gupta Model Efficiency"
+
+class Confidence(StrEnum):
+    """Symbols that refer to condifence estimates for evaluation metrics."""
+    _point = "Point"
+    _lower = "Lower"
+    _upper = "Upper"
+
 DOMAIN_FORCING_CONFIGURATION: dict[ModelDomain, dict[ModelForcing, ModelConfiguration]] = {
     ModelDomain.alaska: {
         ModelForcing.eana_mrms: ModelConfiguration.analysis_assim_extend_alaska_no_da,
