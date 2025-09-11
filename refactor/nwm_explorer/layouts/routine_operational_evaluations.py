@@ -120,6 +120,22 @@ class RoutineOperationalEvaluationLayout(Viewer):
         self.site_metrics = pn.pane.Markdown("Site metrics")
 
         # Callbacks
+        # TODO keep this from updating twice
+        def update_data(evaluation: str, domain: str, forcing: str) -> None:
+            store = registry.scan_evaluation(
+                    self.filters.evaluation,
+                    self.filters.domain,
+                    self.filters.forcing
+                )
+            print(store.head().collect())
+        pn.bind(
+            update_data,
+            evaluation=self.filters.evaluation_selector.param.value,
+            domain=self.filters.domain_selector.param.value,
+            forcing=self.filters.forcing_selector.param.value,
+            watch=True
+        )
+
         def update_metric(metric: str, confidence: str) -> None:
             # Set column
             m = Metric(metric)
