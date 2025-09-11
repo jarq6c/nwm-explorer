@@ -3,18 +3,24 @@
         "title": "National Water Model Evaluations",
         "slug": "national-water-model-evaluations"
     },
+    "geometry": {
+        "CONUS": "../data/parquet/conus/routelink.parquet",
+        "Alaska": "../data/parquet/alaska/routelink.parquet",
+        "Hawaii": "../data/parquet/hawaii/routelink.parquet",
+        "Puerto Rico": "../data/parquet/puertorico/routelink.parquet"
+    },
     "evaluations": {
         "FY2024 Q1": {
             "CONUS": {
-                "Extended Analysis (MRMS, No-DA)": "data/parquet/conus/evaluation_ana.parquet"
+                "Extended Analysis (MRMS, No-DA)": "../data/parquet/conus/evaluations/analysis_assim_extend_no_da_20231001_20231003.parquet"
             }
         },
         "FY2024 Q2": {
             "CONUS": {
-                "Short Range Forecast (HRRR)": "data/parquet/conus/evaluation_srf.parquet"
+                "Short Range Forecast (HRRR)": "../data/parquet/conus/evaluations/analysis_assim_extend_no_da_20240101_20240103.parquet"
             },
             "Alaska": {
-                "Short Range Forecast (HRRR)": "data/parquet/conus/evaluation_srf.parquet"
+                "Short Range Forecast (HRRR)": "../data/parquet/alaska/evaluations/short_range_alaska_20231001_20231003.parquet"
             }
         }
     }

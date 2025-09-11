@@ -163,4 +163,38 @@ class EvaluationRegistry(BaseModel):
         Dict of EvaluationSpec keyed to hashable str.
     """
     dashboard_configuration: DashboardConfiguration
+    geometry: dict[ModelDomain, Path]
     evaluations: dict[str, dict[ModelDomain, dict[ModelForcing, Path]]]
+
+    def scan_geometry(self, domain: ModelDomain) -> pl.LazyFrame:
+        """
+        Lazily loads ['nwm_feature_id', 'latitude', 'longitude'] columns for
+        given domain.
+
+        Parameters
+        ----------
+        domain: ModelDomain, required
+            Domain geometry to load.
+        
+        Returns
+        -------
+        polars.LazyFrame
+        """
+        return pl.scan_parquet(self.geometry[domain]).select(
+            ["nwm_feature_id", "latitude", "longitude"])
+    
+    def scan_evaluation(
+            self,
+            evaluation: str,
+            domain: ModelDomain,
+            forcing: ModelForcing
+        ) -> pl.LazyFrame:
+        """
+        Returns lazily loaded evaluation data with geometry.
+        """
+        geometry = self.scan_geometry(domain)
+        return pl.scan_parquet(
+            self.evaluations[evaluation][domain][forcing]
+            ).join(
+                geometry, on="nwm_feature_id", how="left"
+            )

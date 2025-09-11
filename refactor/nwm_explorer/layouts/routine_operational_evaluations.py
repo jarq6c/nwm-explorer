@@ -6,10 +6,12 @@ from typing import Any
 
 import panel as pn
 from panel.viewable import Viewer
+import polars as pl
 
 from nwm_explorer.logging.loggers import get_logger
-from nwm_explorer.application.api import EvaluationRegistry
+from nwm_explorer.application.api import EvaluationRegistry, Metric, ModelDomain
 from nwm_explorer.panes.filters import Filters
+from nwm_explorer.panes.site_map import MapLayer, SiteMap, DOMAIN_VIEWS
 
 class RoutineOperationalEvaluationLayout(Viewer):
     """
@@ -33,7 +35,69 @@ class RoutineOperationalEvaluationLayout(Viewer):
 
         # Cards
         self.filters = Filters(registry)
-        self.site_map = pn.pane.Markdown("Site map")
+        self.site_map = SiteMap(
+            layers={
+                "Metrics": MapLayer(
+                    store=registry.scan_evaluation(
+                        self.filters.evaluation,
+                        self.filters.domain,
+                        self.filters.forcing
+                    ),
+                    color_column="nash_sutcliffe_efficiency_point",
+                    custom_data_columns=[
+                        "usgs_site_code",
+                        "nwm_feature_id"
+                    ],
+                    custom_data_labels=[
+                        "USGS site code",
+                        "NWM feature ID"
+                    ],
+                    colorbar_title=list(Metric)[0],
+                    colorbar_limits=(-1.0, 1.0)
+                ),
+                "USGS streamflow gages": MapLayer(
+                    store=pl.scan_parquet("../data/site_information.parquet"),
+                    custom_data_columns=[
+                        "site_name",
+                        "usgs_site_code",
+                        "HUC",
+                        "drainage_area",
+                        "contributing_drainage_area"
+                    ],
+                    custom_data_labels=[
+                        "Site name",
+                        "USGS site code",
+                        "HUC",
+                        "Drainage Area (sq.mi.)",
+                        "Contrib. Drain. Area (sq.mi.)"
+                    ],
+                    marker_color="rgba(23, 225, 189, 0.75)",
+                    marker_size=10
+                ),
+                "National Inventory of Dams": MapLayer(
+                    store=pl.scan_parquet("../data/NID.parquet"),
+                    custom_data_columns=[
+                        "riverName",
+                        "name",
+                        "maxDischarge",
+                        "normalStorage",
+                        "maxStorage",
+                        "drainageArea"
+                    ],
+                    custom_data_labels=[
+                        "River Name",
+                        "Dam Name",
+                        "Maximum Discharge (CFS)",
+                        "Normal Storage (ac-ft)",
+                        "Maximum Storage (ac-ft)",
+                        "Drainage Area (sq.mi.)"
+                    ],
+                    marker_color="rgba(255, 141, 0, 0.75)",
+                    marker_size=10
+                )
+            },
+            domains=DOMAIN_VIEWS
+        )
         self.histograms = [
             pn.pane.Markdown("Histogram"),
             pn.pane.Markdown("Histogram"),
