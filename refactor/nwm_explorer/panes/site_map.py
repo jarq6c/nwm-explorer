@@ -426,6 +426,7 @@ class SiteMap(Viewer):
             self,
             layers: dict[str, MapLayer],
             domains: dict[str, MapFocus],
+            domain_selector: pn.widgets.Select,
             default_domain: str | None = None,
             **params
         ) -> None:
@@ -453,8 +454,6 @@ class SiteMap(Viewer):
         })
 
         # Widgets
-        self.domain_selector = pn.widgets.Select(name="Domain",
-            options=list(domains.keys()))
         self.layer_selector = pn.widgets.CheckBoxGroup(
             name="Layers",
             options=list(layers.keys()),
@@ -476,12 +475,12 @@ class SiteMap(Viewer):
         def switch_domain(domain: str) -> None:
             self.layout = self.layouts[domain]
             self.refresh()
-        pn.bind(switch_domain, self.domain_selector.param.value, watch=True)
+        pn.bind(switch_domain, domain_selector.param.value, watch=True)
 
         # Handle double click
         def reset_layout(event) -> None:
             self.layout = self.layouts[self.default_domain]
-            self.domain_selector.value = self.default_domain
+            domain_selector.value = self.default_domain
         pn.bind(reset_layout, self.pane.param.doubleclick_data, watch=True)
 
         # Handle single click
@@ -509,20 +508,6 @@ class SiteMap(Viewer):
             "data": data,
             "layout": self.layout
         }
-    
-    def register_domain_callback(self, function: Callable[..., None], **params) -> None:
-        """
-        Register a callback that triggers when the domain changes.
-        
-        Parameters
-        ----------
-        function: Callable
-            Function called when domain is updated. First argument must accept a
-            string (domain).
-        params:
-            Additional keyword arguments passed to function.
-        """
-        pn.bind(function, self.domain_selector.param.value, **params, watch=True)
 
     def __panel__(self) -> pn.Card:
         return pn.Card(
@@ -530,8 +515,3 @@ class SiteMap(Viewer):
             collapsible=False,
             hide_header=True
         )
-    
-    @property
-    def domain(self) -> str:
-        """Currently selected domain."""
-        return self.domain_selector.value

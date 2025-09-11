@@ -159,12 +159,16 @@ class EvaluationRegistry(BaseModel):
     ----------
     dashboard_configuration: DashboardConfiguration
         Dashboard configuration options.
+    geometry: dict[ModelDomain, Path]
+        Dict of routelink files keyed to ModelDomain.
     evaluations: dict[str, dict[ModelDomain, dict[ModelForcing, Path]]]
         Dict of EvaluationSpec keyed to hashable str.
     """
     dashboard_configuration: DashboardConfiguration
     geometry: dict[ModelDomain, Path]
     evaluations: dict[str, dict[ModelDomain, dict[ModelForcing, Path]]]
+    _geometry: dict[ModelDomain, pl.LazyFrame] | None = None
+    _evaluations: dict[str, pl.LazyFrame] | None = None
 
     def scan_geometry(self, domain: ModelDomain) -> pl.LazyFrame:
         """
@@ -180,8 +184,13 @@ class EvaluationRegistry(BaseModel):
         -------
         polars.LazyFrame
         """
-        return pl.scan_parquet(self.geometry[domain]).select(
+        if self._geometry is None:
+            self._geometry = {}
+        if domain in self._geometry:
+            return self._geometry[domain]
+        self._geometry[domain] =  pl.scan_parquet(self.geometry[domain]).select(
             ["nwm_feature_id", "latitude", "longitude"])
+        return self._geometry[domain]
     
     def scan_evaluation(
             self,
@@ -191,10 +200,29 @@ class EvaluationRegistry(BaseModel):
         ) -> pl.LazyFrame:
         """
         Returns lazily loaded evaluation data with geometry.
+
+        Parameters
+        ----------
+        evaluation: str
+            Evaluation label in registry JSON file.
+        domain: ModelDomain
+            Specifies domain.
+        forcing: ModelForcing.
+            Specifies forcing.
+        
+        Returns
+        -------
+        polars.LazyFrame
         """
+        if self._evaluations is None:
+            self._evaluations = {}
+        key = evaluation + domain + forcing
+        if key in self._evaluations:
+            return self._evaluations[key]
         geometry = self.scan_geometry(domain)
-        return pl.scan_parquet(
+        self._evaluations[key] =  pl.scan_parquet(
             self.evaluations[evaluation][domain][forcing]
             ).join(
                 geometry, on="nwm_feature_id", how="left"
             )
+        return self._evaluations[key]

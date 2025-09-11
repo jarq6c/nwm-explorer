@@ -96,7 +96,8 @@ class RoutineOperationalEvaluationLayout(Viewer):
                     marker_size=10
                 )
             },
-            domains=DOMAIN_VIEWS
+            domains=DOMAIN_VIEWS,
+            domain_selector=self.filters.domain_selector
         )
         self.histograms = [
             pn.pane.Markdown("Histogram"),
