@@ -80,6 +80,16 @@ class MapLayerName(StrEnum):
     site_information = "USGS streamflow gages"
     national_inventory_of_dams = "National Inventory of Dams"
 
+METRIC_PLOTTING_LIMITS: dict[Metric, tuple[float, float]] = {
+    Metric.relative_mean_bias: (-1.0, 1.0),
+    Metric.pearson_correlation_coefficient: (-1.0, 1.0),
+    Metric.nash_sutcliffe_efficiency: (-1.0, 1.0),
+    Metric.relative_mean: (0.0, 2.0),
+    Metric.relative_standard_deviation: (0.0, 2.0),
+    Metric.kling_gupta_efficiency: (-1.0, 1.0)
+}
+"""Mapping from Metrics to plotting limits (cmin, cmax)."""
+
 DOMAIN_FORCING_CONFIGURATION: dict[ModelDomain, dict[ModelForcing, ModelConfiguration]] = {
     ModelDomain.alaska: {
         ModelForcing.eana_mrms: ModelConfiguration.analysis_assim_extend_alaska_no_da,

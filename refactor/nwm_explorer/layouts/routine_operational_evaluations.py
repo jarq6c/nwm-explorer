@@ -9,7 +9,8 @@ from panel.viewable import Viewer
 import polars as pl
 
 from nwm_explorer.logging.loggers import get_logger
-from nwm_explorer.application.api import EvaluationRegistry, Metric, MapLayerName
+from nwm_explorer.application.api import (EvaluationRegistry, Metric,
+    MapLayerName, METRIC_PLOTTING_LIMITS, Confidence)
 from nwm_explorer.panes.filters import Filters
 from nwm_explorer.panes.site_map import MapLayer, SiteMap, DOMAIN_VIEWS
 from nwm_explorer.panes.configuration import ConfigurationPane
@@ -117,6 +118,29 @@ class RoutineOperationalEvaluationLayout(Viewer):
         self.site_information = pn.pane.Markdown("Site information")
         self.hydrograph = pn.pane.Markdown("Hydrograph")
         self.site_metrics = pn.pane.Markdown("Site metrics")
+
+        # Callbacks
+        def update_metric(metric: str, confidence: str) -> None:
+            # Set column
+            m = Metric(metric)
+            column = m.name + Confidence(confidence).name
+
+            # Update rendered layer
+            self.site_map.layers[MapLayerName.metrics].update(
+                color_column=column,
+                colorbar_title=m,
+                colorbar_limits=METRIC_PLOTTING_LIMITS[m]
+            )
+
+            # Update map
+            if self.site_map.layers[MapLayerName.metrics].trace is not None:
+                self.site_map.refresh()
+        pn.bind(
+            update_metric,
+            metric=self.filters.metric_selector.param.value,
+            confidence=self.filters.confidence_selector.param.value,
+            watch=True
+        )
 
     def __panel__(self) -> pn.Card:
         return pn.Column(
