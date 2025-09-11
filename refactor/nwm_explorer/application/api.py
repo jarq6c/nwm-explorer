@@ -46,7 +46,12 @@ class ModelConfiguration(StrEnum):
 
 class Threshold(StrEnum):
     """Symbols that refer to different conditional flow thresholds."""
-    aep_100 = "100% AEP-USGS (All data)"
+    usgs_aep_100 = "100% AEP-USGS (All data)"
+    usgs_aep_20 = "20% AEP-USGS (All data)"
+    usgs_aep_02 = "2% AEP-USGS (All data)"
+    usgs_aep_01 = "1% AEP-USGS (All data)"
+    usgs_aep_001 = "0.1% AEP-USGS (All data)"
+    usgs_aep_0001 = "0.01% AEP-USGS (All data)"
     action = "NWS Action Stage"
     minor = "NWS Minor Stage"
     moderate = "NWS Moderate Stage"
