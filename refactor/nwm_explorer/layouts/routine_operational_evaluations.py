@@ -9,9 +9,10 @@ from panel.viewable import Viewer
 import polars as pl
 
 from nwm_explorer.logging.loggers import get_logger
-from nwm_explorer.application.api import EvaluationRegistry, Metric, ModelDomain
+from nwm_explorer.application.api import EvaluationRegistry, Metric, MapLayerName
 from nwm_explorer.panes.filters import Filters
 from nwm_explorer.panes.site_map import MapLayer, SiteMap, DOMAIN_VIEWS
+from nwm_explorer.panes.configuration import ConfigurationPane
 
 class RoutineOperationalEvaluationLayout(Viewer):
     """
@@ -21,10 +22,17 @@ class RoutineOperationalEvaluationLayout(Viewer):
     ----------
     registry: EvaluationRegistry
         EvaluationRegistry used throughout dashboard.
+    configuration: ConfigurationPane
+        ConfigurationPane that specifies dashboard wide options.
     params: any
         Additional keyword arguments passed directly to panel.viewable.Viewer.
     """
-    def __init__(self, registry: EvaluationRegistry, **params: dict[str, Any]):
+    def __init__(
+            self,
+            registry: EvaluationRegistry,
+            configuration: ConfigurationPane,
+            **params: dict[str, Any]
+            ):
         # Apply parameters
         super().__init__(**params)
 
@@ -37,7 +45,7 @@ class RoutineOperationalEvaluationLayout(Viewer):
         self.filters = Filters(registry)
         self.site_map = SiteMap(
             layers={
-                "Metrics": MapLayer(
+                MapLayerName.metrics: MapLayer(
                     store=registry.scan_evaluation(
                         self.filters.evaluation,
                         self.filters.domain,
@@ -55,8 +63,8 @@ class RoutineOperationalEvaluationLayout(Viewer):
                     colorbar_title=list(Metric)[0],
                     colorbar_limits=(-1.0, 1.0)
                 ),
-                "USGS streamflow gages": MapLayer(
-                    store=pl.scan_parquet("../data/site_information.parquet"),
+                MapLayerName.site_information: MapLayer(
+                    store=pl.scan_parquet(registry.site_information),
                     custom_data_columns=[
                         "site_name",
                         "usgs_site_code",
@@ -74,8 +82,8 @@ class RoutineOperationalEvaluationLayout(Viewer):
                     marker_color="rgba(23, 225, 189, 0.75)",
                     marker_size=10
                 ),
-                "National Inventory of Dams": MapLayer(
-                    store=pl.scan_parquet("../data/NID.parquet"),
+                MapLayerName.national_inventory_of_dams: MapLayer(
+                    store=pl.scan_parquet(registry.national_inventory_of_dams),
                     custom_data_columns=[
                         "riverName",
                         "name",
@@ -97,7 +105,8 @@ class RoutineOperationalEvaluationLayout(Viewer):
                 )
             },
             domains=DOMAIN_VIEWS,
-            domain_selector=self.filters.domain_selector
+            domain_selector=self.filters.domain_selector,
+            layer_selector=configuration.layer_selector
         )
         self.histograms = [
             pn.pane.Markdown("Histogram"),

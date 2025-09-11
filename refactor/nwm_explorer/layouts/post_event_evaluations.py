@@ -8,6 +8,8 @@ import panel as pn
 from panel.viewable import Viewer
 
 from nwm_explorer.logging.loggers import get_logger
+from nwm_explorer.panes.configuration import ConfigurationPane
+from nwm_explorer.application.api import EvaluationRegistry
 
 class PostEventEvaluationLayout(Viewer):
     """
@@ -18,7 +20,12 @@ class PostEventEvaluationLayout(Viewer):
     params: any
         Additional keyword arguments passed directly to panel.viewable.Viewer.
     """
-    def __init__(self, **params: dict[str, Any]):
+    def __init__(
+            self,
+            registry: EvaluationRegistry,
+            configuration: ConfigurationPane,
+            **params: dict[str, Any]
+            ):
         # Apply parameters
         super().__init__(**params)
 

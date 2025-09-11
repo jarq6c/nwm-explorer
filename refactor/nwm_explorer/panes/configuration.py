@@ -64,40 +64,38 @@ class ConfigurationPane(Viewer):
         logger.info("Build configuration pane")
 
         # Widgets
-        self.widgets = {
-            # Dashboard mode
-            "mode_selector": pn.widgets.Select(
-                name="Dashboard Mode",
-                options=mode_options
-                ),
-
-            # Streamflow units
-            "streamflow_selector": pn.widgets.Select(
-                name="Streamflow measurement units",
-                options=streamflow_options
-                ),
-
-            # Precipitation units
-            "precipitation_selector": pn.widgets.Select(
-                name="Precipitation measurement units",
-                options=precipitation_options
-                ),
-
-            # Map layers
-            "layer_selector": TitledCheckBoxGroup(
-                name="Map layers",
-                options=map_layers,
-                value=map_layers[0:1]
+        self.mode_selector = pn.widgets.Select(
+            name="Dashboard Mode",
+            options=mode_options
             )
-        }
 
-        # Add widgets as attributes
-        for k, v in self.widgets.items():
-            setattr(self, k, v)
+        # Streamflow units
+        self.streamflow_selector = pn.widgets.Select(
+            name="Streamflow measurement units",
+            options=streamflow_options
+            )
+
+        # Precipitation units
+        self.precipitation_selector = pn.widgets.Select(
+            name="Precipitation measurement units",
+            options=precipitation_options
+            )
+
+        # Map layers
+        self.layer_selector = TitledCheckBoxGroup(
+            name="Map layers",
+            options=map_layers,
+            value=map_layers[0:1]
+        )
 
     def __panel__(self) -> pn.Card:
         return pn.Card(
-            pn.Column(*[v for v in self.widgets.values()]),
+            pn.Column(
+                self.mode_selector,
+                self.streamflow_selector,
+                self.precipitation_selector,
+                self.layer_selector
+            ),
             collapsible=False,
             title="Configuration"
         )

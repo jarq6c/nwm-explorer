@@ -74,6 +74,12 @@ class Confidence(StrEnum):
     _lower = "Lower"
     _upper = "Upper"
 
+class MapLayerName(StrEnum):
+    """Symbols that refer to map layer labels."""
+    metrics = "Metrics"
+    site_information = "USGS streamflow gages"
+    national_inventory_of_dams = "National Inventory of Dams"
+
 DOMAIN_FORCING_CONFIGURATION: dict[ModelDomain, dict[ModelForcing, ModelConfiguration]] = {
     ModelDomain.alaska: {
         ModelForcing.eana_mrms: ModelConfiguration.analysis_assim_extend_alaska_no_da,
@@ -163,10 +169,16 @@ class EvaluationRegistry(BaseModel):
         Dict of routelink files keyed to ModelDomain.
     evaluations: dict[str, dict[ModelDomain, dict[ModelForcing, Path]]]
         Dict of EvaluationSpec keyed to hashable str.
+    site_information: Path
+        Path to site information parquet file.
+    national_inventory_of_dams: Path
+        Path to NID parquet file.
     """
     dashboard_configuration: DashboardConfiguration
     geometry: dict[ModelDomain, Path]
     evaluations: dict[str, dict[ModelDomain, dict[ModelForcing, Path]]]
+    site_information: Path
+    national_inventory_of_dams: Path
     _geometry: dict[ModelDomain, pl.LazyFrame] | None = None
     _evaluations: dict[str, pl.LazyFrame] | None = None
 

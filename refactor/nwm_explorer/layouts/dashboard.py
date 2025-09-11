@@ -2,7 +2,7 @@
 Dashboard layout.
 """
 import inspect
-from typing import Any
+from typing import Any, Protocol
 
 import panel as pn
 from panel.viewable import Viewer
@@ -12,7 +12,42 @@ from nwm_explorer.logging.loggers import get_logger
 from nwm_explorer.layouts.post_event_evaluations import PostEventEvaluationLayout
 from nwm_explorer.layouts.routine_operational_evaluations import RoutineOperationalEvaluationLayout
 from nwm_explorer.panes.configuration import ConfigurationPane
-from nwm_explorer.application.api import EvaluationRegistry
+from nwm_explorer.application.api import EvaluationRegistry, MapLayerName
+
+class ModeGenerator(Protocol):
+    """
+    Defines a dashboard mode generator. It takes an EvaluationRegistry
+    and a ConfigurationPane as parameters and returns an object with a 
+    __panel__ method. Child-classes of panel.viewable.Viewer, for example.
+
+    Parameters
+    ----------
+    registry: EvaluationRegistry
+        EvaluationRegistry used throughout dashboard.
+    configuration: ConfigurationPane
+        ConfigurationPane that specifies dashboard wide options.
+    params: any
+        Additional keyword arguments passed directly to panel.viewable.Viewer.
+    """
+    def __init__(
+            self,
+            registry: EvaluationRegistry,
+            configuration: ConfigurationPane,
+            **params: dict[str, Any]
+            ):
+        # Apply parameters
+        super().__init__(**params)
+
+    def __panel__(self) -> pn.Card:
+        ...
+
+DASHBOARD_MODES: dict[str, ModeGenerator] = {
+    "Routine Operational": RoutineOperationalEvaluationLayout,
+    "Post-event": PostEventEvaluationLayout
+}
+"""
+Dashboard modes to include by default.
+"""
 
 class Dashboard(Viewer):
     """
@@ -41,24 +76,21 @@ class Dashboard(Viewer):
             sidebar_width=380
         )
 
+        # Dashboard configuration
+        self.configuration = ConfigurationPane(
+            mode_options=list(DASHBOARD_MODES.keys()),
+            streamflow_options=["foot^3/s", "m^3/s", "foot^3/s/mile^2", "inch/h", "mm/h"],
+            precipitation_options=["inch/h", "mm/h"],
+            map_layers=list(MapLayerName)
+        )
+        self.template.sidebar.append(self.configuration)
+
         # Dashboard modes
-        self.modes = {
-            "Routine Operational": RoutineOperationalEvaluationLayout(registry),
-            "Post-event": PostEventEvaluationLayout()
-        }
+        self.modes = {k: v(registry, self.configuration) for k, v in DASHBOARD_MODES.items()}
         self.main_area = pn.pane.Placeholder(
             object=list(self.modes.values())[0]
         )
         self.template.main.append(self.main_area)
-
-        # Dashboard configuration
-        self.configuration = ConfigurationPane(
-            mode_options=list(self.modes.keys()),
-            streamflow_options=["foot^3/s", "m^3/s", "foot^3/s/mile^2", "inch/h", "mm/h"],
-            precipitation_options=["inch/h", "mm/h"],
-            map_layers=["Metrics", "USGS streamflow gages", "National Inventory of Dams"]
-        )
-        self.template.sidebar.append(self.configuration)
 
         # Update main area
         def change_dashboard_mode(mode_key) -> None:

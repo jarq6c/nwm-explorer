@@ -23,5 +23,7 @@
                 "Short Range Forecast (HRRR)": "../data/parquet/alaska/evaluations/short_range_alaska_20231001_20231003.parquet"
             }
         }
-    }
+    },
+    "site_information": "../data/site_information.parquet",
+    "national_inventory_of_dams": "../data/NID.parquet"
 }

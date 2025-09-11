@@ -427,6 +427,7 @@ class SiteMap(Viewer):
             layers: dict[str, MapLayer],
             domains: dict[str, MapFocus],
             domain_selector: pn.widgets.Select,
+            layer_selector: pn.widgets.CheckBoxGroup,
             default_domain: str | None = None,
             **params
         ) -> None:
@@ -453,13 +454,6 @@ class SiteMap(Viewer):
             "layout": self.layout
         })
 
-        # Widgets
-        self.layer_selector = pn.widgets.CheckBoxGroup(
-            name="Layers",
-            options=list(layers.keys()),
-            value=list(layers.keys())[0:1]
-        )
-
         # Add/Remove layers
         def update_layers(layer_keys: list[str]) -> None:
             for k, v in self.layers.items():
@@ -469,7 +463,7 @@ class SiteMap(Viewer):
                 else:
                     v.clear()
             self.refresh()
-        pn.bind(update_layers, self.layer_selector.param.value, watch=True)
+        pn.bind(update_layers, layer_selector.param.value, watch=True)
 
         # Switch domain view
         def switch_domain(domain: str) -> None:
