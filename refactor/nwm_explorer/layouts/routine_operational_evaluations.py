@@ -10,7 +10,7 @@ import polars as pl
 
 from nwm_explorer.logging.loggers import get_logger
 from nwm_explorer.application.api import (EvaluationRegistry, Metric,
-    MapLayerName, METRIC_PLOTTING_LIMITS, Confidence)
+    MapLayerName, METRIC_PLOTTING_LIMITS, Confidence, LEAD_TIME_VALUES)
 from nwm_explorer.panes.filters import Filters
 from nwm_explorer.panes.site_map import MapLayer, SiteMap, DOMAIN_VIEWS
 from nwm_explorer.panes.configuration import ConfigurationPane
@@ -119,23 +119,57 @@ class RoutineOperationalEvaluationLayout(Viewer):
         self.hydrograph = pn.pane.Markdown("Hydrograph")
         self.site_metrics = pn.pane.Markdown("Site metrics")
 
-        # Callbacks
-        # TODO keep this from updating twice
-        # def update_data(evaluation: str, domain: str, forcing: str) -> None:
-        #     store = registry.scan_evaluation(
-        #             self.filters.evaluation,
-        #             self.filters.domain,
-        #             self.filters.forcing
-        #         )
-        #     print(store.head().collect())
-        # pn.bind(
-        #     update_data,
-        #     evaluation=self.filters.evaluation_selector.param.value,
-        #     domain=self.filters.domain_selector.param.value,
-        #     forcing=self.filters.forcing_selector.param.value,
-        #     watch=True
-        # )
+        # Data updates
+        self.selected_evaluation: str = ""
+        self.selected_domain: str = ""
+        self.selected_forcing: str = ""
+        def update_data_store() -> None:
+            store = registry.scan_evaluation(
+                    self.filters.evaluation,
+                    self.filters.domain,
+                    self.filters.forcing
+                )
+            if self.filters.configuration in LEAD_TIME_VALUES:
+                store = store.filter(pl.col("lead_time_hours_min") == self.filters.lead_time)
+            print(store.collect())
+            self.selected_evaluation = self.filters.evaluation
+            self.selected_domain = self.filters.domain
+            self.selected_forcing = self.filters.forcing
 
+        # Evaluation updates
+        def handle_evaluation_update(evaluation: str) -> None:
+            if evaluation == self.selected_evaluation:
+                return
+            update_data_store()
+        pn.bind(
+            handle_evaluation_update,
+            evaluation=self.filters.evaluation_selector.param.value,
+            watch=True
+        )
+
+        # Domain updates
+        def handle_domain_update(domain: str) -> None:
+            if domain == self.selected_domain:
+                return
+            update_data_store()
+        pn.bind(
+            handle_domain_update,
+            domain=self.filters.domain_selector.param.value,
+            watch=True
+        )
+
+        # Forcing updates
+        def handle_forcing_update(forcing: str) -> None:
+            if forcing == self.selected_forcing:
+                return
+            update_data_store()
+        pn.bind(
+            handle_forcing_update,
+            forcing=self.filters.forcing_selector.param.value,
+            watch=True
+        )
+
+        # Metric callbacks
         def update_metric(metric: str, confidence: str) -> None:
             # Set column
             m = Metric(metric)

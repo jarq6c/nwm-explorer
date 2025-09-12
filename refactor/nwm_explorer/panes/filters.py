@@ -199,6 +199,11 @@ class Filters(Viewer):
         return DOMAIN_FORCING_CONFIGURATION[self.domain][self.forcing]
 
     @property
+    def lead_time(self) -> int:
+        """Currently selected lead time value."""
+        return self.lead_time_selector.value
+
+    @property
     def dataframe(self) -> pl.LazyFrame:
         """Scans current file path and returns lazy dataframe."""
         return pl.scan_parquet(self.filepath)

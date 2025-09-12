@@ -21,7 +21,7 @@
         "FY2024 Q2": {
             "CONUS": {
                 "Extended Analysis (MRMS, No-DA)": "../data/parquet/conus/evaluations/analysis_assim_extend_no_da_20240101_20240103.parquet",
-                "Short Range Forecast (HRRR)": "../data/parquet/conus/evaluations/analysis_assim_extend_no_da_20240101_20240103.parquet"
+                "Short Range Forecast (HRRR)": "../data/parquet/conus/evaluations/short_range_20240101_20240103.parquet"
             },
             "Alaska": {
                 "Extended Analysis (MRMS, No-DA)": "../data/parquet/alaska/evaluations/analysis_assim_extend_alaska_no_da_20240101_20240103.parquet",
