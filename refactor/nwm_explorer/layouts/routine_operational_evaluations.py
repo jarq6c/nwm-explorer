@@ -123,57 +123,34 @@ class RoutineOperationalEvaluationLayout(Viewer):
         self.selected_evaluation: str = ""
         self.selected_domain: str = ""
         self.selected_forcing: str = ""
-        def update_data_store() -> None:
-            store = registry.scan_evaluation(
+        self.update_data_source = False
+        def update_map() -> None:
+            # Swap data source
+            if self.update_data_source:
+                self.site_map.layers[MapLayerName.metrics].clear()
+                store = registry.scan_evaluation(
                     self.filters.evaluation,
                     self.filters.domain,
                     self.filters.forcing
                 )
+                self.site_map.layers[MapLayerName.metrics].update(
+                    store=store
+                )
+                self.update_data_source = False
+
+            # Handle lead time
             if self.filters.configuration in LEAD_TIME_VALUES:
-                store = store.filter(pl.col("lead_time_hours_min") == self.filters.lead_time)
-            print(store.collect())
-            self.selected_evaluation = self.filters.evaluation
-            self.selected_domain = self.filters.domain
-            self.selected_forcing = self.filters.forcing
+                s = self.site_map.layers[MapLayerName.metrics].store
+                # print(s.filter(
+                #     pl.col("lead_time_hours_min") == self.filters.lead_time
+                # ).collect())
+            #     self.site_map.layers[MapLayerName.metrics].update(
+            #         filters=[(pl.col("lead_time_hours_min") == self.filters.lead_time)]
+            #     )
 
-        # Evaluation updates
-        def handle_evaluation_update(evaluation: str) -> None:
-            if evaluation == self.selected_evaluation:
-                return
-            update_data_store()
-        pn.bind(
-            handle_evaluation_update,
-            evaluation=self.filters.evaluation_selector.param.value,
-            watch=True
-        )
-
-        # Domain updates
-        def handle_domain_update(domain: str) -> None:
-            if domain == self.selected_domain:
-                return
-            update_data_store()
-        pn.bind(
-            handle_domain_update,
-            domain=self.filters.domain_selector.param.value,
-            watch=True
-        )
-
-        # Forcing updates
-        def handle_forcing_update(forcing: str) -> None:
-            if forcing == self.selected_forcing:
-                return
-            update_data_store()
-        pn.bind(
-            handle_forcing_update,
-            forcing=self.filters.forcing_selector.param.value,
-            watch=True
-        )
-
-        # Metric callbacks
-        def update_metric(metric: str, confidence: str) -> None:
             # Set column
-            m = Metric(metric)
-            column = m.name + Confidence(confidence).name
+            m = self.filters.metric
+            column = m.name + self.filters.confidence.name
 
             # Update rendered layer
             self.site_map.layers[MapLayerName.metrics].update(
@@ -185,8 +162,55 @@ class RoutineOperationalEvaluationLayout(Viewer):
             # Update map
             if self.site_map.layers[MapLayerName.metrics].trace is not None:
                 self.site_map.refresh()
+            else:
+                self.site_map.layers[MapLayerName.metrics].render()
+
+            # Apply updates
+            self.selected_evaluation = self.filters.evaluation
+            self.selected_domain = self.filters.domain
+            self.selected_forcing = self.filters.forcing
+
+        # Evaluation updates
+        def handle_evaluation_update(evaluation: str) -> None:
+            if evaluation == self.selected_evaluation:
+                return
+            self.update_data_source = True
+            update_map()
         pn.bind(
-            update_metric,
+            handle_evaluation_update,
+            evaluation=self.filters.evaluation_selector.param.value,
+            watch=True
+        )
+
+        # Domain updates
+        def handle_domain_update(domain: str) -> None:
+            if domain == self.selected_domain:
+                return
+            self.update_data_source = True
+            update_map()
+        pn.bind(
+            handle_domain_update,
+            domain=self.filters.domain_selector.param.value,
+            watch=True
+        )
+
+        # Forcing updates
+        def handle_forcing_update(forcing: str) -> None:
+            if forcing == self.selected_forcing:
+                return
+            self.update_data_source = True
+            update_map()
+        pn.bind(
+            handle_forcing_update,
+            forcing=self.filters.forcing_selector.param.value,
+            watch=True
+        )
+
+        # Metric callbacks
+        def handle_metric_update(metric: str, confidence: str) -> None:
+            update_map()
+        pn.bind(
+            handle_metric_update,
             metric=self.filters.metric_selector.param.value,
             confidence=self.filters.confidence_selector.param.value,
             watch=True

@@ -270,6 +270,8 @@ class MapLayer:
         ----------
         store: pl.LazyFrame, optional
             Polars LazyFrame pointing at data to plot.
+        filters: list[pl.Expr], optional
+            List of polars expressions to apply to store.
         latitude_column: str, optional
             Column in data to use as latitude.
         longitude_column: str, optional
@@ -315,7 +317,7 @@ class MapLayer:
             columns += custom_data_columns
 
         # Additional attributes
-        if store:
+        if store is not None:
             self.store = store
         if custom_data_labels:
             self.custom_data_labels = custom_data_labels
