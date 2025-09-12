@@ -118,21 +118,30 @@ class Filters(Viewer):
             value=lead_time_options[0]
         )
 
-        # Domain-Configuration callback
-        def update_selector_options(evaluation: str) -> None:
+        # Domain callback
+        def update_domain_options(evaluation: str) -> None:
             if evaluation is None:
                 return
             self.domain_selector.options = self.domain_options
+        pn.bind(update_domain_options, self.evaluation_selector.param.value, watch=True)
+
+        # Forcing callback
+        def update_forcing_options(event: str) -> None:
+            if event is None:
+                return
             self.forcing_selector.options = self.forcing_options
-        pn.bind(update_selector_options, self.evaluation_selector.param.value, watch=True)
+        pn.bind(update_forcing_options, self.domain_selector.param.value, watch=True)
+        pn.bind(update_forcing_options, self.evaluation_selector.param.value, watch=True)
 
         # Lead time callback
-        def update_lead_times(forcing: str) -> None:
-            if forcing is None:
+        def update_lead_times(event: str) -> None:
+            if event is None:
                 return
             lead_time_options = LEAD_TIME_VALUES.get(self.configuration, [0])
             self.lead_time_selector.update(options=lead_time_options)
         pn.bind(update_lead_times, self.forcing_selector.param.value, watch=True)
+        pn.bind(update_lead_times, self.domain_selector.param.value, watch=True)
+        pn.bind(update_lead_times, self.evaluation_selector.param.value, watch=True)
 
     @property
     def evaluation_options(self) -> list[str]:

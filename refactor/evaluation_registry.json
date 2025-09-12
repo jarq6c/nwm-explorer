@@ -13,13 +13,18 @@
         "FY2024 Q1": {
             "CONUS": {
                 "Extended Analysis (MRMS, No-DA)": "../data/parquet/conus/evaluations/analysis_assim_extend_no_da_20231001_20231003.parquet"
+            },
+            "Hawaii": {
+                "Short Range Forecast (WRF-ARW, No-DA)": "../data/parquet/hawaii/evaluations/short_range_hawaii_no_da_20231001_20231003.parquet"
             }
         },
         "FY2024 Q2": {
             "CONUS": {
+                "Extended Analysis (MRMS, No-DA)": "../data/parquet/conus/evaluations/analysis_assim_extend_no_da_20240101_20240103.parquet",
                 "Short Range Forecast (HRRR)": "../data/parquet/conus/evaluations/analysis_assim_extend_no_da_20240101_20240103.parquet"
             },
             "Alaska": {
+                "Extended Analysis (MRMS, No-DA)": "../data/parquet/alaska/evaluations/analysis_assim_extend_alaska_no_da_20240101_20240103.parquet",
                 "Short Range Forecast (HRRR)": "../data/parquet/alaska/evaluations/short_range_alaska_20231001_20231003.parquet"
             }
         }
