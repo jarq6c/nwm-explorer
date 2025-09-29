@@ -104,7 +104,8 @@ def process_netcdf(
     -------
     pandas.DataFrame
     """
-    with xr.open_mfdataset(job.filepaths) as ds:
+    with xr.open_mfdataset(
+        job.filepaths, data_vars="different", compat="no_conflicts") as ds:
         df = ds[job.variables].sel(feature_id=job.features
             ).to_dataframe().reset_index().dropna()
         if "time" not in df:
