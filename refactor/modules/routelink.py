@@ -18,8 +18,8 @@ ROUTELINK_URL: str = (
 )
 """URL to RouteLink CSV tarball."""
 
-ROUTELINK_PARQUET: Path = Path("./data/routelink.parquet")
-"""Path to polars-compatible RouteLink parquet file used by application."""
+ROUTELINK_PARQUET: Path = Path("routelink.parquet")
+"""Default path to polars-compatible RouteLink parquet file used by application."""
 
 ROUTELINK_FILENAMES: dict[ModelDomain, str] = {
     ModelDomain.ALASKA: "RouteLink_AK.csv",
@@ -56,9 +56,6 @@ def download_routelink(
         logger.info("%s exists", file_path)
         return pl.scan_parquet(file_path)
     logger.info("Downloading %s", file_path)
-
-    # Create parents
-    file_path.parent.mkdir(exist_ok=True, parents=True)
 
     # Download RouteLink
     with TemporaryDirectory() as td:
