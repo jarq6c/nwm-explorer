@@ -97,7 +97,10 @@ def download_routelink(
             data,
             schema_overrides={
                 "usgs_site_code": enumerated_site_code,
-                "domain": ModelDomain
+                "domain": ModelDomain,
+                "nwm_feature_id": pl.Int64,
+                "latitude": pl.Float64,
+                "longitude": pl.Float64
                 }
         )
         pl_data.write_parquet(file_path)
