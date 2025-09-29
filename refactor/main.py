@@ -551,25 +551,26 @@ URLBuilder = Callable[[pd.Timestamp], list[str]]
 NWM_URL_BUILDERS: dict[tuple[ModelDomain, ModelConfiguration], URLBuilder] = {
     (ModelDomain.ALASKA,
      ModelConfiguration.ANALYSIS_ASSIM_EXTEND_ALASKA_NO_DA): analysis_assim_extend_alaska_no_da,
-    # (ModelDomain.CONUS,
-    #  ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA): analysis_assim_extend_no_da,
-    # (ModelDomain.HAWAII,
-    #  ModelConfiguration.ANALYSIS_ASSIM_HAWAII_NO_DA): analysis_assim_hawaii_no_da,
-    # (ModelDomain.PUERTO_RICO,
-    #  ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA): analysis_assim_puerto_rico_no_da,
-    # (ModelDomain.CONUS, ModelConfiguration.MEDIUM_RANGE_MEM_1): medium_range_mem_1,
-    # (ModelDomain.CONUS, ModelConfiguration.MEDIUM_RANGE_BLEND): medium_range_blend,
-    # (ModelDomain.CONUS, ModelConfiguration.MEDIUM_RANGE_NO_DA): medium_range_no_da,
-    # (ModelDomain.ALASKA, ModelConfiguration.MEDIUM_RANGE_ALASKA_MEM_1): medium_range_alaska_mem_1,
-    # (ModelDomain.ALASKA, ModelConfiguration.MEDIUM_RANGE_BLEND_ALASKA): medium_range_blend_alaska,
-    # (ModelDomain.ALASKA, ModelConfiguration.MEDIUM_RANGE_ALASKA_NO_DA): medium_range_alaska_no_da,
-    # (ModelDomain.CONUS, ModelConfiguration.SHORT_RANGE): short_range,
-    # (ModelDomain.ALASKA, ModelConfiguration.SHORT_RANGE_ALASKA): short_range_alaska,
-    # (ModelDomain.HAWAII, ModelConfiguration.SHORT_RANGE_HAWAII): short_range_hawaii,
-    # (ModelDomain.HAWAII, ModelConfiguration.SHORT_RANGE_HAWAII_NO_DA): short_range_hawaii_no_da,
-    # (ModelDomain.PUERTO_RICO, ModelConfiguration.SHORT_RANGE_PUERTO_RICO): short_range_puerto_rico,
-    # (ModelDomain.PUERTO_RICO,
-    #  ModelConfiguration.SHORT_RANGE_PUERTO_RICO_NO_DA): short_range_puerto_rico_no_da
+    (ModelDomain.CONUS,
+     ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA): analysis_assim_extend_no_da,
+    (ModelDomain.HAWAII,
+     ModelConfiguration.ANALYSIS_ASSIM_HAWAII_NO_DA): analysis_assim_hawaii_no_da,
+    (ModelDomain.PUERTO_RICO,
+     ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA): analysis_assim_puerto_rico_no_da,
+    (ModelDomain.CONUS, ModelConfiguration.MEDIUM_RANGE_MEM_1): medium_range_mem_1,
+    (ModelDomain.CONUS, ModelConfiguration.MEDIUM_RANGE_BLEND): medium_range_blend,
+    (ModelDomain.CONUS, ModelConfiguration.MEDIUM_RANGE_NO_DA): medium_range_no_da,
+    (ModelDomain.ALASKA, ModelConfiguration.MEDIUM_RANGE_ALASKA_MEM_1): medium_range_alaska_mem_1,
+    (ModelDomain.ALASKA, ModelConfiguration.MEDIUM_RANGE_BLEND_ALASKA): medium_range_blend_alaska,
+    (ModelDomain.ALASKA, ModelConfiguration.MEDIUM_RANGE_ALASKA_NO_DA): medium_range_alaska_no_da,
+    (ModelDomain.CONUS, ModelConfiguration.SHORT_RANGE): short_range,
+    (ModelDomain.ALASKA, ModelConfiguration.SHORT_RANGE_ALASKA): short_range_alaska,
+    (ModelDomain.HAWAII, ModelConfiguration.SHORT_RANGE_HAWAII): short_range_hawaii,
+    (ModelDomain.HAWAII, ModelConfiguration.SHORT_RANGE_HAWAII_NO_DA): short_range_hawaii_no_da,
+    (ModelDomain.PUERTO_RICO,
+     ModelConfiguration.SHORT_RANGE_PUERTO_RICO): short_range_puerto_rico,
+    (ModelDomain.PUERTO_RICO,
+     ModelConfiguration.SHORT_RANGE_PUERTO_RICO_NO_DA): short_range_puerto_rico_no_da
 }
 """Mapping from (ModelDomain, ModelConfiguration) to url builder function."""
 
@@ -593,6 +594,7 @@ def download_nwm(
         jobs: int = 1,
         retries: int = 3
 ) -> None:
+    """Download and process NWM output."""
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
@@ -676,7 +678,7 @@ if __name__ == "__main__":
     )
 
     # Check data
-    df = pl.scan_parquet(
+    result = pl.scan_parquet(
         "data/nwm/",
         hive_schema={
             "configuration": pl.Enum(ModelConfiguration),
@@ -685,7 +687,7 @@ if __name__ == "__main__":
         }
     )
     print(
-        df.filter(
+        result.filter(
             pl.col("configuration") == ModelConfiguration.ANALYSIS_ASSIM_EXTEND_ALASKA_NO_DA,
             pl.col("nwm_feature_id") == 75000700032122
         ).select(
