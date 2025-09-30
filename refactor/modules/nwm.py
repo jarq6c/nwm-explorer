@@ -113,31 +113,39 @@ def process_netcdf(
     -------
     pandas.DataFrame
     """
-    with xr.open_mfdataset(
-        job.filepaths, data_vars="different", compat="no_conflicts",
-        join="outer") as ds:
-        df = ds[job.variables].sel(feature_id=job.features
-            ).to_dataframe().reset_index().dropna()
-        if "time" not in df:
-            df["time"] = ds.time.values[0]
-        if "reference_time" not in df:
-            df["reference_time"] = ds.reference_time.values[0]
-    df = df.rename(columns={
+    dfs = []
+    for fp in job.filepaths:
+        # Extract data
+        with xr.open_dataset(fp, engine="h5netcdf") as ds:
+            df = ds[job.variables].sel(feature_id=job.features
+                ).to_dataframe().reset_index().dropna()
+            if "time" not in df:
+                df["time"] = ds.time.values[0]
+            if "reference_time" not in df:
+                df["reference_time"] = ds.reference_time.values[0]
+
+        # Add to list
+        dfs.append(df)
+
+    # Merge
+    merged = pd.concat(dfs, ignore_index=True)
+
+    # Update columns
+    merged = merged.rename(columns={
         "time": "value_time",
         "feature_id": "nwm_feature_id",
         "streamflow": "predicted_cfs"
         })
 
     # Downcast and convert to cubic feet per second
-    df["predicted_cfs"] = df["predicted_cfs"].astype(np.float32) / (0.3048 ** 3.0)
-    return df
+    merged["predicted_cfs"] = merged["predicted_cfs"].astype(np.float32) / (0.3048 ** 3.0)
+    return merged
 
 def process_netcdf_parallel(
     filepaths: list[Path],
     variables: list[str],
     features: list[int],
-    max_processes: int = 1,
-    files_per_job: int = 5
+    max_processes: int = 1
     ) -> pd.DataFrame:
     """
     Process a collection of National Water Model NetCDF files and return a
@@ -153,19 +161,15 @@ def process_netcdf_parallel(
         Feature to extract from NetCDF Files.
     max_processes: int, optional, default 1
         Maximum number of cores to use simultaneously.
-    files_per_job: int, optional, default 5
-        Maximum numer of files to load at once. Memory limited.
 
     Returns
     -------
     pandas.DataFrame
     """
-    job_files = np.array_split(filepaths, len(filepaths) // files_per_job)
+    job_files = np.array_split(filepaths, max_processes)
     jobs = [NetCDFJob(j, variables, features) for j in job_files]
-    chunksize = max(1, len(jobs) // max_processes)
     with ProcessPoolExecutor(max_workers=max_processes) as pool:
-        return pd.concat(pool.map(
-            process_netcdf, jobs, chunksize=chunksize), ignore_index=True)
+        return pd.concat(pool.map(process_netcdf, jobs), ignore_index=True)
 
 def generate_reference_dates(
         start: str | pd.Timestamp,
@@ -672,7 +676,8 @@ def download_nwm(
                     *list(zip(urls, file_paths)),
                     timeout=3600,
                     file_validator=netcdf_validator,
-                    retries=retries
+                    retries=retries,
+                    limit=20
                 )
 
                 logger.info("Processing NWM data")
