@@ -1,4 +1,11 @@
-"""Download and process National Water Model output."""
+"""
+Download and process National Water Model output.
+
+Methods
+-------
+- download_nwm
+- scan_nwm
+"""
 from tempfile import TemporaryDirectory
 from typing import Callable
 from dataclasses import dataclass
@@ -44,6 +51,9 @@ class ModelConfiguration(StrEnum):
 
 GOOGLE_CLOUD_BUCKET_URL: str = "https://storage.googleapis.com/national-water-model/"
 """National Water Model Google Cloud Storage bucket."""
+
+SUBDIRECTORY: str = "nwm"
+"""Subdirectory that indicates root of NWM output parquet store."""
 
 def netcdf_validator(filepath: Path) -> None:
     """
@@ -104,7 +114,8 @@ def process_netcdf(
     pandas.DataFrame
     """
     with xr.open_mfdataset(
-        job.filepaths, data_vars="different", compat="no_conflicts") as ds:
+        job.filepaths, data_vars="different", compat="no_conflicts",
+        join="outer") as ds:
         df = ds[job.variables].sel(feature_id=job.features
             ).to_dataframe().reset_index().dropna()
         if "time" not in df:
@@ -584,7 +595,7 @@ def build_nwm_filepath(
     year = f"year={reference_date.year}"
     month = f"month={reference_date.month}"
     day = f"D{reference_date.day}.parquet"
-    return root / "nwm" / config / year / month / day
+    return root / SUBDIRECTORY / config / year / month / day
 
 def download_nwm(
         start: pd.Timestamp,
@@ -594,7 +605,24 @@ def download_nwm(
         jobs: int = 1,
         retries: int = 3
 ) -> None:
-    """Download and process NWM output."""
+    """
+    Download and process NWM output.
+
+    Parameters
+    ----------
+    start: pandas.Timestamp
+        First reference date to retrieve and process.
+    end: pandas.Timestamp
+        Last refrence date to retrieve and process.
+    routelink: polars.DataFrame
+        Crosswalk from NWM channel feature IDs to USGS site codes.
+    root: pathlib.Path
+        Root data directory.
+    jobs: int, optional, default 1
+        Number of parallel process used to process NWM output.
+    retries: int, optional, default 3
+        Number of times to retry NetCDF file downloads.
+    """
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
@@ -659,3 +687,21 @@ def download_nwm(
                     pl.col("value_time").dt.cast_time_unit("ms"),
                     pl.col("reference_time").dt.cast_time_unit("ms")
                 ).write_parquet(ofile)
+
+def scan_nwm(root: Path) -> pl.LazyFrame:
+    """
+    Return polars.LazyFrame of NWM output.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    """
+    return pl.scan_parquet(
+        root / f"{SUBDIRECTORY}/",
+        hive_schema={
+            "configuration": pl.Enum(ModelConfiguration),
+            "year": pl.Int32,
+            "month": pl.Int32
+        }
+    )
