@@ -20,8 +20,8 @@ import pandas as pd
 import polars as pl
 import xarray as xr
 
-from modules.logger import get_logger
-from modules.downloads import download_files, FileValidationError
+from .logger import get_logger
+from .downloads import download_files, FileValidationError
 
 class ModelDomain(StrEnum):
     """Model domains."""
