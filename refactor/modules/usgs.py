@@ -40,6 +40,52 @@ SUBDIRECTORY: str = "usgs"
 SITE_TABLE_DIRECTORY: str = "site_table"
 """Subdirectory that indicates root of USGS site parquet store."""
 
+SITE_SCHEMA: pl.Schema = pl.Schema({
+    "id": pl.String,
+    "vertical_datum": pl.String,
+    "original_horizontal_datum_name": pl.String,
+    "well_constructed_depth": pl.String,
+    "country_name": pl.String,
+    "vertical_datum_name": pl.String,
+    "drainage_area": pl.Float64,
+    "hole_constructed_depth": pl.String,
+    "minor_civil_division_code": pl.String,
+    "hydrologic_unit_code": pl.String,
+    "horizontal_positional_accuracy_code": pl.String,
+    "contributing_drainage_area": pl.Float64,
+    "depth_source_code": pl.String,
+    "agency_name": pl.String,
+    "basin_code": pl.String,
+    "horizontal_positional_accuracy": pl.String,
+    "time_zone_abbreviation": pl.String,
+    "altitude": pl.Float64,
+    "monitoring_location_name": pl.String,
+    "district_code": pl.String,
+    "state_code": pl.String,
+    "site_type": pl.String,
+    "horizontal_position_method_code": pl.String,
+    "uses_daylight_savings": pl.String,
+    "agency_code": pl.String,
+    "country_code": pl.String,
+    "county_code": pl.String,
+    "altitude_accuracy": pl.Float64,
+    "construction_date": pl.String,
+    "aquifer_code": pl.String,
+    "monitoring_location_number": pl.String,
+    "state_name": pl.String,
+    "site_type_code": pl.String,
+    "altitude_method_code": pl.String,
+    "horizontal_position_method_name": pl.String,
+    "national_aquifer_code": pl.String,
+    "county_name": pl.String,
+    "altitude_method_name": pl.String,
+    "original_horizontal_datum": pl.String,
+    "aquifer_type_code": pl.String,
+    "longitude": pl.Float64,
+    "latitude": pl.Float64
+})
+"""Schema for USGS site data."""
+
 def download_site_table(
         root: Path
     ):
@@ -50,8 +96,6 @@ def download_site_table(
     ----------
     root: pathlib.Path
         Root data directory.
-    retries: int, optional, default 3
-        Number of times to retry NetCDF file downloads.
     """
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
@@ -68,6 +112,7 @@ def download_site_table(
         ofile = odir / (state.abbr.lower() + ".parquet")
         if ofile.exists():
             logger.info("Found %s", ofile)
+            continue
         logger.info("Buildling %s", ofile)
 
         # Build URL
@@ -80,7 +125,10 @@ def download_site_table(
         # Convert to polars
         gdf["longitude"] = gdf.geometry.x
         gdf["latitude"] = gdf.geometry.y
-        data = pl.DataFrame(gdf.drop("geometry", axis=1))
+        data = pl.DataFrame(
+            gdf.drop("geometry", axis=1),
+            schema_overrides=SITE_SCHEMA
+        )
 
         # Save
         logger.info("Saving %s", ofile)
@@ -95,9 +143,7 @@ def scan_site_table(root: Path) -> pl.LazyFrame:
     root: pathlib.Path
         Root data directory.
     """
-    return pl.scan_parquet(
-        root / f"{SITE_TABLE_DIRECTORY}/"
-    )
+    return pl.scan_parquet(root / SITE_TABLE_DIRECTORY)
 
 def json_validator(ifile: Path) -> None:
     """
