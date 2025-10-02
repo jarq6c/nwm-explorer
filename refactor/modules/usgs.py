@@ -3,6 +3,7 @@ Download and process USGS streamflow observations.
 
 Methods
 -------
+- download_site_table
 - download_usgs
 - scan_usgs
 """
@@ -15,6 +16,7 @@ from tempfile import TemporaryDirectory
 import us
 import pandas as pd
 import polars as pl
+import geopandas as gpd
 
 from .logger import get_logger
 from .downloads import download_files
@@ -22,11 +24,80 @@ from .downloads import download_files
 NWIS_BASE_URL: str = "https://waterservices.usgs.gov/nwis/iv/?format=json&siteStatus=all"
 """NWIS IV API returning json and all site statuses."""
 
+MONITORING_LOCATION_BASE_URL: str = (
+    "https://api.waterdata.usgs.gov/ogcapi/v0/collections/monitoring-locations"
+    "/items?f=json&lang=en-US&limit=10000&skipGeometry=false&offset=0"
+    "&agency_code=USGS&site_type_code=ST"
+)
+"""USGS monitoring location API returning geojson."""
+
 STATE_LIST: list[us.states.State] = us.states.STATES + [us.states.PR]
 """List of US states."""
 
 SUBDIRECTORY: str = "usgs"
 """Subdirectory that indicates root of USGS output parquet store."""
+
+SITE_TABLE_DIRECTORY: str = "site_table"
+"""Subdirectory that indicates root of USGS site parquet store."""
+
+def download_site_table(
+        root: Path
+    ):
+    """
+    Download and process NWM output.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    retries: int, optional, default 3
+        Number of times to retry NetCDF file downloads.
+    """
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+
+    # Output directory
+    odir = root / SITE_TABLE_DIRECTORY
+    odir.mkdir(exist_ok=True, parents=True)
+
+    # Build site table
+    logger.info("Building site table")
+    for state in STATE_LIST:
+        # Build state file
+        ofile = odir / (state.abbr.lower() + ".parquet")
+        if ofile.exists():
+            logger.info("Found %s", ofile)
+        logger.info("Buildling %s", ofile)
+
+        # Build URL
+        url = MONITORING_LOCATION_BASE_URL + f"&state_code={state.fips}"
+        logger.info("Downloading %s", url)
+
+        # Fetch
+        gdf = gpd.read_file(url)
+
+        # Convert to polars
+        gdf["longitude"] = gdf.geometry.x
+        gdf["latitude"] = gdf.geometry.y
+        data = pl.DataFrame(gdf.drop("geometry", axis=1))
+
+        # Save
+        logger.info("Saving %s", ofile)
+        data.write_parquet(ofile)
+
+def scan_site_table(root: Path) -> pl.LazyFrame:
+    """
+    Return polars.LazyFrame of USGS sites.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    """
+    return pl.scan_parquet(
+        root / f"{SITE_TABLE_DIRECTORY}/"
+    )
 
 def json_validator(ifile: Path) -> None:
     """
