@@ -1,4 +1,11 @@
-"""Retrieve and organize USGS streamflow observations."""
+"""
+Download and process USGS streamflow observations.
+
+Methods
+-------
+- download_usgs
+- scan_usgs
+"""
 from pathlib import Path
 import inspect
 import json
@@ -91,7 +98,6 @@ def download_usgs(
         start: pd.Timestamp,
         end: pd.Timestamp,
         root: Path,
-        jobs: int = 1,
         retries: int = 3
     ):
     """
@@ -107,8 +113,6 @@ def download_usgs(
         Crosswalk from NWM channel feature IDs to USGS site codes.
     root: pathlib.Path
         Root data directory.
-    jobs: int, optional, default 1
-        Number of parallel process used to process NWM output.
     retries: int, optional, default 3
         Number of times to retry NetCDF file downloads.
     """
@@ -164,7 +168,7 @@ def download_usgs(
             download_files(
                 (url, json_file),
                 limit=1,
-                timeout=3600, 
+                timeout=3600,
                 headers={"Accept-Encoding": "gzip"},
                 file_validator=json_validator,
                 retries=retries
