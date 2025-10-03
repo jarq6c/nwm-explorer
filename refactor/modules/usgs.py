@@ -12,6 +12,7 @@ import inspect
 import json
 from dataclasses import dataclass
 from tempfile import TemporaryDirectory
+from enum import StrEnum
 
 import us
 import pandas as pd
@@ -27,9 +28,47 @@ NWIS_BASE_URL: str = "https://waterservices.usgs.gov/nwis/iv/?format=json&siteSt
 MONITORING_LOCATION_BASE_URL: str = (
     "https://api.waterdata.usgs.gov/ogcapi/v0/collections/monitoring-locations"
     "/items?f=json&lang=en-US&limit=10000&skipGeometry=false&offset=0"
-    "&agency_code=USGS&site_type_code=ST"
+    "&agency_code=USGS&site_type_code="
 )
 """USGS monitoring location API returning geojson."""
+
+class SiteTypeSlug(StrEnum):
+    """Machine-friendly site types."""
+    STREAM = "stream"
+    CANAL = "canal"
+    DITCH = "ditch"
+    LAKE = "lake"
+    TIDAL = "tidal"
+
+@dataclass
+class SiteType:
+    """
+    Dataclass for storing USGS site type details.
+
+    Attributes
+    ----------
+    code: str
+        Site type code.
+    name: str
+        Short name.
+    long_name: str
+        Long name.
+    slug: SiteTypeSlug
+        Machine-friendly representation.
+    """
+    code: str
+    name: str
+    long_name: str
+    slug: SiteTypeSlug
+
+SITE_TYPES: list[SiteType] = [
+    SiteType("ST", "Stream", "Stream", SiteTypeSlug.STREAM),
+    SiteType("ST-CA", "Canal", "Canal", SiteTypeSlug.CANAL),
+    SiteType("ST-DCH", "Ditch", "Ditch", SiteTypeSlug.DITCH),
+    SiteType("ST-TS", "Tidal SW", "Tidal stream", SiteTypeSlug.TIDAL),
+    SiteType("LK", "Lake", "Lake, Reservoir, Impoundment", SiteTypeSlug.LAKE)
+]
+"""List of USGS site types to retrieve for master site table."""
 
 STATE_LIST: list[us.states.State] = us.states.STATES + [us.states.PR]
 """List of US states."""
@@ -108,31 +147,37 @@ def download_site_table(
     # Build site table
     logger.info("Building site table")
     for state in STATE_LIST:
-        # Build state file
-        ofile = odir / (state.abbr.lower() + ".parquet")
-        if ofile.exists():
-            logger.info("Found %s", ofile)
-            continue
-        logger.info("Buildling %s", ofile)
+        for site_type in SITE_TYPES:
+            # Build state file
+            ofile = odir / f"site_type={site_type.slug}" / (state.abbr.lower() + ".parquet")
+            if ofile.exists():
+                logger.info("Found %s", ofile)
+                continue
+            logger.info("Buildling %s", ofile)
+            ofile.parent.mkdir(exist_ok=True, parents=True)
 
-        # Build URL
-        url = MONITORING_LOCATION_BASE_URL + f"&state_code={state.fips}"
-        logger.info("Downloading %s", url)
+            # Build URL
+            url = MONITORING_LOCATION_BASE_URL + site_type.code + f"&state_code={state.fips}"
+            logger.info("Downloading %s", url)
 
-        # Fetch
-        gdf = gpd.read_file(url)
+            # Fetch
+            gdf = gpd.read_file(url)
 
-        # Convert to polars
-        gdf["longitude"] = gdf.geometry.x
-        gdf["latitude"] = gdf.geometry.y
-        data = pl.DataFrame(
-            gdf.drop("geometry", axis=1),
-            schema_overrides=SITE_SCHEMA
-        )
+            # Check for data
+            if gdf.empty:
+                continue
 
-        # Save
-        logger.info("Saving %s", ofile)
-        data.write_parquet(ofile)
+            # Convert to polars
+            gdf["longitude"] = gdf.geometry.x
+            gdf["latitude"] = gdf.geometry.y
+            data = pl.DataFrame(
+                gdf.drop("geometry", axis=1),
+                schema_overrides=SITE_SCHEMA
+            )
+
+            # Save
+            logger.info("Saving %s", ofile)
+            data.write_parquet(ofile)
 
 def scan_site_table(root: Path) -> pl.LazyFrame:
     """
