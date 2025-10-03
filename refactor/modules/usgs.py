@@ -294,7 +294,6 @@ def download_usgs(
             # Process
             logger.info("Building %s", ofile)
             process_json(JSONJob(json_file, ofile))
-            return
 
 def scan_usgs(root: Path) -> pl.LazyFrame:
     """
