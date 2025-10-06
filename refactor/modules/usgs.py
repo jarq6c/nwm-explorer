@@ -213,6 +213,47 @@ def download_site_table(
             logger.info("Saving %s", ofile)
             data.write_parquet(ofile)
 
+def expand_site_table(
+        ifile: Path,
+        ofile: Path
+) -> None:
+    """
+    Manually expand the site.
+
+    Parameters
+    ----------
+    ifile: pathlib.Path
+        GeoJSON file of USGS monitoring locations. (e.g.
+        Path('new_york_sites.json'))
+    ofile: pathlib.Path
+        New parquet file to add to the application site table. (e.g.
+        Path('site_table/site_type_slug=stream/ny_2.parquet'))
+    
+    Returns
+    -------
+    None
+    """
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+
+    # Open file
+    logger.info("Importing %s", ifile)
+    gdf = gpd.read_file(ifile)
+
+    # Convert to polars
+    logger.info("Converting to parquet")
+    gdf["longitude"] = gdf.geometry.x
+    gdf["latitude"] = gdf.geometry.y
+    data = pl.DataFrame(
+        gdf.drop("geometry", axis=1),
+        schema_overrides=SITE_SCHEMA
+    )
+
+    # Save
+    logger.info("Saving %s", ofile)
+    data.write_parquet(ofile)
+
 def scan_site_table(root: Path) -> pl.LazyFrame:
     """
     Return polars.LazyFrame of USGS sites.

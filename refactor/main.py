@@ -14,9 +14,7 @@ if __name__ == "__main__":
 
     # Download site table
     # download_site_table(root, Path("config.json"))
-    site_table = scan_site_table(root).with_columns(
-        pl.col("id").str.slice(5).alias("usgs_site_code")
-    ).collect()
+    site_table = scan_site_table(root).drop("site_type_slug").collect()
 
     # Load routelink
     rl = download_routelink(
@@ -24,8 +22,6 @@ if __name__ == "__main__":
     ).select(
         ["nwm_feature_id", "usgs_site_code", "domain"]
     ).with_columns(pl.col("usgs_site_code").cast(pl.String)).collect()
-    print(rl.filter(~pl.col("usgs_site_code").is_in(site_table["usgs_site_code"].to_list())))
-    quit()
 
     # Download and process NWM output
     download_nwm(
