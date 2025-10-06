@@ -14,7 +14,7 @@ if __name__ == "__main__":
 
     # Download site table
     # download_site_table(root, Path("config.json"))
-    site_table = scan_site_table(root).drop("site_type_slug").collect()
+    site_table = scan_site_table(root).collect()
 
     # Load routelink
     rl = download_routelink(
@@ -49,6 +49,8 @@ if __name__ == "__main__":
     )
 
     # Check observations
-    observations = scan_usgs(root)
+    observations = scan_usgs(root).with_columns(
+        pl.col("usgs_site_code").cast(pl.String)
+    ).filter(~pl.col("usgs_site_code").is_in(site_table["monitoring_location_number"].to_list()))
 
     print(observations.collect())

@@ -28,7 +28,7 @@ class Configuration(BaseModel):
     """Application configuration options."""
     key: str
 
-NWIS_BASE_URL: str = "https://waterservices.usgs.gov/nwis/iv/?format=json&siteStatus=all"
+NWIS_BASE_URL: str = "https://waterservices.usgs.gov/nwis/iv/?format=json&siteStatus=all&parameterCd=00060"
 """NWIS IV API returning json and all site statuses."""
 
 MONITORING_LOCATION_BASE_URL: str = (
