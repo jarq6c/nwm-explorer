@@ -6,7 +6,7 @@ import polars as pl
 
 from modules.routelink import download_routelink
 from modules.nwm import download_nwm, scan_nwm
-from modules.usgs import download_usgs, scan_usgs, download_site_table, scan_site_table
+from modules.usgs import download_usgs, scan_usgs, scan_site_table
 
 if __name__ == "__main__":
     # Data directory
