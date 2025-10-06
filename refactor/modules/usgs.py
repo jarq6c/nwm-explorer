@@ -13,14 +13,20 @@ import json
 from dataclasses import dataclass
 from tempfile import TemporaryDirectory
 from enum import StrEnum
+from time import sleep
 
 import us
 import pandas as pd
 import polars as pl
 import geopandas as gpd
+from pydantic import BaseModel
 
 from .logger import get_logger
 from .downloads import download_files
+
+class Configuration(BaseModel):
+    """Application configuration options."""
+    key: str
 
 NWIS_BASE_URL: str = "https://waterservices.usgs.gov/nwis/iv/?format=json&siteStatus=all"
 """NWIS IV API returning json and all site statuses."""
@@ -39,6 +45,11 @@ class SiteTypeSlug(StrEnum):
     DITCH = "ditch"
     LAKE = "lake"
     TIDAL = "tidal"
+    SPRING = "spring"
+    DIVERSION = "diversion"
+    ESTUARY = "estuary"
+    TUNNEL = "tunnel"
+    FIELD = "field"
 
 @dataclass
 class SiteType:
@@ -66,11 +77,16 @@ SITE_TYPES: list[SiteType] = [
     SiteType("ST-CA", "Canal", "Canal", SiteTypeSlug.CANAL),
     SiteType("ST-DCH", "Ditch", "Ditch", SiteTypeSlug.DITCH),
     SiteType("ST-TS", "Tidal SW", "Tidal stream", SiteTypeSlug.TIDAL),
-    SiteType("LK", "Lake", "Lake, Reservoir, Impoundment", SiteTypeSlug.LAKE)
+    SiteType("LK", "Lake", "Lake, Reservoir, Impoundment", SiteTypeSlug.LAKE),
+    SiteType("SP", "Spring", "Spring", SiteTypeSlug.SPRING),
+    SiteType("FA-DV", "Diversion", "Diversion", SiteTypeSlug.DIVERSION),
+    SiteType("ES", "Estuary", "Estuary", SiteTypeSlug.ESTUARY),
+    SiteType("SB-TSM", "Tunl/mine", "Tunnel, shaft, or mine", SiteTypeSlug.TUNNEL),
+    SiteType("FA-FON", "Agric area", "Field, Pasture, Orchard, or Nursery", SiteTypeSlug.FIELD)
 ]
 """List of USGS site types to retrieve for master site table."""
 
-STATE_LIST: list[us.states.State] = us.states.STATES + [us.states.PR]
+STATE_LIST: list[us.states.State] = us.states.STATES + [us.states.PR, us.states.DC]
 """List of US states."""
 
 SUBDIRECTORY: str = "usgs"
@@ -126,7 +142,8 @@ SITE_SCHEMA: pl.Schema = pl.Schema({
 """Schema for USGS site data."""
 
 def download_site_table(
-        root: Path
+        root: Path,
+        configuration_file: Path
     ):
     """
     Download and process NWM output.
@@ -140,6 +157,11 @@ def download_site_table(
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
 
+    # Load configuration
+    logger.info("Reading %s", configuration_file)
+    with configuration_file.open("r") as fo:
+        config = Configuration.model_validate_json(fo.read())
+
     # Output directory
     odir = root / SITE_TABLE_DIRECTORY
     odir.mkdir(exist_ok=True, parents=True)
@@ -149,7 +171,7 @@ def download_site_table(
     for state in STATE_LIST:
         for site_type in SITE_TYPES:
             # Build state file
-            ofile = odir / f"site_type={site_type.slug}" / (state.abbr.lower() + ".parquet")
+            ofile = odir / f"site_type_slug={site_type.slug}" / (state.abbr.lower() + ".parquet")
             if ofile.exists():
                 logger.info("Found %s", ofile)
                 continue
@@ -157,14 +179,26 @@ def download_site_table(
             ofile.parent.mkdir(exist_ok=True, parents=True)
 
             # Build URL
-            url = MONITORING_LOCATION_BASE_URL + site_type.code + f"&state_code={state.fips}"
+            url = (MONITORING_LOCATION_BASE_URL + site_type.code +
+                f"&state_code={state.fips}" + f"&api_key={config.key}")
             logger.info("Downloading %s", url)
 
             # Fetch
-            gdf = gpd.read_file(url)
+            for attempt in range(3):
+                try:
+                    gdf = gpd.read_file(url)
+                    break
+                except Exception as e:
+                    logger.info(e)
+                    gdf = None
+                    sleep(2 ** attempt)
 
             # Check for data
+            if gdf is None:
+                logger.info("Unable to retrieve")
+                continue
             if gdf.empty:
+                logger.info("Empty response")
                 continue
 
             # Convert to polars
@@ -188,7 +222,10 @@ def scan_site_table(root: Path) -> pl.LazyFrame:
     root: pathlib.Path
         Root data directory.
     """
-    return pl.scan_parquet(root / SITE_TABLE_DIRECTORY)
+    return pl.scan_parquet(
+        root / SITE_TABLE_DIRECTORY,
+        hive_schema={"site_type_slug": pl.Enum(SiteTypeSlug)}
+        )
 
 def json_validator(ifile: Path) -> None:
     """
