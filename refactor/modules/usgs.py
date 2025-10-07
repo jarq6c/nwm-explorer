@@ -399,6 +399,11 @@ def download_usgs(
             ofile.parent.mkdir(exist_ok=True, parents=True)
             urls.append(generate_usgs_url(rd, state_code))
 
+    # Check for files
+    if len(ofiles) == 0:
+        logger.info("No files to download")
+        return
+
     # Temporary directory
     odir = root / "temp"
     odir.mkdir(exist_ok=True)
@@ -437,6 +442,11 @@ def scan_usgs(root: Path) -> pl.LazyFrame:
     root: pathlib.Path
         Root data directory.
     """
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+
+    logger.info("Scanning observations")
     return pl.scan_parquet(
         root / f"{SUBDIRECTORY}/",
         hive_schema={

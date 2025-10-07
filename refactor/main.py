@@ -49,8 +49,19 @@ if __name__ == "__main__":
     )
 
     # Check observations
-    observations = scan_usgs(root).with_columns(
-        pl.col("usgs_site_code").cast(pl.String)
-    ).filter(~pl.col("usgs_site_code").is_in(site_table["monitoring_location_number"].to_list()))
+    # observations = scan_usgs(root).with_columns(
+    #     pl.col("usgs_site_code").cast(pl.String)
+    # ).filter(~pl.col("usgs_site_code").is_in(site_table["monitoring_location_number"].to_list()))
+    observations = scan_usgs(root).filter(
+        pl.col("usgs_site_code") == "073802280",
+        pl.col("month") == 4
+    ).select(
+        ["value_time", "observed_cfs"]
+    ).unique("value_time").sort("value_time")
 
-    print(observations.collect())
+    from time import perf_counter
+    now = perf_counter()
+    for _ in range(3):
+        df = observations.collect()
+    duration = perf_counter() - now
+    print(duration / 3)
