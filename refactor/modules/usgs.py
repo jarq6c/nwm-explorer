@@ -19,21 +19,10 @@ import us
 import pandas as pd
 import polars as pl
 import geopandas as gpd
-from pydantic import BaseModel
 
 from .logger import get_logger
 from .downloads import download_files
-
-class Configuration(BaseModel):
-    """
-    Application configuration options.
-
-    Attributes
-    ----------
-    key: str
-        USGS API key.
-    """
-    key: str
+from .configuration import Configuration
 
 NWIS_BASE_URL: str = (
     "https://waterservices.usgs.gov/nwis/iv/"
@@ -153,7 +142,7 @@ SITE_SCHEMA: pl.Schema = pl.Schema({
 
 def download_site_table(
         root: Path,
-        configuration_file: Path
+        config: Configuration
     ):
     """
     Download and process NWM output.
@@ -162,15 +151,12 @@ def download_site_table(
     ----------
     root: pathlib.Path
         Root data directory.
+    config: Configuration
+        Configuration object.
     """
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
-
-    # Load configuration
-    logger.info("Reading %s", configuration_file)
-    with configuration_file.open("r") as fo:
-        config = Configuration.model_validate_json(fo.read())
 
     # Output directory
     odir = root / SITE_TABLE_DIRECTORY
