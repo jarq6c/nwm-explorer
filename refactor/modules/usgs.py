@@ -49,6 +49,9 @@ class SiteTypeSlug(StrEnum):
     ESTUARY = "estuary"
     TUNNEL = "tunnel"
     FIELD = "field"
+    STORM_SEWER = "storm_sewer"
+    COMBINED_SEWER = "combined_sewer"
+    OUTFALL = "outfall"
 
 @dataclass
 class SiteType:
@@ -81,7 +84,10 @@ SITE_TYPES: list[SiteType] = [
     SiteType("FA-DV", "Diversion", "Diversion", SiteTypeSlug.DIVERSION),
     SiteType("ES", "Estuary", "Estuary", SiteTypeSlug.ESTUARY),
     SiteType("SB-TSM", "Tunl/mine", "Tunnel, shaft, or mine", SiteTypeSlug.TUNNEL),
-    SiteType("FA-FON", "Agric area", "Field, Pasture, Orchard, or Nursery", SiteTypeSlug.FIELD)
+    SiteType("FA-FON", "Agric area", "Field, Pasture, Orchard, or Nursery", SiteTypeSlug.FIELD),
+    SiteType("FA-STS", "Sewer-strm", "Storm sewer", SiteTypeSlug.STORM_SEWER),
+    SiteType("FA-CS", "Sewer-comb", "Combined sewer", SiteTypeSlug.COMBINED_SEWER),
+    SiteType("FA-OF", "Outfall", "Outfall", SiteTypeSlug.OUTFALL)
 ]
 """List of USGS site types to retrieve for master site table."""
 
@@ -331,6 +337,7 @@ class JSONJob:
     """
     ifile: Path
     ofile: Path
+    enumerated_sites: pl.Enum
 
 def process_json(job: JSONJob) -> None:
     """Process a JSON file."""
@@ -350,7 +357,7 @@ def process_json(job: JSONJob) -> None:
                 dfs.append(value)
     pl.from_dicts(dfs).with_columns(
         pl.col("value").cast(pl.Float32),
-        pl.col("usgs_site_code").cast(pl.Categorical),
+        pl.col("usgs_site_code").cast(job.enumerated_sites, strict=False),
         pl.col("series").cast(pl.Int32),
         pl.col("qualifiers").cast(pl.Categorical),
         pl.col("dateTime").str.to_datetime("%Y-%m-%dT%H:%M:%S%.3f%:z",
@@ -358,7 +365,7 @@ def process_json(job: JSONJob) -> None:
     ).rename({
         "value": "observed_cfs",
         "dateTime": "value_time"
-    }).write_parquet(job.ofile)
+    }).drop_nulls("usgs_site_code").write_parquet(job.ofile)
 
 def download_usgs(
         start: pd.Timestamp,
@@ -447,7 +454,7 @@ def download_usgs(
 
             # Process
             logger.info("Building %s", ofile)
-            process_json(JSONJob(json_file, ofile))
+            process_json(JSONJob(json_file, ofile, enumerate_sites(root)))
 
 def scan_usgs(root: Path) -> pl.LazyFrame:
     """

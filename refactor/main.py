@@ -9,6 +9,13 @@ from modules.nwm import scan_nwm, ModelConfiguration
 from modules.usgs import scan_usgs
 
 if __name__ == "__main__":
+    # Scan local parquet
+    observations = scan_usgs(Path("/ised/nwm_explorer_data"))
+    print(observations.filter(
+        pl.col("state_code") == "nc",
+        pl.col("usgs_site_code") == "02146470"
+    ).select(["value_time", "observed_cfs"]).unique("value_time").collect().sort("value_time"))
+    quit()
     # Data directory
     root = Path("./data")
 
@@ -46,6 +53,8 @@ if __name__ == "__main__":
 
     # Prepare observations
     observations = scan_usgs(root
+        ).filter(
+            pl.col("usgs_site_code").is_in(rl["usgs_site_code"].implode())
         ).select(
             ["usgs_site_code", "value_time", "observed_cfs"]
         ).unique(
@@ -58,6 +67,11 @@ if __name__ == "__main__":
             group_by="usgs_site_code"
         ).agg(
             pl.col("observed_cfs").max()
+        ).with_columns(
+            nwm_feature_id=pl.col("usgs_site_code").replace_strict(
+                rl["usgs_site_code"].implode(),
+                rl["nwm_feature_id"].implode()
+            )
         )
 
     predictions = scan_nwm(root
@@ -81,4 +95,4 @@ if __name__ == "__main__":
             # pl.col("reference_time").min().alias("reference_time_min"),
             # pl.col("reference_time").max().alias("reference_time_max")
         )
-    print(predictions.collect())
+    print(observations.collect().estimated_size("mb"))
