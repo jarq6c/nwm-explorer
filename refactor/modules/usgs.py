@@ -264,6 +264,36 @@ def scan_site_table(root: Path) -> pl.LazyFrame:
         hive_schema={"site_type_slug": pl.Enum(SiteTypeSlug)}
         )
 
+def enumerate_sites(root: Path) -> pl.Enum:
+    """
+    Return polars.Enum of USGS site codes found in the site table.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    """
+    # Check for existing enumeration
+    ofile = root / "enumerated_usgs_sites.parquet"
+    if ofile.exists():
+        return pl.read_parquet(ofile)["monitoring_location_number"].dtype
+
+    # Extract site list and enumerate
+    site_list = scan_site_table(root).select(
+            "monitoring_location_number"
+        ).collect()["monitoring_location_number"].sort().to_list()
+
+    # Apply enumeration
+    site_table = scan_site_table(root).select(
+        "monitoring_location_number"
+    ).with_columns(
+        pl.col("monitoring_location_number").cast(pl.Enum(site_list))
+    )
+
+    # Save
+    site_table.collect().write_parquet(ofile)
+    return pl.read_parquet(ofile)["monitoring_location_number"].dtype
+
 def json_validator(ifile: Path) -> None:
     """
     Open and read json file data.

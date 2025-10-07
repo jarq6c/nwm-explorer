@@ -5,67 +5,80 @@ import pandas as pd
 import polars as pl
 
 from modules.routelink import download_routelink
-from modules.nwm import download_nwm, scan_nwm
-from modules.usgs import download_usgs, scan_usgs, scan_site_table, download_site_table
-from modules.configuration import load_configuration
+from modules.nwm import scan_nwm, ModelConfiguration
+from modules.usgs import scan_usgs
 
 if __name__ == "__main__":
-    # Load configuration
-    config = load_configuration(Path("config.json"))
-
     # Data directory
     root = Path("./data")
 
-    # Download site table
-    download_site_table(root, config)
-    site_table = scan_site_table(root).collect()
-
     # Load routelink
     rl = download_routelink(
-        file_path=root / "routelink.parquet"
+        root
     ).select(
         ["nwm_feature_id", "usgs_site_code", "domain"]
-    ).with_columns(pl.col("usgs_site_code").cast(pl.String)).collect()
+    ).collect()
 
-    # Download and process NWM output
-    download_nwm(
-        start=pd.Timestamp("2025-04-01"),
-        end=pd.Timestamp("2025-04-05"),
-        root=root,
-        routelink=rl,
-        jobs=18
-    )
+    # # Download and process NWM output
+    # download_nwm(
+    #     start=pd.Timestamp("2025-04-01"),
+    #     end=pd.Timestamp("2025-04-05"),
+    #     root=root,
+    #     routelink=rl,
+    #     jobs=18
+    # )
 
-    # Extract required dates of observations
-    predictions = scan_nwm(root)
-    date_range = predictions.select(
-        pl.col("value_time").min().alias("start"),
-        pl.col("value_time").max().alias("end")
-        ).collect()
-    start = date_range["start"].item(0).strftime("%Y-%m-%d")
-    end = date_range["end"].item(0).strftime("%Y-%m-%d")
+    # # Extract required dates of observations
+    # predictions = scan_nwm(root)
+    # date_range = predictions.select(
+    #     pl.col("value_time").min().alias("start"),
+    #     pl.col("value_time").max().alias("end")
+    #     ).collect()
+    # start = date_range["start"].item(0).strftime("%Y-%m-%d")
+    # end = date_range["end"].item(0).strftime("%Y-%m-%d")
 
-    # Download and process USGS streamflow
-    download_usgs(
-        start=pd.Timestamp(start),
-        end=pd.Timestamp(end),
-        root=root
-    )
+    # # Download and process USGS streamflow
+    # download_usgs(
+    #     start=pd.Timestamp(start),
+    #     end=pd.Timestamp(end),
+    #     root=root
+    # )
 
-    # Check observations
-    # observations = scan_usgs(root).with_columns(
-    #     pl.col("usgs_site_code").cast(pl.String)
-    # ).filter(~pl.col("usgs_site_code").is_in(site_table["monitoring_location_number"].to_list()))
-    observations = scan_usgs(root).filter(
-        pl.col("usgs_site_code") == "073802280",
-        pl.col("month") == 4
-    ).select(
-        ["value_time", "observed_cfs"]
-    ).unique("value_time").sort("value_time")
+    # Prepare observations
+    observations = scan_usgs(root
+        ).select(
+            ["usgs_site_code", "value_time", "observed_cfs"]
+        ).unique(
+            ["usgs_site_code", "value_time"]
+        ).sort(
+            ["usgs_site_code", "value_time"]
+        ).group_by_dynamic(
+            "value_time",
+            every="1d",
+            group_by="usgs_site_code"
+        ).agg(
+            pl.col("observed_cfs").max()
+        )
 
-    from time import perf_counter
-    now = perf_counter()
-    for _ in range(3):
-        df = observations.collect()
-    duration = perf_counter() - now
-    print(duration / 3)
+    predictions = scan_nwm(root
+        ).filter(
+            pl.col("configuration") == ModelConfiguration.MEDIUM_RANGE_MEM_1
+        ).select(
+            ["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
+        ).with_columns(
+            ((pl.col("value_time") - pl.col("reference_time")) /
+                pl.duration(hours=24)).round().cast(pl.Int32).alias("lead_time_hours_min")
+        ).sort(
+            ["nwm_feature_id", "lead_time_hours_min", "value_time"]
+        ).group_by_dynamic(
+            "value_time",
+            every="1d",
+            group_by=["nwm_feature_id", "lead_time_hours_min"]
+        ).agg(
+            pl.col("predicted_cfs").max(),
+            # pl.col("value_time").min().alias("value_time_min"),
+            # pl.col("value_time").max().alias("value_time_max"),
+            # pl.col("reference_time").min().alias("reference_time_min"),
+            # pl.col("reference_time").max().alias("reference_time_max")
+        )
+    print(predictions.collect())

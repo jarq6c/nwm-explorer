@@ -702,6 +702,12 @@ def scan_nwm(root: Path) -> pl.LazyFrame:
     root: pathlib.Path
         Root data directory.
     """
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+
+    # Generate reference dates
+    logger.info("Scanning predictions")
     return pl.scan_parquet(
         root / f"{SUBDIRECTORY}/",
         hive_schema={

@@ -11,6 +11,7 @@ from yarl import URL
 from .logger import get_logger
 from .downloads import download_files
 from .nwm import ModelDomain
+from .usgs import enumerate_sites
 
 ROUTELINK_URL: str = (
     "https://www.hydroshare.org/resource"
@@ -30,18 +31,18 @@ ROUTELINK_FILENAMES: dict[ModelDomain, str] = {
 """Mapping from domains to routelink files names."""
 
 def download_routelink(
-        url: str | URL = ROUTELINK_URL,
-        file_path: Path = ROUTELINK_PARQUET
+        root: Path,
+        url: str | URL = ROUTELINK_URL
 ) -> pl.LazyFrame:
     """
     Download RouteLink file.
 
     Parameters
     ----------
+    root: pathlib.Path
+        Root data directory.
     url: str | URL
         Source URL.
-    file_path: pathlib.Path
-        Destination file path.
     
     Returns
     -------
@@ -52,8 +53,9 @@ def download_routelink(
     logger = get_logger(name)
 
     # Check for file
+    file_path = root / ROUTELINK_PARQUET
     if file_path.exists():
-        logger.info("%s exists", file_path)
+        logger.info("Scanning %s", file_path)
         return pl.scan_parquet(file_path)
     logger.info("Downloading %s", file_path)
 
@@ -92,7 +94,7 @@ def download_routelink(
         data.loc[short, "usgs_site_code"] = "0" + data.loc[short, "usgs_site_code"]
 
         # Save
-        enumerated_site_code = pl.Enum(data["usgs_site_code"].to_list())
+        enumerated_site_code = enumerate_sites(root)
         pl_data = pl.DataFrame(
             data,
             schema_overrides={
@@ -101,9 +103,11 @@ def download_routelink(
                 "nwm_feature_id": pl.Int64,
                 "latitude": pl.Float64,
                 "longitude": pl.Float64
-                }
-        )
+                },
+            strict=False
+        ).drop_nulls("usgs_site_code")
         pl_data.write_parquet(file_path)
 
-    # Scan and return
+    # Scan
+    logger.info("Scanning %s", file_path)
     return pl.scan_parquet(file_path)
