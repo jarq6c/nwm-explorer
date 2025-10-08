@@ -6,15 +6,40 @@ import polars as pl
 
 from modules.routelink import download_routelink
 from modules.nwm import scan_nwm, ModelConfiguration
-from modules.usgs import scan_usgs
+from modules.usgs import scan_usgs, load_usgs
+
+import functools
 
 if __name__ == "__main__":
     # Scan local parquet
-    observations = scan_usgs(Path("/ised/nwm_explorer_data"))
-    print(observations.filter(
-        pl.col("state_code") == "nc",
-        pl.col("usgs_site_code") == "02146470"
-    ).select(["value_time", "observed_cfs"]).unique("value_time").collect().sort("value_time"))
+    # observations = scan_usgs(Path("/ised/nwm_explorer_data"))
+
+    # @functools.lru_cache()
+    # def load_observations_data(
+    #         state_code: str,
+    #         year: int,
+    #         month: int
+    # ) -> pl.DataFrame:
+    #     return observations.filter(
+    #         pl.col("state_code") == state_code,
+    #         pl.col("year") == year,
+    #         pl.col("month") == month
+    #     ).select(["usgs_site_code", "value_time", "observed_cfs"]).collect().unique(
+    #         ["usgs_site_code", "value_time"]).sort(["usgs_site_code", "value_time"])
+
+    from time import perf_counter
+
+    for _ in range(3):
+        start = perf_counter()
+        df = load_usgs(
+            Path("/ised/nwm_explorer_data"),
+            "nc",
+            2024,
+            4,
+            True
+        ).filter(pl.col("usgs_site_code") == "02146470")
+        duration = perf_counter() - start
+        print(duration)
     quit()
     # Data directory
     root = Path("./data")

@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from tempfile import TemporaryDirectory
 from enum import StrEnum
 from time import sleep
+import functools
 
 import us
 import pandas as pd
@@ -23,6 +24,9 @@ import geopandas as gpd
 from .logger import get_logger
 from .downloads import download_files
 from .configuration import Configuration
+
+LRU_CACHE_SIZE: int = 25
+"""Maximum size of functools.lru_cache."""
 
 NWIS_BASE_URL: str = (
     "https://waterservices.usgs.gov/nwis/iv/"
@@ -456,7 +460,7 @@ def download_usgs(
             logger.info("Building %s", ofile)
             process_json(JSONJob(json_file, ofile, enumerate_sites(root)))
 
-def scan_usgs(root: Path) -> pl.LazyFrame:
+def scan_usgs_no_cache(root: Path) -> pl.LazyFrame:
     """
     Return polars.LazyFrame of USGS observations.
 
@@ -464,12 +468,11 @@ def scan_usgs(root: Path) -> pl.LazyFrame:
     ----------
     root: pathlib.Path
         Root data directory.
-    """
-    # Get logger
-    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
-    logger = get_logger(name)
 
-    logger.info("Scanning observations")
+    Returns
+    -------
+    polars.LazyFrame
+    """
     return pl.scan_parquet(
         root / f"{SUBDIRECTORY}/",
         hive_schema={
@@ -478,3 +481,152 @@ def scan_usgs(root: Path) -> pl.LazyFrame:
             "month": pl.Int32
         }
     )
+
+@functools.lru_cache(LRU_CACHE_SIZE)
+def scan_usgs_cache(root: Path) -> pl.LazyFrame:
+    """
+    Return polars.LazyFrame of USGS observations. Cache result.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+
+    Returns
+    -------
+    polars.LazyFrame
+    """
+    return scan_usgs_no_cache(root)
+
+def scan_usgs(root: Path, cache: bool = False) -> pl.LazyFrame:
+    """
+    Return polars.LazyFrame of USGS observations.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    cache: bool, optional, default False
+        Whether to cache the resulting LazyFrame for subsequent calls.
+
+    Returns
+    -------
+    polars.LazyFrame
+    """
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+
+    logger.info("Scanning observations")
+    if cache:
+        return scan_usgs_cache(root)
+    return scan_usgs_no_cache(root)
+
+def load_usgs_no_cache(
+    root: Path,
+    state_code: str,
+    year: int,
+    month: int
+    ) -> pl.LazyFrame:
+    """
+    Return polars.DataFrame of USGS observations.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    state_code: str
+        Two character lower case state abbreviation.
+    year: int
+        Integer year.
+    month: int
+        Integer month.
+    
+    Returns
+    -------
+    polars.DataFrame
+    """
+    return scan_usgs(root).filter(
+        pl.col("state_code") == state_code,
+        pl.col("year") == year,
+        pl.col("month") == month
+    ).select(
+        ["usgs_site_code", "value_time", "observed_cfs"]
+    ).collect().unique(
+        ["usgs_site_code", "value_time"]
+    ).sort(
+        ["usgs_site_code", "value_time"]
+    )
+
+@functools.lru_cache(LRU_CACHE_SIZE)
+def load_usgs_cache(
+    root: Path,
+    state_code: str,
+    year: int,
+    month: int
+    ) -> pl.LazyFrame:
+    """
+    Return polars.DataFrame of USGS observations. Cache DataFrame.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    state_code: str
+        Two character lower case state abbreviation.
+    year: int
+        Integer year.
+    month: int
+        Integer month.
+    
+    Returns
+    -------
+    polars.DataFrame
+    """
+    return scan_usgs(root, cache=True).filter(
+        pl.col("state_code") == state_code,
+        pl.col("year") == year,
+        pl.col("month") == month
+    ).select(
+        ["usgs_site_code", "value_time", "observed_cfs"]
+    ).collect().unique(
+        ["usgs_site_code", "value_time"]
+    ).sort(
+        ["usgs_site_code", "value_time"]
+    )
+
+def load_usgs(
+    root: Path,
+    state_code: str,
+    year: int,
+    month: int,
+    cache: bool = False
+    ) -> pl.LazyFrame:
+    """
+    Return polars.DataFrame of USGS observations.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    state_code: str
+        Two character lower case state abbreviation.
+    year: int
+        Integer year.
+    month: int
+        Integer month.
+    cache: bool, optional, default False
+        Whether to cache the resulting DataFrame for subsequent calls.
+    
+    Returns
+    -------
+    polars.DataFrame
+    """
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+
+    logger.info("Retrieving observations")
+    if cache:
+        return load_usgs_cache(root, state_code, year, month)
+    return load_usgs_no_cache(root, state_code, year, month)
