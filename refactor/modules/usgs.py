@@ -274,6 +274,46 @@ def scan_site_table(root: Path) -> pl.LazyFrame:
         hive_schema={"site_type_slug": pl.Enum(SiteTypeSlug)}
         )
 
+@functools.lru_cache(LRU_CACHE_SIZE)
+def lookup_site_state_code_cache(root: Path, usgs_site_code: str) -> str:
+    """
+    Given a USGS site code, return the US state as a lower case two-character
+    abbreviation.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    usgs_site_code: str
+        USGS site code.
+    
+    Returns
+    -------
+    str
+    """
+    fips = scan_site_table(root).filter(
+        pl.col("monitoring_location_number") == usgs_site_code
+    ).select("state_code").collect()["state_code"].item(0)
+    return us.states.lookup(fips).abbr.lower()
+
+def lookup_site_state_code(root: Path, usgs_site_code: str) -> str:
+    """
+    Given a USGS site code, return the US state as a lower case two-character
+    abbreviation.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    usgs_site_code: str
+        USGS site code.
+    
+    Returns
+    -------
+    str
+    """
+    return lookup_site_state_code_cache(root, usgs_site_code)
+
 def enumerate_sites(root: Path) -> pl.Enum:
     """
     Return polars.Enum of USGS site codes found in the site table.
