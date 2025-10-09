@@ -24,7 +24,7 @@ import xarray as xr
 from .logger import get_logger
 from .downloads import download_files, FileValidationError
 
-LRU_CACHE_SIZE: int = 15
+LRU_CACHE_SIZE: int = 9
 """Maximum size of functools.lru_cache."""
 
 class ModelDomain(StrEnum):
@@ -825,7 +825,7 @@ def load_nwm(
     cache: bool = False
     ) -> pl.DataFrame:
     """
-    Return polars.DataFrame of USGS observations.
+    Return polars.DataFrame of NWM output.
 
     Parameters
     ----------
@@ -853,3 +853,52 @@ def load_nwm(
     if cache:
         return load_nwm_cache(root, configuration, year, month)
     return load_nwm_no_cache(root, configuration, year, month)
+
+def load_nwm_site(
+    root: Path,
+    configuration: ModelConfiguration,
+    nwm_feature_id: int,
+    start_time: pd.Timestamp,
+    end_time: pd.Timestamp,
+    cache: bool = False
+    ) -> pl.DataFrame:
+    """
+    Return polars.DataFrame of NWM output.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    configuration: ModelConfiguration
+        Model configuration (e.g. ModelConfiguration.MEDIUM_RANGE_MEM_1)
+    nwm_feature_id: str
+        NWM channel feature ID.
+    start_time: pandas.Timestamp
+        Earliest reference time to retrieve.
+    end_time: pandas.Timestamp
+        Latest reference time to retrieve.
+    cache: bool, optional, default False
+        Whether to cache the underlying DataFrames for subsequent calls.
+    
+    Returns
+    -------
+    polars.DataFrame
+    """
+    # Check end month
+    if start_time.strftime("%Y%m") == end_time.strftime("%Y%m"):
+        end_time += pd.Timedelta("31D")
+
+    # Load data
+    dataframes = []
+    for m in pd.date_range(start_time, end_time, freq="1ME"):
+        # Get month of data
+        if cache:
+            df = load_nwm_cache(root, configuration, m.year, m.month)
+        else:
+            df = load_nwm_no_cache(root, configuration, m.year, m.month)
+
+        # Filter to relevant site, add to rest
+        dataframes.append(df.filter(pl.col("nwm_feature_id") == nwm_feature_id))
+
+    # Concatenate
+    return pl.concat(dataframes)

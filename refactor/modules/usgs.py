@@ -706,6 +706,10 @@ def load_usgs_site(
     logger.info("Looking up state code for %s", usgs_site_code)
     state_code = lookup_site_state_code(root, usgs_site_code)
 
+    # Check end month
+    if start_time.strftime("%Y%m") == end_time.strftime("%Y%m"):
+        end_time += pd.Timedelta("31D")
+
     # Load data
     dataframes = []
     for m in pd.date_range(start_time, end_time, freq="1ME"):
