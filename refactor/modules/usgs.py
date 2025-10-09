@@ -567,7 +567,7 @@ def load_usgs_no_cache(
     state_code: str,
     year: int,
     month: int
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
     """
     Return polars.DataFrame of USGS observations.
 
@@ -604,7 +604,7 @@ def load_usgs_cache(
     state_code: str,
     year: int,
     month: int
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
     """
     Return polars.DataFrame of USGS observations. Cache DataFrame.
 
@@ -641,7 +641,7 @@ def load_usgs(
     year: int,
     month: int,
     cache: bool = False
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
     """
     Return polars.DataFrame of USGS observations.
 
@@ -670,3 +670,53 @@ def load_usgs(
     if cache:
         return load_usgs_cache(root, state_code, year, month)
     return load_usgs_no_cache(root, state_code, year, month)
+
+def load_usgs_site(
+    root: Path,
+    usgs_site_code: str,
+    start_time: pd.Timestamp,
+    end_time: pd.Timestamp,
+    cache: bool = False
+    ) -> pl.DataFrame:
+    """
+    Return polars.DataFrame of USGS observations.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    usgs_site_code: str
+        USGS site code.
+    start_time: pandas.Timestamp
+        Earliest datetime to retrieve.
+    end_time: pandas.Timestamp
+        Latest datetime to retrieve.
+    cache: bool, optional, default False
+        Whether to cache the underlying DataFrames for subsequent calls.
+    
+    Returns
+    -------
+    polars.DataFrame
+    """
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+
+    # Find state code
+    logger.info("Looking up state code for %s", usgs_site_code)
+    state_code = lookup_site_state_code(root, usgs_site_code)
+
+    # Load data
+    dataframes = []
+    for m in pd.date_range(start_time, end_time, freq="1ME"):
+        # Get month of data
+        if cache:
+            df = load_usgs_cache(root, state_code, m.year, m.month)
+        else:
+            df = load_usgs_no_cache(root, state_code, m.year, m.month)
+
+        # Filter to relevant site, add to rest
+        dataframes.append(df.filter(pl.col("usgs_site_code") == usgs_site_code))
+
+    # Concatenate
+    return pl.concat(dataframes)
