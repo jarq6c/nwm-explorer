@@ -14,6 +14,7 @@ import inspect
 from concurrent.futures import ProcessPoolExecutor
 import os
 from enum import StrEnum
+import functools
 
 import numpy as np
 import pandas as pd
@@ -22,6 +23,9 @@ import xarray as xr
 
 from .logger import get_logger
 from .downloads import download_files, FileValidationError
+
+LRU_CACHE_SIZE: int = 25
+"""Maximum size of functools.lru_cache."""
 
 class ModelDomain(StrEnum):
     """Model domains."""
@@ -693,7 +697,7 @@ def download_nwm(
                     pl.col("reference_time").dt.cast_time_unit("ms")
                 ).write_parquet(ofile)
 
-def scan_nwm(root: Path) -> pl.LazyFrame:
+def scan_nwm_no_cache(root: Path) -> pl.LazyFrame:
     """
     Return polars.LazyFrame of NWM output.
 
@@ -716,3 +720,30 @@ def scan_nwm(root: Path) -> pl.LazyFrame:
             "month": pl.Int32
         }
     )
+
+@functools.lru_cache(LRU_CACHE_SIZE)
+def scan_nwm_cache(root: Path) -> pl.LazyFrame:
+    """
+    Return polars.LazyFrame of NWM output. Cache LazyFrame.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    """
+    return scan_nwm_no_cache(root)
+
+def scan_nwm(root: Path, cache: bool = False) -> pl.LazyFrame:
+    """
+    Return polars.LazyFrame of NWM output.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    cache: bool, optional, default False
+        If True, cache underlying LazyFrame.
+    """
+    if cache:
+        return scan_nwm_cache(root)
+    return scan_nwm_no_cache(root)
