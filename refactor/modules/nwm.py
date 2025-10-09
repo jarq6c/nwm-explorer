@@ -24,7 +24,7 @@ import xarray as xr
 from .logger import get_logger
 from .downloads import download_files, FileValidationError
 
-LRU_CACHE_SIZE: int = 25
+LRU_CACHE_SIZE: int = 15
 """Maximum size of functools.lru_cache."""
 
 class ModelDomain(StrEnum):
@@ -747,3 +747,109 @@ def scan_nwm(root: Path, cache: bool = False) -> pl.LazyFrame:
     if cache:
         return scan_nwm_cache(root)
     return scan_nwm_no_cache(root)
+
+def load_nwm_no_cache(
+    root: Path,
+    configuration: ModelConfiguration,
+    year: int,
+    month: int
+    ) -> pl.DataFrame:
+    """
+    Return polars.DataFrame of USGS observations.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    configuration: ModelConfiguration
+        Model configuration (e.g. ModelConfiguration.MEDIUM_RANGE_MEM_1)
+    year: int
+        Integer year.
+    month: int
+        Integer month.
+    
+    Returns
+    -------
+    polars.DataFrame
+    """
+    return scan_nwm(root).filter(
+        pl.col("configuration") == configuration,
+        pl.col("year") == year,
+        pl.col("month") == month
+    ).select(
+        ["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
+    ).collect().sort(
+        ["nwm_feature_id", "reference_time", "value_time"]
+    )
+
+@functools.lru_cache(LRU_CACHE_SIZE)
+def load_nwm_cache(
+    root: Path,
+    configuration: ModelConfiguration,
+    year: int,
+    month: int
+    ) -> pl.DataFrame:
+    """
+    Return polars.DataFrame of USGS observations. Cache result.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    configuration: ModelConfiguration
+        Model configuration (e.g. ModelConfiguration.MEDIUM_RANGE_MEM_1)
+    year: int
+        Integer year.
+    month: int
+        Integer month.
+    
+    Returns
+    -------
+    polars.DataFrame
+    """
+    return scan_nwm(root, cache=True).filter(
+        pl.col("configuration") == configuration,
+        pl.col("year") == year,
+        pl.col("month") == month
+    ).select(
+        ["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
+    ).collect().sort(
+        ["nwm_feature_id", "reference_time", "value_time"]
+    )
+
+def load_nwm(
+    root: Path,
+    configuration: ModelConfiguration,
+    year: int,
+    month: int,
+    cache: bool = False
+    ) -> pl.DataFrame:
+    """
+    Return polars.DataFrame of USGS observations.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    configuration: ModelConfiguration
+        Model configuration (e.g. ModelConfiguration.MEDIUM_RANGE_MEM_1)
+    year: int
+        Integer year.
+    month: int
+        Integer month.
+    cache: bool, optional, default False
+        If True, cache underlying dataframe.
+    
+    Returns
+    -------
+    polars.DataFrame
+    """
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+
+    # Generate reference dates
+    logger.info("Retrieving predictions")
+    if cache:
+        return load_nwm_cache(root, configuration, year, month)
+    return load_nwm_no_cache(root, configuration, year, month)
