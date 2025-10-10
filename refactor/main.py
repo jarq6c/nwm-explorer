@@ -5,16 +5,24 @@ import pandas as pd
 import polars as pl
 
 from modules.routelink import download_routelink
-from modules.nwm import scan_nwm, ModelConfiguration, load_nwm_site
+from modules.nwm import scan_nwm, ModelConfiguration, load_nwm_site, load_nwm
 from modules.usgs import download_usgs, load_usgs_site
 
 if __name__ == "__main__":
+    pred = load_nwm(
+        Path("/ised/nwm_explorer_data"),
+        ModelConfiguration.SHORT_RANGE_ALASKA,
+        2024,
+        6,
+        True
+    )
+    print(pred)
     pred = load_nwm_site(
-        Path("data"),
-        ModelConfiguration.MEDIUM_RANGE_MEM_1,
-        3109,
-        pd.Timestamp("2025-04-01"),
-        pd.Timestamp("2025-04-04"),
+        Path("/ised/nwm_explorer_data"),
+        ModelConfiguration.SHORT_RANGE_ALASKA,
+        19020190011954,
+        pd.Timestamp("2024-04-01"),
+        pd.Timestamp("2024-06-30"),
         True
     )
     print(pred)
