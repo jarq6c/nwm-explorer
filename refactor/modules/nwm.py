@@ -901,4 +901,7 @@ def load_nwm_site(
         dataframes.append(df.filter(pl.col("nwm_feature_id") == nwm_feature_id))
 
     # Concatenate
-    return pl.concat(dataframes)
+    return pl.concat(dataframes).filter(
+        pl.col("reference_time") >= start_time,
+        pl.col("reference_time") <= end_time
+    )

@@ -723,4 +723,7 @@ def load_usgs_site(
         dataframes.append(df.filter(pl.col("usgs_site_code") == usgs_site_code))
 
     # Concatenate
-    return pl.concat(dataframes)
+    return pl.concat(dataframes).filter(
+        pl.col("value_time") >= start_time,
+        pl.col("value_time") <= end_time
+    )
