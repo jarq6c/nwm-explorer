@@ -752,7 +752,8 @@ def load_nwm_no_cache(
     root: Path,
     configuration: ModelConfiguration,
     year: int,
-    month: int
+    month: int,
+    nwm_feature_id: int | None = None
     ) -> pl.DataFrame:
     """
     Return polars.DataFrame of USGS observations.
@@ -767,18 +768,26 @@ def load_nwm_no_cache(
         Integer year.
     month: int
         Integer month.
+    nwm_feature_id: int, optional
+        NWM channel feature ID.
     
     Returns
     -------
     polars.DataFrame
     """
-    return scan_nwm(root).filter(
+    # Initial scan
+    df = scan_nwm(root).filter(
         pl.col("configuration") == configuration,
         pl.col("year") == year,
         pl.col("month") == month
     ).select(
         ["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
-    ).collect().sort(
+    )
+
+    # Feature by filter
+    if nwm_feature_id is not None:
+        df = df.filter(pl.col("nwm_feature_id") == nwm_feature_id)
+    return df.collect().sort(
         ["nwm_feature_id", "reference_time", "value_time"]
     )
 
@@ -787,7 +796,8 @@ def load_nwm_cache(
     root: Path,
     configuration: ModelConfiguration,
     year: int,
-    month: int
+    month: int,
+    nwm_feature_id: int | None = None
     ) -> pl.DataFrame:
     """
     Return polars.DataFrame of USGS observations. Cache result.
@@ -802,18 +812,26 @@ def load_nwm_cache(
         Integer year.
     month: int
         Integer month.
+    nwm_feature_id: int, optional
+        NWM channel feature ID.
     
     Returns
     -------
     polars.DataFrame
     """
-    return scan_nwm(root, cache=True).filter(
+    # Initial scan with caching
+    df = scan_nwm(root, cache=True).filter(
         pl.col("configuration") == configuration,
         pl.col("year") == year,
         pl.col("month") == month
     ).select(
         ["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
-    ).collect().sort(
+    )
+
+    # Feature by filter
+    if nwm_feature_id is not None:
+        df = df.filter(pl.col("nwm_feature_id") == nwm_feature_id)
+    return df.collect().sort(
         ["nwm_feature_id", "reference_time", "value_time"]
     )
 
@@ -893,12 +911,12 @@ def load_nwm_site(
     for m in pd.date_range(start_time, end_time, freq="1ME"):
         # Get month of data
         if cache:
-            df = load_nwm_cache(root, configuration, m.year, m.month)
+            df = load_nwm_cache(root, configuration, m.year, m.month, nwm_feature_id)
         else:
-            df = load_nwm_no_cache(root, configuration, m.year, m.month)
+            df = load_nwm_no_cache(root, configuration, m.year, m.month, nwm_feature_id)
 
-        # Filter to relevant site, add to rest
-        dataframes.append(df.filter(pl.col("nwm_feature_id") == nwm_feature_id))
+        # Add to list
+        dataframes.append(df)
 
     # Concatenate
     return pl.concat(dataframes).filter(
