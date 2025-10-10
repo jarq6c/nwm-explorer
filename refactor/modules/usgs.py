@@ -314,36 +314,6 @@ def lookup_site_state_code(root: Path, usgs_site_code: str) -> str:
     """
     return lookup_site_state_code_cache(root, usgs_site_code)
 
-def enumerate_sites(root: Path) -> pl.Enum:
-    """
-    Return polars.Enum of USGS site codes found in the site table.
-
-    Parameters
-    ----------
-    root: pathlib.Path
-        Root data directory.
-    """
-    # Check for existing enumeration
-    ofile = root / "enumerated_usgs_sites.parquet"
-    if ofile.exists():
-        return pl.read_parquet(ofile)["monitoring_location_number"].dtype
-
-    # Extract site list and enumerate
-    site_list = scan_site_table(root).select(
-            "monitoring_location_number"
-        ).collect()["monitoring_location_number"].unique().sort().to_list()
-
-    # Apply enumeration
-    site_table = scan_site_table(root).select(
-        "monitoring_location_number"
-    ).with_columns(
-        pl.col("monitoring_location_number").cast(pl.Enum(site_list))
-    )
-
-    # Save
-    site_table.collect().write_parquet(ofile)
-    return pl.read_parquet(ofile)["monitoring_location_number"].dtype
-
 def json_validator(ifile: Path) -> None:
     """
     Open and read json file data.
@@ -381,7 +351,6 @@ class JSONJob:
     """
     ifile: Path
     ofile: Path
-    enumerated_sites: pl.Enum
 
 def process_json(job: JSONJob) -> None:
     """Process a JSON file."""
@@ -401,9 +370,9 @@ def process_json(job: JSONJob) -> None:
                 dfs.append(value)
     pl.from_dicts(dfs).with_columns(
         pl.col("value").cast(pl.Float32),
-        pl.col("usgs_site_code").cast(job.enumerated_sites, strict=False),
+        pl.col("usgs_site_code").cast(pl.String),
         pl.col("series").cast(pl.Int32),
-        pl.col("qualifiers").cast(pl.Categorical),
+        pl.col("qualifiers").cast(pl.String),
         pl.col("dateTime").str.to_datetime("%Y-%m-%dT%H:%M:%S%.3f%:z",
             time_unit="ms").dt.replace_time_zone(None)
     ).rename({
@@ -498,7 +467,7 @@ def download_usgs(
 
             # Process
             logger.info("Building %s", ofile)
-            process_json(JSONJob(json_file, ofile, enumerate_sites(root)))
+            process_json(JSONJob(json_file, ofile))
 
 def scan_usgs_no_cache(root: Path) -> pl.LazyFrame:
     """

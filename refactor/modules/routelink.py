@@ -11,7 +11,6 @@ from yarl import URL
 from .logger import get_logger
 from .downloads import download_files
 from .nwm import ModelDomain
-from .usgs import enumerate_sites
 
 ROUTELINK_URL: str = (
     "https://www.hydroshare.org/resource"
@@ -94,11 +93,10 @@ def download_routelink(
         data.loc[short, "usgs_site_code"] = "0" + data.loc[short, "usgs_site_code"]
 
         # Save
-        enumerated_site_code = enumerate_sites(root)
         pl_data = pl.DataFrame(
             data,
             schema_overrides={
-                "usgs_site_code": enumerated_site_code,
+                "usgs_site_code": pl.String,
                 "domain": ModelDomain,
                 "nwm_feature_id": pl.Int64,
                 "latitude": pl.Float64,
