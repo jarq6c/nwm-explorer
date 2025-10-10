@@ -331,7 +331,7 @@ def enumerate_sites(root: Path) -> pl.Enum:
     # Extract site list and enumerate
     site_list = scan_site_table(root).select(
             "monitoring_location_number"
-        ).collect()["monitoring_location_number"].sort().to_list()
+        ).collect()["monitoring_location_number"].unique().sort().to_list()
 
     # Apply enumeration
     site_table = scan_site_table(root).select(
