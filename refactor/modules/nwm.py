@@ -15,6 +15,7 @@ from concurrent.futures import ProcessPoolExecutor
 import os
 from enum import StrEnum
 import functools
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -684,9 +685,15 @@ def download_nwm(
                     limit=20
                 )
 
+                logger.info("Verifying files")
+                verified = [f for f in file_paths if f.exists()]
+                if not verified:
+                    warnings.warn("No files verified", RuntimeWarning)
+                    continue
+
                 logger.info("Processing NWM data")
                 data = process_netcdf_parallel(
-                    file_paths,
+                    verified,
                     ["streamflow"],
                     features[domain],
                     jobs

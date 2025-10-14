@@ -5,69 +5,39 @@ import pandas as pd
 import polars as pl
 
 from modules.routelink import download_routelink
-from modules.nwm import scan_nwm, ModelConfiguration, load_nwm_site, load_nwm
+from modules.nwm import scan_nwm, ModelConfiguration, load_nwm_site, load_nwm, download_nwm
 from modules.usgs import download_usgs, load_usgs_site
 
 if __name__ == "__main__":
-    pred = load_nwm(
-        Path("/ised/nwm_explorer_data"),
-        ModelConfiguration.SHORT_RANGE_ALASKA,
-        2024,
-        6,
-        True
-    )
-    print(pred)
-    pred = load_nwm_site(
-        Path("/ised/nwm_explorer_data"),
-        ModelConfiguration.SHORT_RANGE_ALASKA,
-        19020190011954,
-        pd.Timestamp("2024-04-01"),
-        pd.Timestamp("2024-06-30"),
-        True
-    )
-    print(pred)
-
-    # Root
-    # root = Path("/ised/nwm_explorer_data")
+    root = Path("/ised/nwm_explorer_data")
 
     # Load routelink
-    # rl = download_routelink(
-    #     root
-    # ).select(
-    #     ["nwm_feature_id", "usgs_site_code", "domain"]
-    # ).collect()
+    rl = download_routelink(
+        root
+    ).select(
+        ["nwm_feature_id", "usgs_site_code", "domain"]
+    ).collect()
+    print(rl)
 
-    # # Download and process NWM output
-    # download_nwm(
-    #     start=pd.Timestamp("2025-04-01"),
-    #     end=pd.Timestamp("2025-04-05"),
-    #     root=root,
-    #     routelink=rl,
-    #     jobs=18
-    # )
+    # Download and process NWM output
+    download_nwm(
+        start=pd.Timestamp("2025-07-14"),
+        end=pd.Timestamp("2025-09-30"),
+        root=root,
+        routelink=rl,
+        jobs=18,
+        retries=1
+    )
 
-    # # Extract required dates of observations
-    # predictions = scan_nwm(root)
-    # date_range = predictions.select(
-    #     pl.col("value_time").min().alias("start"),
-    #     pl.col("value_time").max().alias("end")
-    #     ).collect()
-    # start = date_range["start"].item(0).strftime("%Y-%m-%d")
-    # end = date_range["end"].item(0).strftime("%Y-%m-%d")
+    # Load predictions
+    predictions = scan_nwm(root, True)
 
     # Download and process USGS streamflow
     # download_usgs(
-    #     start=pd.Timestamp("2025-07-01"),
-    #     end=pd.Timestamp("2025-10-01"),
+    #     start=pd.Timestamp("2025-10-01"),
+    #     end=pd.Timestamp("2025-10-12"),
     #     root=root
     # )
-    # df = load_usgs_site(
-    #     root,
-    #     "01013500",
-    #     pd.Timestamp("2025-07-01"),
-    #     pd.Timestamp("2025-10-01")
-    #     )
-    # print(df)
 
     # # Prepare observations
     # observations = scan_usgs(root
