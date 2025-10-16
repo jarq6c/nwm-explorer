@@ -1,6 +1,7 @@
-"""Main."""
+"""Methods to pair predictions with observations."""
 from pathlib import Path
 from dataclasses import dataclass
+import functools
 
 import pandas as pd
 import polars as pl
@@ -18,6 +19,7 @@ class NWMGroupSpecification:
     index_column: str = "value_time"
     group_by_columns: list[str] | None = None
     window_interval: str = "1d"
+    state_code: str | None = None
 
     def __post_init__(self) -> None:
         if self.group_by_columns is None:
@@ -34,107 +36,231 @@ class NWMGroupSpecification:
         return self.group_by_columns + [self.index_column]
 
 GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
-    ModelConfiguration.ANALYSIS_ASSIM_EXTEND_ALASKA_NO_DA: NWMGroupSpecification(),
-    ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA: NWMGroupSpecification(),
-    ModelConfiguration.ANALYSIS_ASSIM_HAWAII_NO_DA: NWMGroupSpecification(),
-    ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA: NWMGroupSpecification(),
+    ModelConfiguration.ANALYSIS_ASSIM_EXTEND_ALASKA_NO_DA: NWMGroupSpecification(
+        group_by_columns=["nwm_feature_id"],
+        state_code="ak"
+    ),
+    ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA: NWMGroupSpecification(
+        group_by_columns=["nwm_feature_id"]
+    ),
+    ModelConfiguration.ANALYSIS_ASSIM_HAWAII_NO_DA: NWMGroupSpecification(
+        group_by_columns=["nwm_feature_id"],
+        state_code="hi"
+    ),
+    ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA: NWMGroupSpecification(
+        group_by_columns=["nwm_feature_id"],
+        state_code="pr"
+    ),
     ModelConfiguration.MEDIUM_RANGE_MEM_1: NWMGroupSpecification(),
     ModelConfiguration.MEDIUM_RANGE_BLEND: NWMGroupSpecification(),
     ModelConfiguration.MEDIUM_RANGE_NO_DA: NWMGroupSpecification(),
-    ModelConfiguration.MEDIUM_RANGE_ALASKA_MEM_1: NWMGroupSpecification(),
-    ModelConfiguration.MEDIUM_RANGE_BLEND_ALASKA: NWMGroupSpecification(),
-    ModelConfiguration.MEDIUM_RANGE_ALASKA_NO_DA: NWMGroupSpecification(),
-    ModelConfiguration.SHORT_RANGE: NWMGroupSpecification(),
-    ModelConfiguration.SHORT_RANGE_ALASKA: NWMGroupSpecification(),
-    ModelConfiguration.SHORT_RANGE_HAWAII: NWMGroupSpecification(),
-    ModelConfiguration.SHORT_RANGE_HAWAII_NO_DA: NWMGroupSpecification(),
-    ModelConfiguration.SHORT_RANGE_PUERTO_RICO: NWMGroupSpecification(),
-    ModelConfiguration.SHORT_RANGE_PUERTO_RICO_NO_DA: NWMGroupSpecification(),
+    ModelConfiguration.MEDIUM_RANGE_ALASKA_MEM_1: NWMGroupSpecification(
+        state_code="ak"
+    ),
+    ModelConfiguration.MEDIUM_RANGE_BLEND_ALASKA: NWMGroupSpecification(
+        state_code="ak"
+    ),
+    ModelConfiguration.MEDIUM_RANGE_ALASKA_NO_DA: NWMGroupSpecification(
+        state_code="ak"
+    ),
+    ModelConfiguration.SHORT_RANGE: NWMGroupSpecification(
+        window_interval="6h"
+    ),
+    ModelConfiguration.SHORT_RANGE_ALASKA: NWMGroupSpecification(
+        window_interval="5h",
+        state_code="ak"
+    ),
+    ModelConfiguration.SHORT_RANGE_HAWAII: NWMGroupSpecification(
+        window_interval="6h",
+        state_code="hi"
+    ),
+    ModelConfiguration.SHORT_RANGE_HAWAII_NO_DA: NWMGroupSpecification(
+        window_interval="6h",
+        state_code="hi"
+    ),
+    ModelConfiguration.SHORT_RANGE_PUERTO_RICO: NWMGroupSpecification(
+        window_interval="6h",
+        state_code="pr"
+    ),
+    ModelConfiguration.SHORT_RANGE_PUERTO_RICO_NO_DA: NWMGroupSpecification(
+        window_interval="6h",
+        state_code="pr"
+    ),
 }
 """Mapping from ModelConfiguration to group-by specifications."""
 
-if __name__ == "__main__":
+@functools.lru_cache(20)
+def load_and_map_observations_by_state(
+        root: Path,
+        state_code: str,
+        year: int,
+        month: int,
+        window_interval: str
+) -> pl.DataFrame:
+    """
+    Return polars.DataFrame of USGS observations. Cache DataFrame.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    state_code: str
+        Two character lower case state abbreviation.
+    year: int
+        Integer year.
+    month: int
+        Integer month.
+    
+    Returns
+    -------
+    polars.DataFrame
+    """
+    # Load routelink
+    routelink = download_routelink(root).select(
+        ["nwm_feature_id", "usgs_site_code"]
+    ).collect()
+
+    # Collect observations
+    return scan_usgs(root
+        ).filter(
+            pl.col("state_code") == state_code,
+            pl.col("year") == year,
+            pl.col("month") == month,
+            pl.col("usgs_site_code").is_in(routelink["usgs_site_code"].implode())
+        ).select(
+            ["usgs_site_code", "value_time", "observed_cfs"]
+        ).collect().unique(
+            ["usgs_site_code", "value_time"]
+        ).sort(
+            ["usgs_site_code", "value_time"]
+        ).group_by_dynamic(
+            "value_time",
+            every=window_interval,
+            group_by="usgs_site_code"
+        ).agg(
+            pl.col("observed_cfs").min().alias("observed_cfs_min"),
+            pl.col("observed_cfs").median().alias("observed_cfs_median"),
+            pl.col("observed_cfs").max().alias("observed_cfs_max"),
+            pl.col("value_time").min().alias("observed_value_time_min"),
+            pl.col("value_time").max().alias("observed_value_time_max")
+        ).with_columns(
+            nwm_feature_id=pl.col("usgs_site_code").replace_strict(
+                routelink["usgs_site_code"].implode(),
+                routelink["nwm_feature_id"].implode()
+            )
+        )
+
+@functools.lru_cache(20)
+def load_and_map_observations_conus(
+        root: Path,
+        year: int,
+        month: int,
+        window_interval: str
+) -> pl.DataFrame:
+    """
+    Return polars.DataFrame of USGS observations. Cache DataFrame.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    state_code: str
+        Two character lower case state abbreviation.
+    year: int
+        Integer year.
+    month: int
+        Integer month.
+    
+    Returns
+    -------
+    polars.DataFrame
+    """
+    # Load routelink
+    routelink = download_routelink(root).select(
+        ["nwm_feature_id", "usgs_site_code"]
+    ).collect()
+
+    # Collect observations
+    return scan_usgs(root
+        ).filter(
+            ~pl.col("state_code").is_in(["ak", "hi", "pr"]),
+            pl.col("year") == year,
+            pl.col("month") == month,
+            pl.col("usgs_site_code").is_in(routelink["usgs_site_code"].implode())
+        ).select(
+            ["usgs_site_code", "value_time", "observed_cfs"]
+        ).collect().unique(
+            ["usgs_site_code", "value_time"]
+        ).sort(
+            ["usgs_site_code", "value_time"]
+        ).group_by_dynamic(
+            "value_time",
+            every=window_interval,
+            group_by="usgs_site_code"
+        ).agg(
+            pl.col("observed_cfs").min().alias("observed_cfs_min"),
+            pl.col("observed_cfs").median().alias("observed_cfs_median"),
+            pl.col("observed_cfs").max().alias("observed_cfs_max"),
+            pl.col("value_time").min().alias("observed_value_time_min"),
+            pl.col("value_time").max().alias("observed_value_time_max")
+        ).with_columns(
+            nwm_feature_id=pl.col("usgs_site_code").replace_strict(
+                routelink["usgs_site_code"].implode(),
+                routelink["nwm_feature_id"].implode()
+            )
+        )
+
+def main() -> None:
+    """Main."""
     root = Path("/ised/nwm_explorer_data")
 
-    # Predictions
-    predictions = scan_nwm(root)
+    # Pair
+    prediction_store = scan_nwm(root)
     date_range = pd.date_range(start="2023-10-01", end="2025-09-30", freq="1MS")
-    for configuration in list(ModelConfiguration):
+    for config, specs in GROUP_SPECIFICATIONS.items():
         for reference_date in date_range:
-            print(configuration, reference_date)
-            pairs = predictions.filter(
-                pl.col("configuration") == configuration,
+            print(config)
+            # Observations
+            if specs.state_code is None:
+                obs = load_and_map_observations_conus(
+                        root=root,
+                        year=reference_date.year,
+                        month=reference_date.month,
+                        window_interval=specs.window_interval
+                    )
+            else:
+                obs = load_and_map_observations_by_state(
+                        root=root,
+                        state_code=specs.state_code,
+                        year=reference_date.year,
+                        month=reference_date.month,
+                        window_interval=specs.window_interval
+                    )
+
+            # Predictions
+            pred = prediction_store.filter(
+                pl.col("configuration") == config,
                 pl.col("year") == reference_date.year,
                 pl.col("month") == reference_date.month
             ).select(
-                ["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
+                specs.select_columns
             ).collect().sort(
-                ["nwm_feature_id", "reference_time", "value_time"]
+                specs.sort_columns
             ).group_by_dynamic(
-                "value_time",
-                every="1d",
-                group_by=["nwm_feature_id", "reference_time"]
+                specs.index_column,
+                every=specs.window_interval,
+                group_by=specs.group_by_columns
             ).agg(
                 pl.col("predicted_cfs").min().alias("predicted_cfs_min"),
+                pl.col("predicted_cfs").median().alias("predicted_cfs_median"),
                 pl.col("predicted_cfs").max().alias("predicted_cfs_max"),
-                # pl.col("value_time").min().alias("value_time_min"),
-                # pl.col("value_time").max().alias("value_time_max")
+                pl.col("value_time").min().alias("predicted_value_time_min"),
+                pl.col("value_time").max().alias("predicted_value_time_max")
             )
-            print(pairs)
+
+            print(obs.head())
             break
         break
 
-    # Load routelink
-    # rl = download_routelink(
-    #     root
-    # ).select(
-    #     ["nwm_feature_id", "usgs_site_code", "domain"]
-    # ).collect()
-
-    # Prepare observations
-    # observations = scan_usgs(root
-    #     ).filter(
-    #         # pl.col("usgs_site_code").is_in(rl["usgs_site_code"].implode())
-    #         pl.col("usgs_site_code") == "02146470"
-    #     ).select(
-    #         ["usgs_site_code", "value_time", "observed_cfs"]
-    #     ).unique(
-    #         ["usgs_site_code", "value_time"]
-    #     ).sort(
-    #         ["usgs_site_code", "value_time"]
-    #     ).group_by_dynamic(
-    #         "value_time",
-    #         every="1d",
-    #         group_by="usgs_site_code"
-    #     ).agg(
-    #         pl.col("observed_cfs").max()
-    #     ).with_columns(
-    #         nwm_feature_id=pl.col("usgs_site_code").replace_strict(
-    #             rl["usgs_site_code"].implode(),
-    #             rl["nwm_feature_id"].implode()
-    #         )
-    #     )
-    # print(observations.head().collect())
-
-    # predictions = scan_nwm(root
-    #     ).filter(
-    #         pl.col("configuration") == ModelConfiguration.MEDIUM_RANGE_MEM_1
-    #     ).select(
-    #         ["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
-    #     ).with_columns(
-    #         ((pl.col("value_time") - pl.col("reference_time")) /
-    #             pl.duration(hours=24)).round().cast(pl.Int32).alias("lead_time_hours_min")
-    #     ).sort(
-    #         ["nwm_feature_id", "lead_time_hours_min", "value_time"]
-    #     ).group_by_dynamic(
-    #         "value_time",
-    #         every="1d",
-    #         group_by=["nwm_feature_id", "lead_time_hours_min"]
-    #     ).agg(
-    #         pl.col("predicted_cfs").max(),
-    #         # pl.col("value_time").min().alias("value_time_min"),
-    #         # pl.col("value_time").max().alias("value_time_max"),
-    #         # pl.col("reference_time").min().alias("reference_time_min"),
-    #         # pl.col("reference_time").max().alias("reference_time_max")
-    #     )
-    # print(observations.collect().estimated_size("mb"))
+if __name__ == "__main__":
+    main()
