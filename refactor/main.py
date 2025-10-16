@@ -2,6 +2,7 @@
 from pathlib import Path
 from dataclasses import dataclass
 import functools
+import inspect
 
 import pandas as pd
 import polars as pl
@@ -9,6 +10,13 @@ import polars as pl
 from modules.routelink import download_routelink
 from modules.nwm import scan_nwm, ModelConfiguration
 from modules.usgs import scan_usgs
+from modules.logger import get_logger
+
+LRU_CACHE_SIZE: int = 20
+"""Maximum size of functools.lru_cache."""
+
+SUBDIRECTORY: str = "pairs"
+"""Subdirectory that indicates root of pairs parquet store."""
 
 @dataclass
 class NWMGroupSpecification:
@@ -210,17 +218,49 @@ def load_and_map_observations_conus(
             )
         )
 
-def main() -> None:
+def build_pairs_filepath(
+    root: Path,
+    configuration: ModelConfiguration,
+    reference_date: pd.Timestamp
+    ) -> Path:
+    """Build and return hive-partitioned parquet file path."""
+    config = f"configuration={configuration}"
+    year = f"year={reference_date.year}"
+    month = f"month={reference_date.month}"
+    partition = f"P{reference_date.day}.parquet"
+    return root / SUBDIRECTORY / config / year / month / partition
+
+def main(
+        root: Path = Path("/ised/nwm_explorer_data"),
+        start_date: pd.Timestamp = pd.Timestamp("2023-10-01"),
+        end_date: pd.Timestamp = pd.Timestamp("2025-09-30")
+        ) -> None:
     """Main."""
-    root = Path("/ised/nwm_explorer_data")
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
 
     # Pair
     prediction_store = scan_nwm(root)
-    date_range = pd.date_range(start="2023-10-01", end="2025-09-30", freq="1MS")
+    date_range = pd.date_range(
+        start=start_date,
+        end=end_date,
+        freq="1MS"
+    )
+    logger.info("Pairing %s to %s", str(start_date), str(end_date))
     for config, specs in GROUP_SPECIFICATIONS.items():
         for reference_date in date_range:
-            print(config)
+            # Check for ofile
+            ofile = build_pairs_filepath(
+                root, config, reference_date
+            )
+            if ofile.exists():
+                logger.info("Skipping existing: %s", ofile)
+                continue
+            logger.info("Building %s", ofile)
+
             # Observations
+            logger.info("Resampling observations")
             if specs.state_code is None:
                 obs = load_and_map_observations_conus(
                         root=root,
@@ -238,6 +278,7 @@ def main() -> None:
                     )
 
             # Predictions
+            logger.info("Resampling predictions")
             pred = prediction_store.filter(
                 pl.col("configuration") == config,
                 pl.col("year") == reference_date.year,
@@ -258,7 +299,15 @@ def main() -> None:
                 pl.col("value_time").max().alias("predicted_value_time_max")
             )
 
-            print(obs.head())
+            # Pair and save
+            logger.info("Pairing observations and predictions")
+            ofile.parent.mkdir(exist_ok=True, parents=True)
+            pairs = pred.join(obs, on=["nwm_feature_id", "value_time"],
+                how="left").drop_nulls()
+
+            # Save
+            logger.info("Saving %s", ofile)
+            pairs.write_parquet(ofile)
             break
         break
 
