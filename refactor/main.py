@@ -97,7 +97,7 @@ GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
 }
 """Mapping from ModelConfiguration to group-by specifications."""
 
-@functools.lru_cache(20)
+@functools.lru_cache(LRU_CACHE_SIZE)
 def load_and_map_observations_by_state(
         root: Path,
         state_code: str,
@@ -158,7 +158,7 @@ def load_and_map_observations_by_state(
             )
         )
 
-@functools.lru_cache(20)
+@functools.lru_cache(LRU_CACHE_SIZE)
 def load_and_map_observations_conus(
         root: Path,
         year: int,
