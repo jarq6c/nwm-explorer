@@ -12,7 +12,7 @@ from modules.nwm import scan_nwm, ModelConfiguration
 from modules.usgs import scan_usgs
 from modules.logger import get_logger
 
-LRU_CACHE_SIZE: int = 20
+LRU_CACHE_SIZE: int = 10
 """Maximum size of functools.lru_cache."""
 
 SUBDIRECTORY: str = "pairs"
@@ -48,20 +48,6 @@ GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
         group_by_columns=["nwm_feature_id"],
         state_code="ak"
     ),
-    ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA: NWMGroupSpecification(
-        group_by_columns=["nwm_feature_id"]
-    ),
-    ModelConfiguration.ANALYSIS_ASSIM_HAWAII_NO_DA: NWMGroupSpecification(
-        group_by_columns=["nwm_feature_id"],
-        state_code="hi"
-    ),
-    ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA: NWMGroupSpecification(
-        group_by_columns=["nwm_feature_id"],
-        state_code="pr"
-    ),
-    ModelConfiguration.MEDIUM_RANGE_MEM_1: NWMGroupSpecification(),
-    ModelConfiguration.MEDIUM_RANGE_BLEND: NWMGroupSpecification(),
-    ModelConfiguration.MEDIUM_RANGE_NO_DA: NWMGroupSpecification(),
     ModelConfiguration.MEDIUM_RANGE_ALASKA_MEM_1: NWMGroupSpecification(
         state_code="ak"
     ),
@@ -71,12 +57,13 @@ GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
     ModelConfiguration.MEDIUM_RANGE_ALASKA_NO_DA: NWMGroupSpecification(
         state_code="ak"
     ),
-    ModelConfiguration.SHORT_RANGE: NWMGroupSpecification(
-        window_interval="6h"
-    ),
     ModelConfiguration.SHORT_RANGE_ALASKA: NWMGroupSpecification(
         window_interval="5h",
         state_code="ak"
+    ),
+    ModelConfiguration.ANALYSIS_ASSIM_HAWAII_NO_DA: NWMGroupSpecification(
+        group_by_columns=["nwm_feature_id"],
+        state_code="hi"
     ),
     ModelConfiguration.SHORT_RANGE_HAWAII: NWMGroupSpecification(
         window_interval="6h",
@@ -86,6 +73,10 @@ GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
         window_interval="6h",
         state_code="hi"
     ),
+    ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA: NWMGroupSpecification(
+        group_by_columns=["nwm_feature_id"],
+        state_code="pr"
+    ),
     ModelConfiguration.SHORT_RANGE_PUERTO_RICO: NWMGroupSpecification(
         window_interval="6h",
         state_code="pr"
@@ -94,6 +85,15 @@ GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
         window_interval="6h",
         state_code="pr"
     ),
+    ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA: NWMGroupSpecification(
+        group_by_columns=["nwm_feature_id"]
+    ),
+    ModelConfiguration.MEDIUM_RANGE_MEM_1: NWMGroupSpecification(),
+    ModelConfiguration.MEDIUM_RANGE_BLEND: NWMGroupSpecification(),
+    ModelConfiguration.MEDIUM_RANGE_NO_DA: NWMGroupSpecification(),
+    ModelConfiguration.SHORT_RANGE: NWMGroupSpecification(
+        window_interval="6h"
+    )
 }
 """Mapping from ModelConfiguration to group-by specifications."""
 
@@ -248,8 +248,8 @@ def main(
         freq="1MS"
     )
     logger.info("Pairing %s to %s", str(start_date), str(end_date))
-    for config, specs in GROUP_SPECIFICATIONS.items():
-        for reference_date in date_range:
+    for reference_date in date_range:
+        for config, specs in GROUP_SPECIFICATIONS.items():
             # Check for ofile
             ofile = build_pairs_filepath(
                 root, config, reference_date
@@ -308,8 +308,6 @@ def main(
             # Save
             logger.info("Saving %s", ofile)
             pairs.write_parquet(ofile)
-            break
-        break
 
 if __name__ == "__main__":
     main()
