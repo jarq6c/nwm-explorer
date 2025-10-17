@@ -279,6 +279,17 @@ def pair_nwm_usgs(
                 continue
             logger.info("Building %s", ofile)
 
+            # Aggregations
+            aggregations = [
+                pl.col("predicted_cfs").min().alias("predicted_cfs_min"),
+                pl.col("predicted_cfs").median().alias("predicted_cfs_median"),
+                pl.col("predicted_cfs").max().alias("predicted_cfs_max"),
+                pl.col("value_time").min().alias("predicted_value_time_min"),
+                pl.col("value_time").max().alias("predicted_value_time_max"),
+            ]
+            if "reference_time" not in specs.group_by_columns:
+                aggregations.append(pl.col("reference_time").min())
+
             # Predictions
             logger.info("Resampling predictions")
             pred = prediction_store.filter(
@@ -293,13 +304,7 @@ def pair_nwm_usgs(
                 specs.index_column,
                 every=specs.window_interval,
                 group_by=specs.group_by_columns
-            ).agg(
-                pl.col("predicted_cfs").min().alias("predicted_cfs_min"),
-                pl.col("predicted_cfs").median().alias("predicted_cfs_median"),
-                pl.col("predicted_cfs").max().alias("predicted_cfs_max"),
-                pl.col("value_time").min().alias("predicted_value_time_min"),
-                pl.col("value_time").max().alias("predicted_value_time_max")
-            )
+            ).agg(*aggregations)
 
             # Get date range
             first = pred["value_time"].min()
@@ -322,9 +327,7 @@ def pair_nwm_usgs(
 
             # Save
             logger.info("Saving %s", ofile)
-            # pairs.write_parquet(ofile)
-            print(pairs)
-        break
+            pairs.write_parquet(ofile)
 
 if __name__ == "__main__":
     mroot = Path("/ised/nwm_explorer_data")
@@ -335,12 +338,12 @@ if __name__ == "__main__":
         end_date = pd.Timestamp("2025-09-30")
     )
 
-    # mpairs = pl.scan_parquet(
-    #     mroot / f"{SUBDIRECTORY}/",
-    #     hive_schema={
-    #         "configuration": pl.Enum(ModelConfiguration),
-    #         "year": pl.Int32,
-    #         "month": pl.Int32
-    #     }
-    # )
-    # print(mpairs.tail().collect())
+    mpairs = pl.scan_parquet(
+        mroot / f"{SUBDIRECTORY}/",
+        hive_schema={
+            "configuration": pl.Enum(ModelConfiguration),
+            "year": pl.Int32,
+            "month": pl.Int32
+        }
+    )
+    print(mpairs.tail().collect())
