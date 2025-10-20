@@ -55,17 +55,17 @@ def generate_prediction_pools(
     return pl.concat(
         dataframes
     ).with_columns(
-        lead_time_pool=(pl.col("predicted_value_time_min").sub(pl.col("reference_time")) /
-            pl.duration(hours=lead_time_interval)).floor().cast(pl.Int32)
+        lead_time_hours_min=(pl.col("predicted_value_time_min").sub(pl.col("reference_time")) /
+            pl.duration(hours=lead_time_interval)).floor().cast(pl.Int32).mul(lead_time_interval)
     ).sort([
         "configuration",
         "nwm_feature_id",
-        "lead_time_pool",
+        "lead_time_hours_min",
         "value_time"]
     ).group_by_dynamic(
         "value_time",
         every=f"{lead_time_interval}h",
-        group_by=["configuration", "nwm_feature_id", "lead_time_pool"]
+        group_by=["configuration", "nwm_feature_id", "lead_time_hours_min"]
     ).agg(
         pl.col("predicted_cfs_min").min(),
         pl.col("predicted_cfs_median").median(),
@@ -86,6 +86,8 @@ def main() -> None:
     """Main."""
     # Process each configuration
     for config, specs in GROUP_SPECIFICATIONS.items():
+        if config != ModelConfiguration.MEDIUM_RANGE_ALASKA_MEM_1:
+            continue
         print(config)
         df = generate_prediction_pools(
             root=Path("/ised/nwm_explorer_data"),
@@ -95,6 +97,7 @@ def main() -> None:
             lead_time_interval=specs.window_interval
         )
         print(df.estimated_size("mb"))
+        df.write_csv("test_eval.csv")
         break
 
 if __name__ == "__main__":
