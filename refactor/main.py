@@ -5,46 +5,85 @@ import polars as pl
 import pandas as pd
 
 from modules.nwm import ModelConfiguration
-from modules.routelink import download_routelink
 from modules.pairs import scan_pairs
 
-def main(
+def generate_forecast_pools(
         root: Path,
+        configuration: ModelConfiguration,
         start_time: pd.Timestamp,
         end_time: pd.Timestamp,
-        lead_time_scale: int = 24,
-        maximum_processes: int = 1,
-        chunk_size: int = 1
-        ) -> None:
-    """Main."""
-    # Load feature list
-    features = download_routelink(root).select(
-        "nwm_feature_id").collect()["nwm_feature_id"].to_list()
+        lead_time_scale: int
+        ) -> pl.DataFrame:
+    """
+    Load and group forecast pairs into lead time pools.
 
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    configuration: ModelConfiguration
+        NWM Model configuration.
+    start_time: pandas.Timestamp
+        First value time.
+    end_time: pandas.Timestamp
+        Last value time.
+    lead_time_scale: int
+        Lead time scale to aggregate over in hours.
+    """
     # Load data
     dataframes = []
     for m in pd.date_range(start_time, end_time, freq="1MS"):
         dataframes.append(
             scan_pairs(root, cache=True).filter(
-                pl.col("configuration") == ModelConfiguration.MEDIUM_RANGE_MEM_1,
+                pl.col("configuration") == configuration,
                 pl.col("year") == m.year,
                 pl.col("month") == m.month,
                 pl.col("reference_time") >= start_time,
-                pl.col("reference_time") <= end_time,
-                # pl.col("nwm_feature_id").is_in(features[:100])
+                pl.col("reference_time") <= end_time
             ).collect()
         )
-    # TODO Group by NWM Feature ID and Lead time, every 1D of value_time
 
-    data = pl.concat(dataframes).filter(
-        pl.col("nwm_feature_id") == 3109,
-        pl.col("value_time") == pd.Timestamp("2023-10-12")
+    # Compute lead time and pool pairs
+    return pl.concat(
+        dataframes
+    ).with_columns(
+        lead_time_pool=(pl.col("predicted_value_time_min").sub(pl.col("reference_time")) /
+            pl.duration(hours=lead_time_scale)).floor().cast(pl.Int32)
+    ).sort([
+        "configuration",
+        "nwm_feature_id",
+        "lead_time_pool",
+        "value_time"]
+    ).group_by_dynamic(
+        "value_time",
+        every="1d",
+        group_by=["configuration", "nwm_feature_id", "lead_time_pool"]
+    ).agg(
+        pl.col("predicted_cfs_min").min(),
+        pl.col("predicted_cfs_median").median(),
+        pl.col("predicted_cfs_max").max(),
+        pl.col("predicted_value_time_min").min(),
+        pl.col("predicted_value_time_max").max(),
+        pl.col("reference_time").min().alias("reference_time_min"),
+        pl.col("reference_time").max().alias("reference_time_max"),
+        pl.col("usgs_site_code").first(),
+        pl.col("observed_cfs_min").min(),
+        pl.col("observed_cfs_median").median(),
+        pl.col("observed_cfs_max").max(),
+        pl.col("observed_value_time_min").min(),
+        pl.col("observed_value_time_max").max()
     )
-    data.write_csv("test_batch.csv")
+
+def main() -> None:
+    """Main."""
+    df = generate_forecast_pools(
+        root=Path("/ised/nwm_explorer_data"),
+        configuration=ModelConfiguration.MEDIUM_RANGE_MEM_1,
+        start_time=pd.Timestamp("2023-10-01"),
+        end_time=pd.Timestamp("2023-12-31"),
+        lead_time_scale=24
+    )
+    print(df)
 
 if __name__ == "__main__":
-    main(
-        Path("/ised/nwm_explorer_data"),
-        pd.Timestamp("2023-10-01"),
-        pd.Timestamp("2023-12-31")
-    )
+    main()
