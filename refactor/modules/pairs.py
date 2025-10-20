@@ -28,7 +28,7 @@ class NWMGroupSpecification:
     group_by_columns: list[str] | None = None
     select_columns: list[str] | None = None
     sort_columns: list[str] | None = None
-    window_interval: str = "1d"
+    window_interval: int = 24
     state_code: str | None = None
 
     def __post_init__(self) -> None:
@@ -57,7 +57,7 @@ GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
         state_code="ak"
     ),
     ModelConfiguration.SHORT_RANGE_ALASKA: NWMGroupSpecification(
-        window_interval="5h",
+        window_interval=5,
         state_code="ak"
     ),
     ModelConfiguration.ANALYSIS_ASSIM_HAWAII_NO_DA: NWMGroupSpecification(
@@ -66,11 +66,11 @@ GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
         select_columns=["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
     ),
     ModelConfiguration.SHORT_RANGE_HAWAII: NWMGroupSpecification(
-        window_interval="6h",
+        window_interval=6,
         state_code="hi"
     ),
     ModelConfiguration.SHORT_RANGE_HAWAII_NO_DA: NWMGroupSpecification(
-        window_interval="6h",
+        window_interval=6,
         state_code="hi"
     ),
     ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA: NWMGroupSpecification(
@@ -79,11 +79,11 @@ GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
         select_columns=["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
     ),
     ModelConfiguration.SHORT_RANGE_PUERTO_RICO: NWMGroupSpecification(
-        window_interval="6h",
+        window_interval=6,
         state_code="pr"
     ),
     ModelConfiguration.SHORT_RANGE_PUERTO_RICO_NO_DA: NWMGroupSpecification(
-        window_interval="6h",
+        window_interval=6,
         state_code="pr"
     ),
     ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA: NWMGroupSpecification(
@@ -94,7 +94,7 @@ GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
     ModelConfiguration.MEDIUM_RANGE_BLEND: NWMGroupSpecification(),
     ModelConfiguration.MEDIUM_RANGE_NO_DA: NWMGroupSpecification(),
     ModelConfiguration.SHORT_RANGE: NWMGroupSpecification(
-        window_interval="6h"
+        window_interval=6
     )
 }
 """Mapping from ModelConfiguration to group-by specifications."""
@@ -129,9 +129,7 @@ def load_and_map_observations_chunk(
     start_time: str
         Start date. pandas.Timestamp compatible.
     end_time: str
-        End date. pandas.Timestamp compatible
-    window_interval: str
-        Time interval to aggregate over.
+        End date. pandas.Timestamp compatible.
 
     Returns
     -------
@@ -158,7 +156,7 @@ def load_and_map_observations(
         root: Path,
         start_time: str,
         end_time: str,
-        window_interval: str
+        window_interval: int
 ) -> pl.DataFrame:
     """
     Return polars.DataFrame of USGS observations. Add nwm_feature_id column.
@@ -171,8 +169,8 @@ def load_and_map_observations(
         Start date. pandas.Timestamp compatible.
     end_time: str
         End date. pandas.Timestamp compatible
-    window_interval: str
-        Time interval to aggregate over.
+    window_interval: int
+        Time interval to aggregate over in hours.
 
     Returns
     -------
@@ -203,7 +201,7 @@ def load_and_map_observations(
                 ["usgs_site_code", "value_time"]
             ).group_by_dynamic(
                 "value_time",
-                every=window_interval,
+                every=f"{window_interval}h",
                 group_by="usgs_site_code"
             ).agg(
                 pl.col("observed_cfs").min().alias("observed_cfs_min"),
@@ -302,7 +300,7 @@ def pair_nwm_usgs(
                 specs.sort_columns
             ).group_by_dynamic(
                 specs.index_column,
-                every=specs.window_interval,
+                every=f"{specs.window_interval}h",
                 group_by=specs.group_by_columns
             ).agg(*aggregations)
 
