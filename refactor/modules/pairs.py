@@ -7,10 +7,10 @@ import inspect
 import pandas as pd
 import polars as pl
 
-from modules.routelink import download_routelink
-from modules.nwm import scan_nwm, ModelConfiguration
-from modules.usgs import scan_usgs, STATE_LIST
-from modules.logger import get_logger
+from .routelink import download_routelink
+from .nwm import scan_nwm, ModelConfiguration
+from .usgs import scan_usgs, STATE_LIST
+from .logger import get_logger
 
 LRU_CACHE_SIZE: int = 60
 """Maximum size of functools.lru_cache."""
@@ -342,6 +342,11 @@ def scan_pairs_no_cache(root: Path) -> pl.LazyFrame:
     -------
     polars.LazyFrame
     """
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+
+    logger.info("Scanning pairs")
     return pl.scan_parquet(
         root / f"{SUBDIRECTORY}/",
         hive_schema={
@@ -383,11 +388,6 @@ def scan_pairs(root: Path, cache: bool = False) -> pl.LazyFrame:
     -------
     polars.LazyFrame
     """
-    # Get logger
-    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
-    logger = get_logger(name)
-
-    logger.info("Scanning observations")
     if cache:
         return scan_pairs_cache(root)
     return scan_pairs_no_cache(root)
