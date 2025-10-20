@@ -26,9 +26,9 @@ def generate_prediction_pools(
     configuration: ModelConfiguration
         NWM Model configuration.
     start_time: pandas.Timestamp
-        First value time.
+        First reference time.
     end_time: pandas.Timestamp
-        Last value time.
+        Last reference time.
     lead_time_interval: int
         Lead time scale to aggregate over in hours.
     """
