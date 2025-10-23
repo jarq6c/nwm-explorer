@@ -38,6 +38,10 @@ def load_pool(
         Lead time scale to aggregate over in hours.
     features: numpy.ndarray[int64], required
         Array of channel features to retrieve from parquet store.
+    
+    Returns
+    -------
+    polars.DataFrame
     """
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
@@ -97,7 +101,7 @@ def prediction_pool_generator(
         end_time: pd.Timestamp,
         lead_time_interval: int,
         sites_per_chunk: int = 1
-        ) -> Generator[pl.DataFrame]:
+        ) -> Generator[pd.DataFrame]:
     """
     Iteratively, load and group forecast pairs into lead time pools
 
@@ -113,6 +117,10 @@ def prediction_pool_generator(
         Last reference time.
     lead_time_interval: int
         Lead time scale to aggregate over in hours.
+    
+    Returns
+    -------
+    Generator[pandas.DataFrame]
     """
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
@@ -146,7 +154,7 @@ def prediction_pool_generator(
             logger.info("Empty pool, trying again")
             continue
         else:
-            yield data
+            yield data.to_pandas()
 
 def main() -> None:
     """Main."""
@@ -165,7 +173,7 @@ def main() -> None:
             sites_per_chunk=250
         ):
             # print(df)
-            print(df.to_pandas().info(memory_usage="deep"))
+            print(df.info(memory_usage="deep"))
         # df.write_csv("test_eval.csv")
         break
 
