@@ -2,16 +2,47 @@
 from pathlib import Path
 import inspect
 from typing import Generator
+from concurrent.futures import ProcessPoolExecutor
 
 import polars as pl
 import pandas as pd
 import numpy as np
 import numpy.typing as npt
+from numba import float64, guvectorize
 
 from modules.nwm import ModelConfiguration
 from modules.pairs import scan_pairs, GROUP_SPECIFICATIONS
 from modules.logger import get_logger
 from modules.routelink import download_routelink
+
+@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+def nash_sutcliffe_efficiency(
+    y_true: npt.NDArray[np.float64],
+    y_pred: npt.NDArray[np.float64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of Nash-Sutcliffe Model Efficiency.
+        
+    Parameters
+    ----------
+    y_true: NDArray[np.float64], required
+        Ground truth (correct) target values, also called observations,
+        measurements, or observed values.
+    y_pred: NDArray[np.float64], required
+        Estimated target values, also called simulations, forecasts, or modeled values.
+    result: NDArray[np.float64], required
+        Stores scalar result.
+        
+    Returns
+    -------
+    None
+    """
+    variance = np.sum((y_true - np.mean(y_true)) ** 2.0)
+    if variance == 0:
+        result[0] = np.nan
+        return
+    result[0] = 1.0 - np.sum((y_true - y_pred) ** 2.0) / variance
 
 def load_pool(
         root: Path,
@@ -101,9 +132,10 @@ def prediction_pool_generator(
         end_time: pd.Timestamp,
         lead_time_interval: int,
         sites_per_chunk: int = 1
-        ) -> Generator[pd.DataFrame]:
+        ) -> Generator[list[pd.DataFrame]]:
     """
-    Iteratively, load and group forecast pairs into lead time pools
+    Iteratively, load and group forecast pairs into lead time pools. Returns a
+    list of DataFrame for each nwm_feature_id and lead_time_hours_min combination.
 
     Parameters
     ----------
@@ -120,7 +152,7 @@ def prediction_pool_generator(
     
     Returns
     -------
-    Generator[pandas.DataFrame]
+    Generator[list[pandas.DataFrame]]
     """
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
@@ -153,29 +185,34 @@ def prediction_pool_generator(
         if data.is_empty():
             logger.info("Empty pool, trying again")
             continue
-        else:
-            yield data.to_pandas()
 
-def main() -> None:
+        # Generate groups
+        yield [df.to_pandas() for _, df in data.group_by(["nwm_feature_id", "lead_time_hours_min"])]
+
+def main(
+        label: str = "FY2024Q1",
+        start_time: pd.Timestamp = pd.Timestamp("2023-10-01"),
+        end_time: pd.Timestamp = pd.Timestamp("2023-12-31"),
+        processes: int = 18,
+        sites_per_chunk: int = 250
+) -> None:
     """Main."""
-    # Process each configuration
-    for config, specs in GROUP_SPECIFICATIONS.items():
-        if config != ModelConfiguration.MEDIUM_RANGE_MEM_1:
-            continue
-        print(config)
-        # Get a generator
-        for df in prediction_pool_generator(
-            root=Path("/ised/nwm_explorer_data"),
-            configuration=config,
-            start_time=pd.Timestamp("2023-10-01"),
-            end_time=pd.Timestamp("2025-09-30"),
-            lead_time_interval=specs.window_interval,
-            sites_per_chunk=250
-        ):
-            # print(df)
-            print(df.info(memory_usage="deep"))
-        # df.write_csv("test_eval.csv")
-        break
+    # Start process pool
+    with ProcessPoolExecutor(max_workers=processes) as parallel_compute:
+        # Process each configuration
+        for config, specs in GROUP_SPECIFICATIONS.items():
+            # Process in chunks
+            for groups in prediction_pool_generator(
+                root=Path("/ised/nwm_explorer_data"),
+                configuration=config,
+                start_time=start_time,
+                end_time=end_time,
+                lead_time_interval=specs.window_interval,
+                sites_per_chunk=sites_per_chunk
+            ):
+                print(len(groups))
+                break
+            break
 
 if __name__ == "__main__":
     main()
