@@ -1,8 +1,9 @@
 """Methods to evaluate pairs."""
 from pathlib import Path
 import inspect
-from typing import Generator, Any
+from typing import Generator, Any, Callable
 from concurrent.futures import ProcessPoolExecutor
+from enum import StrEnum
 
 import polars as pl
 import pandas as pd
@@ -14,6 +15,17 @@ from modules.nwm import ModelConfiguration
 from modules.pairs import scan_pairs, GROUP_SPECIFICATIONS
 from modules.logger import get_logger
 from modules.routelink import download_routelink
+
+class Metric(StrEnum):
+    """Symbols for common metrics."""
+    NASH_SUTCLIFFE_EFFICIENCY = "nash_sutcliffe_efficiency"
+
+MetricFunction = Callable[[
+    npt.NDArray[np.float64],
+    npt.NDArray[np.float64],
+    npt.NDArray[np.float64]
+    ], None]
+"""Type hint for Numba functions that generate metrics."""
 
 @guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
 def nash_sutcliffe_efficiency(
@@ -43,6 +55,11 @@ def nash_sutcliffe_efficiency(
         result[0] = np.nan
         return
     result[0] = 1.0 - np.sum((y_true - y_pred) ** 2.0) / variance
+
+METRIC_FUNCTIONS: dict[Metric, MetricFunction] = {
+    Metric.NASH_SUTCLIFFE_EFFICIENCY: nash_sutcliffe_efficiency
+}
+"""Mapping from metrics to functions used to compute them."""
 
 def bootstrap_metrics(
     data: pd.DataFrame,
@@ -78,8 +95,9 @@ def bootstrap_metrics(
     for rank in ["min", "median", "max"]:
         y_true = data[f"observed_cfs_{rank}"].to_numpy(dtype=np.float64)
         y_pred = data[f"predicted_cfs_{rank}"].to_numpy(dtype=np.float64)
-        nse = nash_sutcliffe_efficiency(y_true, y_pred)
-        result[f"nse_{rank}_point"] = nse
+        for label, func in METRIC_FUNCTIONS.items():
+            point = func(y_true, y_pred)
+            result[f"{label}_{rank}_point"] = point
     return result
 
 def load_pool(
