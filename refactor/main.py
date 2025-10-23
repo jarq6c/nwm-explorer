@@ -1,7 +1,7 @@
 """Methods to evaluate pairs."""
 from pathlib import Path
 import inspect
-from typing import Generator
+from typing import Generator, Any
 from concurrent.futures import ProcessPoolExecutor
 
 import polars as pl
@@ -43,6 +43,34 @@ def nash_sutcliffe_efficiency(
         result[0] = np.nan
         return
     result[0] = 1.0 - np.sum((y_true - y_pred) ** 2.0) / variance
+
+def bootstrap_metrics(
+    data: pd.DataFrame,
+    # minimum_sample_size: int = 30,
+    # minimum_mean: float = 0.01,
+    # minimum_variance: float = 0.000025
+    ) -> dict[str, Any]:
+    """
+    Use stationary bootstrap to generate metrics with confidence intervals.
+    """
+    result = {
+        "nwm_feature_id": data["nwm_feature_id"].iloc[0],
+        "lead_time_hours_min": data["lead_time_hours_min"].min(),
+        "predicted_cfs_min": data["predicted_cfs_min"].min(),
+        "predicted_cfs_median": data["predicted_cfs_median"].median(),
+        "predicted_cfs_max": data["predicted_cfs_max"].max(),
+        "predicted_value_time_min": data["predicted_value_time_min"].min(),
+        "predicted_value_time_max": data["predicted_value_time_max"].max(),
+        "reference_time_min": data["reference_time_min"].min(),
+        "reference_time_max": data["reference_time_max"].max(),
+        "usgs_site_code": data["usgs_site_code"].iloc[0],
+        "observed_cfs_min": data["observed_cfs_min"].min(),
+        "observed_cfs_median": data["observed_cfs_median"].median(),
+        "observed_cfs_max": data["observed_cfs_max"].max(),
+        "observed_value_time_min": data["observed_value_time_min"].min(),
+        "observed_value_time_max": data["observed_value_time_max"].max()
+    }
+    return result
 
 def load_pool(
         root: Path,
@@ -198,7 +226,7 @@ def main(
 ) -> None:
     """Main."""
     # Start process pool
-    with ProcessPoolExecutor(max_workers=processes) as parallel_compute:
+    with ProcessPoolExecutor(max_workers=processes) as parallel_computer:
         # Process each configuration
         for config, specs in GROUP_SPECIFICATIONS.items():
             # Process in chunks
@@ -210,7 +238,16 @@ def main(
                 lead_time_interval=specs.window_interval,
                 sites_per_chunk=sites_per_chunk
             ):
-                print(len(groups))
+                # Chunk size
+                chunksize = len(groups) // processes + 1
+
+                # Compute
+                results = pd.DataFrame.from_records(
+                    parallel_computer.map(
+                        bootstrap_metrics, groups, chunksize=chunksize
+                    )
+                )
+                print(results)
                 break
             break
 
