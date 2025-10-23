@@ -53,7 +53,9 @@ def bootstrap_metrics(
     """
     Use stationary bootstrap to generate metrics with confidence intervals.
     """
+    # Start building results
     result = {
+        "configuration": data["configuration"].iloc[0],
         "nwm_feature_id": data["nwm_feature_id"].iloc[0],
         "lead_time_hours_min": data["lead_time_hours_min"].min(),
         "predicted_cfs_min": data["predicted_cfs_min"].min(),
@@ -68,8 +70,16 @@ def bootstrap_metrics(
         "observed_cfs_median": data["observed_cfs_median"].median(),
         "observed_cfs_max": data["observed_cfs_max"].max(),
         "observed_value_time_min": data["observed_value_time_min"].min(),
-        "observed_value_time_max": data["observed_value_time_max"].max()
+        "observed_value_time_max": data["observed_value_time_max"].max(),
+        "sample_size": data["nwm_feature_id"].count()
     }
+
+    # Compute metrics
+    for rank in ["min", "median", "max"]:
+        y_true = data[f"observed_cfs_{rank}"].to_numpy(dtype=np.float64)
+        y_pred = data[f"predicted_cfs_{rank}"].to_numpy(dtype=np.float64)
+        nse = nash_sutcliffe_efficiency(y_true, y_pred)
+        result[f"nse_{rank}_point"] = nse
     return result
 
 def load_pool(
@@ -220,9 +230,9 @@ def prediction_pool_generator(
 def main(
         label: str = "FY2024Q1",
         start_time: pd.Timestamp = pd.Timestamp("2023-10-01"),
-        end_time: pd.Timestamp = pd.Timestamp("2023-12-31"),
+        end_time: pd.Timestamp = pd.Timestamp("2025-09-30"),
         processes: int = 18,
-        sites_per_chunk: int = 250
+        sites_per_chunk: int = 100
 ) -> None:
     """Main."""
     # Start process pool
