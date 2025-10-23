@@ -1,20 +1,25 @@
 """Methods to evaluate pairs."""
 from pathlib import Path
 import inspect
+from typing import Generator
 
 import polars as pl
 import pandas as pd
+import numpy as np
+import numpy.typing as npt
 
 from modules.nwm import ModelConfiguration
 from modules.pairs import scan_pairs, GROUP_SPECIFICATIONS
 from modules.logger import get_logger
+from modules.routelink import download_routelink
 
-def generate_prediction_pools(
+def load_pool(
         root: Path,
         configuration: ModelConfiguration,
         start_time: pd.Timestamp,
         end_time: pd.Timestamp,
-        lead_time_interval: int
+        lead_time_interval: int,
+        features: npt.NDArray[np.int64]
         ) -> pl.DataFrame:
     """
     Load and group forecast pairs into lead time pools.
@@ -31,6 +36,8 @@ def generate_prediction_pools(
         Last reference time.
     lead_time_interval: int
         Lead time scale to aggregate over in hours.
+    features: numpy.ndarray[int64], required
+        Array of channel features to retrieve from parquet store.
     """
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
@@ -46,7 +53,8 @@ def generate_prediction_pools(
                 pl.col("year") == m.year,
                 pl.col("month") == m.month,
                 pl.col("reference_time") >= start_time,
-                pl.col("reference_time") <= end_time
+                pl.col("reference_time") <= end_time,
+                pl.col("nwm_feature_id").is_in(features)
             ).collect()
         )
 
@@ -82,22 +90,83 @@ def generate_prediction_pools(
         pl.col("observed_value_time_max").max()
     )
 
+def prediction_pool_generator(
+        root: Path,
+        configuration: ModelConfiguration,
+        start_time: pd.Timestamp,
+        end_time: pd.Timestamp,
+        lead_time_interval: int,
+        sites_per_chunk: int = 1
+        ) -> Generator[pl.DataFrame]:
+    """
+    Iteratively, load and group forecast pairs into lead time pools
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    configuration: ModelConfiguration
+        NWM Model configuration.
+    start_time: pandas.Timestamp
+        First reference time.
+    end_time: pandas.Timestamp
+        Last reference time.
+    lead_time_interval: int
+        Lead time scale to aggregate over in hours.
+    """
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+
+    # Generate feature list
+    feature_list = download_routelink(
+        root
+    ).select(
+        "nwm_feature_id"
+    ).collect()["nwm_feature_id"].to_numpy()
+
+    # Feature chunks
+    number_of_chunks = len(feature_list) // sites_per_chunk + 1
+    feature_chunks = np.array_split(feature_list, number_of_chunks)
+
+    # Yield pool generator
+    for features in feature_chunks:
+        # Load data
+        data = load_pool(
+            root=root,
+            configuration=configuration,
+            start_time=start_time,
+            end_time=end_time,
+            lead_time_interval=lead_time_interval,
+            features=features
+        )
+
+        # Check for data
+        if data.is_empty():
+            logger.info("Empty pool, trying again")
+            continue
+        else:
+            yield data
+
 def main() -> None:
     """Main."""
     # Process each configuration
     for config, specs in GROUP_SPECIFICATIONS.items():
-        if config != ModelConfiguration.MEDIUM_RANGE_ALASKA_MEM_1:
+        if config != ModelConfiguration.MEDIUM_RANGE_MEM_1:
             continue
         print(config)
-        df = generate_prediction_pools(
+        # Get a generator
+        for df in prediction_pool_generator(
             root=Path("/ised/nwm_explorer_data"),
             configuration=config,
             start_time=pd.Timestamp("2023-10-01"),
-            end_time=pd.Timestamp("2023-12-31"),
-            lead_time_interval=specs.window_interval
-        )
-        print(df.estimated_size("mb"))
-        df.write_csv("test_eval.csv")
+            end_time=pd.Timestamp("2025-09-30"),
+            lead_time_interval=specs.window_interval,
+            sites_per_chunk=250
+        ):
+            # print(df)
+            print(df.to_pandas().info(memory_usage="deep"))
+        # df.write_csv("test_eval.csv")
         break
 
 if __name__ == "__main__":
