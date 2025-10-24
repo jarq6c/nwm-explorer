@@ -339,7 +339,6 @@ def bootstrap_metrics(
     """
     # Start building results
     result = {
-        "configuration": data["configuration"].iloc[0],
         "nwm_feature_id": data["nwm_feature_id"].iloc[0],
         "lead_time_hours_min": data["lead_time_hours_min"].min(),
         "predicted_cfs_min": data["predicted_cfs_min"].min(),
@@ -594,8 +593,13 @@ def main(
     with ProcessPoolExecutor(max_workers=processes) as parallel_computer:
         # Process each configuration
         for config, specs in GROUP_SPECIFICATIONS.items():
-            if config != ModelConfiguration.MEDIUM_RANGE_MEM_1:
+            # Prepare output file
+            ofile = root / f"evaluations/label={label}/configuration={config}/E0.parquet"
+            if ofile.exists():
+                logger.info("Found %s", ofile)
                 continue
+            ofile.parent.mkdir(exist_ok=True, parents=True)
+
             # Process in chunks
             logger.info("Evaluating %s", config)
             logger.info("Grouping into chunks of %d sites", sites_per_chunk)
@@ -615,7 +619,7 @@ def main(
                 logger.info("Evaluating %d groups", len(groups))
                 logger.info("Running %d groups per process", chunksize)
 
-                # Compute
+                # Compute and collect results
                 logger.info("Computing metrics")
                 dataframes.append(
                     pd.DataFrame.from_records(
@@ -624,9 +628,12 @@ def main(
                         )
                     )
                 )
+
+            # Concatenate into a single dataframe
             results = pd.concat(dataframes, ignore_index=True)
-            print(results.info(memory_usage="deep"))
-            break
+
+            # Save results
+            pl.DataFrame(results).write_parquet(ofile)
 
 if __name__ == "__main__":
     main()
