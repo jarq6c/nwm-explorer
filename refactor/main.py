@@ -4,6 +4,7 @@ import inspect
 from typing import Generator, Any, Callable
 from concurrent.futures import ProcessPoolExecutor
 from enum import StrEnum
+import itertools
 
 import polars as pl
 import pandas as pd
@@ -20,6 +21,14 @@ from modules.routelink import download_routelink
 class Metric(StrEnum):
     """Symbols for common metrics."""
     NASH_SUTCLIFFE_EFFICIENCY = "nash_sutcliffe_efficiency"
+    RELATIVE_MEAN_BIAS = "relative_mean_bias"
+    PEARSON_CORRELATION_COEFFICIENT = "pearson_correlation_coefficient"
+    RELATIVE_MEAN = "relative_mean"
+    RELATIVE_MEDIAN = "relative_median"
+    RELATIVE_MINIMUM = "relative_minimum"
+    RELATIVE_MAXIMUM = "relative_maximum"
+    RELATIVE_STANDARD_DEVIATION = "relative_standard_deviation"
+    KLING_GUPTA_EFFICIENCY = "kling_gupta_efficiency"
 
 MetricFunction = Callable[[
     npt.NDArray[np.float64],
@@ -57,8 +66,265 @@ def nash_sutcliffe_efficiency(
         return
     result[0] = 1.0 - np.sum((y_true - y_pred) ** 2.0) / variance
 
+@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+def relative_mean_bias(
+    y_true: npt.NDArray[np.float64],
+    y_pred: npt.NDArray[np.float64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of signed mean relative bias.
+    Also called mean relative error or fractional bias.
+        
+    Parameters
+    ----------
+    y_true: NDArray[np.float64], required
+        Ground truth (correct) target values, also called observations,
+        measurements, or observed values.
+    y_pred: NDArray[np.float64], required
+        Estimated target values, also called simulations or modeled values.
+    result: NDArray[np.float64], required
+        Stores scalar result.
+        
+    Returns
+    -------
+    None
+    """
+    total = np.sum(y_true)
+    if total == 0.0:
+        result[0] = np.nan
+        return
+    result[0] = np.sum(y_pred - y_true) / np.sum(y_true)
+
+@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+def pearson_correlation_coefficient(
+    y_true: npt.NDArray[np.float64],
+    y_pred: npt.NDArray[np.float64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of the Pearson correlation
+    coefficient.
+        
+    Parameters
+    ----------
+    y_true: NDArray[np.float64], required
+        Ground truth (correct) target values, also called observations,
+        measurements, or observed values.
+    y_pred: NDArray[np.float64], required
+        Estimated target values, also called simulations or modeled values.
+    result: NDArray[np.float64], required
+        Stores scalar result.
+        
+    Returns
+    -------
+    None
+    """
+    y_true_dev = y_true - np.mean(y_true)
+    y_pred_dev = y_pred - np.mean(y_pred)
+    num = np.sum(y_true_dev * y_pred_dev)
+    den = (
+        np.sqrt(np.sum(y_true_dev ** 2)) *
+        np.sqrt(np.sum(y_pred_dev ** 2))
+        )
+    if den == 0:
+        result[0] = np.nan
+        return
+    result[0] = num / den
+
+@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+def relative_standard_deviation(
+    y_true: npt.NDArray[np.float64],
+    y_pred: npt.NDArray[np.float64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of relative standard deviation,
+    required to compute Kling-Gupta Model Efficiency.
+        
+    Parameters
+    ----------
+    y_true: NDArray[np.float64], required
+        Ground truth (correct) target values, also called observations,
+        measurements, or observed values.
+    y_pred: NDArray[np.float64], required
+        Estimated target values, also called simulations or modeled values.
+    result: NDArray[np.float64], required
+        Stores scalar result.
+        
+    Returns
+    -------
+    None
+    """
+    std_dev = np.std(y_true)
+    if std_dev == 0:
+        result[0] = np.nan
+        return
+    result[0] = np.std(y_pred) / std_dev
+
+@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+def relative_mean(
+    y_true: npt.NDArray[np.float64],
+    y_pred: npt.NDArray[np.float64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of relative mean,
+    required to compute Kling-Gupta Model Efficiency.
+        
+    Parameters
+    ----------
+    y_true: NDArray[np.float64], required
+        Ground truth (correct) target values, also called observations,
+        measurements, or observed values.
+    y_pred: NDArray[np.float64], required
+        Estimated target values, also called simulations or modeled values.
+    result: NDArray[np.float64], required
+        Stores scalar result.
+        
+    Returns
+    -------
+    None
+    """
+    mean = np.mean(y_true)
+    if mean == 0:
+        result[0] = np.nan
+        return
+    result[0] = np.mean(y_pred) / mean
+
+@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+def relative_median(
+    y_true: npt.NDArray[np.float64],
+    y_pred: npt.NDArray[np.float64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of relative mean,
+    required to compute Kling-Gupta Model Efficiency.
+        
+    Parameters
+    ----------
+    y_true: NDArray[np.float64], required
+        Ground truth (correct) target values, also called observations,
+        measurements, or observed values.
+    y_pred: NDArray[np.float64], required
+        Estimated target values, also called simulations or modeled values.
+    result: NDArray[np.float64], required
+        Stores scalar result.
+        
+    Returns
+    -------
+    None
+    """
+    median = np.median(y_true)
+    if median == 0:
+        result[0] = np.nan
+        return
+    result[0] = np.median(y_pred) / median
+
+@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+def relative_minimum(
+    y_true: npt.NDArray[np.float64],
+    y_pred: npt.NDArray[np.float64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of relative minimum.
+        
+    Parameters
+    ----------
+    y_true: NDArray[np.float64], required
+        Ground truth (correct) target values, also called observations,
+        measurements, or observed values.
+    y_pred: NDArray[np.float64], required
+        Estimated target values, also called simulations or modeled values.
+    result: NDArray[np.float64], required
+        Stores scalar result.
+        
+    Returns
+    -------
+    None
+    """
+    minimum = np.min(y_true)
+    if minimum == 0:
+        result[0] = np.nan
+        return
+    result[0] = np.min(y_pred) / minimum
+
+@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+def relative_maximum(
+    y_true: npt.NDArray[np.float64],
+    y_pred: npt.NDArray[np.float64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of relative maximum.
+        
+    Parameters
+    ----------
+    y_true: NDArray[np.float64], required
+        Ground truth (correct) target values, also called observations,
+        measurements, or observed values.
+    y_pred: NDArray[np.float64], required
+        Estimated target values, also called simulations or modeled values.
+    result: NDArray[np.float64], required
+        Stores scalar result.
+        
+    Returns
+    -------
+    None
+    """
+    maximum = np.max(y_true)
+    if maximum == 0:
+        result[0] = np.nan
+        return
+    result[0] = np.max(y_pred) / maximum
+
+@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+def kling_gupta_efficiency(
+    y_true: npt.NDArray[np.float64],
+    y_pred: npt.NDArray[np.float64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of Kling-Gupta Model Efficiency.
+        
+    Parameters
+    ----------
+    y_true: NDArray[np.float64], required
+        Ground truth (correct) target values, also called observations,
+        measurements, or observed values.
+    y_pred: NDArray[np.float64], required
+        Estimated target values, also called simulations or modeled values.
+    result: NDArray[np.float64], required
+        Stores scalar result.
+        
+    Returns
+    -------
+    None
+    """
+    correlation = np.empty(shape=1, dtype=np.float64)
+    pearson_correlation_coefficient(y_true, y_pred, correlation)
+    rel_var = np.empty(shape=1, dtype=np.float64)
+    relative_standard_deviation(y_true, y_pred, rel_var)
+    rel_mean = np.empty(shape=1, dtype=np.float64)
+    relative_mean(y_true, y_pred, rel_mean)
+    result[0] = (1.0 - np.sqrt(
+        ((correlation[0] - 1.0)) ** 2.0 + 
+        ((rel_var[0] - 1.0)) ** 2.0 + 
+        ((rel_mean[0] - 1.0)) ** 2.0
+        ))
+
 METRIC_FUNCTIONS: dict[Metric, MetricFunction] = {
-    Metric.NASH_SUTCLIFFE_EFFICIENCY: nash_sutcliffe_efficiency
+    Metric.NASH_SUTCLIFFE_EFFICIENCY: nash_sutcliffe_efficiency,
+    Metric.RELATIVE_MEAN_BIAS: relative_mean_bias,
+    Metric.PEARSON_CORRELATION_COEFFICIENT: pearson_correlation_coefficient,
+    Metric.RELATIVE_MEAN: relative_mean,
+    Metric.RELATIVE_MEDIAN: relative_median,
+    Metric.RELATIVE_MINIMUM: relative_minimum,
+    Metric.RELATIVE_MAXIMUM: relative_maximum,
+    Metric.RELATIVE_STANDARD_DEVIATION: relative_standard_deviation,
+    Metric.KLING_GUPTA_EFFICIENCY: kling_gupta_efficiency
 }
 """Mapping from metrics to functions used to compute them."""
 
@@ -311,7 +577,8 @@ def main(
         start_time: pd.Timestamp = pd.Timestamp("2023-10-01"),
         end_time: pd.Timestamp = pd.Timestamp("2025-09-30T23:59"),
         processes: int = 18,
-        sites_per_chunk: int = 100
+        sites_per_chunk: int = 200,
+        root: Path = Path("/ised/nwm_explorer_data")
 ) -> None:
     """Main."""
     # Get logger
@@ -327,11 +594,15 @@ def main(
     with ProcessPoolExecutor(max_workers=processes) as parallel_computer:
         # Process each configuration
         for config, specs in GROUP_SPECIFICATIONS.items():
+            if config != ModelConfiguration.MEDIUM_RANGE_MEM_1:
+                continue
             # Process in chunks
             logger.info("Evaluating %s", config)
             logger.info("Grouping into chunks of %d sites", sites_per_chunk)
+            batch_counter = itertools.count(1)
+            dataframes = []
             for groups in prediction_pool_generator(
-                root=Path("/ised/nwm_explorer_data"),
+                root=root,
                 configuration=config,
                 start_time=start_time,
                 end_time=end_time,
@@ -339,19 +610,22 @@ def main(
                 sites_per_chunk=sites_per_chunk
             ):
                 # Chunk size
+                logger.info("Batch: %d", next(batch_counter))
                 chunksize = len(groups) // processes + 1
                 logger.info("Evaluating %d groups", len(groups))
                 logger.info("Running %d groups per process", chunksize)
 
                 # Compute
                 logger.info("Computing metrics")
-                results = pd.DataFrame.from_records(
-                    parallel_computer.map(
-                        bootstrap_metrics, groups, chunksize=chunksize
+                dataframes.append(
+                    pd.DataFrame.from_records(
+                        parallel_computer.map(
+                            bootstrap_metrics, groups, chunksize=chunksize
+                        )
                     )
                 )
-                print(results)
-                break
+            results = pd.concat(dataframes, ignore_index=True)
+            print(results.info(memory_usage="deep"))
             break
 
 if __name__ == "__main__":
