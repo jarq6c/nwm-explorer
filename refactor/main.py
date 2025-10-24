@@ -565,7 +565,7 @@ def prediction_pool_generator(
 
         # Check for data
         if data.is_empty():
-            logger.info("Empty pool, trying again")
+            logger.debug("Empty pool, trying again")
             continue
 
         # Generate groups
@@ -630,9 +630,11 @@ def main(
                 )
 
             # Concatenate into a single dataframe
+            logger.info("Concatenating groups")
             results = pd.concat(dataframes, ignore_index=True)
 
             # Save results
+            logger.info("Saving %s", ofile)
             pl.DataFrame(results).write_parquet(ofile)
 
 if __name__ == "__main__":
