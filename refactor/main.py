@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 import numpy.typing as npt
 from numba import float64, guvectorize
+from arch.bootstrap import StationaryBootstrap, optimal_block_length
 
 from modules.nwm import ModelConfiguration
 from modules.pairs import scan_pairs, GROUP_SPECIFICATIONS
@@ -93,11 +94,17 @@ def bootstrap_metrics(
 
     # Compute metrics
     for rank in ["min", "median", "max"]:
+        # Extract numpy arrays for Numba functions
         y_true = data[f"observed_cfs_{rank}"].to_numpy(dtype=np.float64)
         y_pred = data[f"predicted_cfs_{rank}"].to_numpy(dtype=np.float64)
+
+        # Compute each metric
         for label, func in METRIC_FUNCTIONS.items():
-            point = func(y_true, y_pred)
-            result[f"{label}_{rank}_point"] = point
+            # NOTE Numba has magic that avoids instantiating point, but
+            #  it makes the linter mad.
+            point = np.empty(shape=1, dtype=np.float64)
+            func(y_true, y_pred, point)
+            result[f"{label}_{rank}_point"] = point[0]
     return result
 
 def load_pool(
@@ -248,16 +255,27 @@ def prediction_pool_generator(
 def main(
         label: str = "FY2024Q1",
         start_time: pd.Timestamp = pd.Timestamp("2023-10-01"),
-        end_time: pd.Timestamp = pd.Timestamp("2025-09-30"),
+        end_time: pd.Timestamp = pd.Timestamp("2025-09-30T23:59"),
         processes: int = 18,
         sites_per_chunk: int = 100
 ) -> None:
     """Main."""
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+
+    # Logging
+    logger.info("Running evaluation %s", label)
+    logger.info("Range: %s to %s", start_time, end_time)
+
     # Start process pool
+    logger.info("Starting %d processes", processes)
     with ProcessPoolExecutor(max_workers=processes) as parallel_computer:
         # Process each configuration
         for config, specs in GROUP_SPECIFICATIONS.items():
             # Process in chunks
+            logger.info("Evaluating %s", config)
+            logger.info("Grouping into chunks of %d sites", sites_per_chunk)
             for groups in prediction_pool_generator(
                 root=Path("/ised/nwm_explorer_data"),
                 configuration=config,
@@ -268,8 +286,11 @@ def main(
             ):
                 # Chunk size
                 chunksize = len(groups) // processes + 1
+                logger.info("Evaluating %d groups", len(groups))
+                logger.info("Running %d groups per process", chunksize)
 
                 # Compute
+                logger.info("Computing metrics")
                 results = pd.DataFrame.from_records(
                     parallel_computer.map(
                         bootstrap_metrics, groups, chunksize=chunksize
