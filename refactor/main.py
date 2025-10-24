@@ -310,8 +310,8 @@ def kling_gupta_efficiency(
     rel_mean = np.empty(shape=1, dtype=np.float64)
     relative_mean(y_true, y_pred, rel_mean)
     result[0] = (1.0 - np.sqrt(
-        ((correlation[0] - 1.0)) ** 2.0 + 
-        ((rel_var[0] - 1.0)) ** 2.0 + 
+        ((correlation[0] - 1.0)) ** 2.0 +
+        ((rel_var[0] - 1.0)) ** 2.0 +
         ((rel_mean[0] - 1.0)) ** 2.0
         ))
 
@@ -336,6 +336,24 @@ def bootstrap_metrics(
     ) -> dict[str, Any]:
     """
     Use stationary bootstrap to generate metrics with confidence intervals.
+    Returns a dictionary. Assumed use is as record for pandas.DataFrame.from_records.
+
+    Parameters
+    ----------
+    data: pandas.DataFrame, required
+        DataFrame of pairs for a specific feature and lead time.
+    minimum_sample_size: int, optional, default 30
+        Minimum number of samples required to compute confidence intervals.
+    minimum_mean: float, optional, default 0.01
+        Smallest mean value of observed time series required to compute
+        confidence intervals.
+    minimum_variance: float, optional, default 0.000025
+        Smallest variance of observed time series required to compute
+        confidence intervals.
+    
+    Returns
+    -------
+    dict[str, Any]
     """
     # Start building results
     result = {
@@ -514,7 +532,7 @@ def prediction_pool_generator(
         end_time: pd.Timestamp,
         lead_time_interval: int,
         sites_per_chunk: int = 1
-        ) -> Generator[list[pd.DataFrame]]:
+) -> Generator[list[pd.DataFrame]]:
     """
     Iteratively, load and group forecast pairs into lead time pools. Returns a
     list of DataFrame for each nwm_feature_id and lead_time_hours_min combination.
@@ -531,7 +549,9 @@ def prediction_pool_generator(
         Last reference time.
     lead_time_interval: int
         Lead time scale to aggregate over in hours.
-    
+    sites_per_chunk: int, optional, default 1
+        Maximum number of sites returned per iteration.
+
     Returns
     -------
     Generator[list[pandas.DataFrame]]
@@ -571,15 +591,37 @@ def prediction_pool_generator(
         # Generate groups
         yield [df.to_pandas() for _, df in data.group_by(["nwm_feature_id", "lead_time_hours_min"])]
 
-def main(
-        label: str = "FY2024Q1",
-        start_time: pd.Timestamp = pd.Timestamp("2023-10-01"),
-        end_time: pd.Timestamp = pd.Timestamp("2025-09-30T23:59"),
-        processes: int = 18,
-        sites_per_chunk: int = 200,
-        root: Path = Path("/ised/nwm_explorer_data")
+def evaluate(
+        label: str,
+        root: Path,
+        start_time: pd.Timestamp,
+        end_time: pd.Timestamp,
+        processes: int = 1,
+        sites_per_chunk: int = 1
 ) -> None:
-    """Main."""
+    """
+    Iteratively, load and group forecast pairs into lead time pools. Returns a
+    list of DataFrame for each nwm_feature_id and lead_time_hours_min combination.
+
+    Parameters
+    ----------
+    label: str, required
+        Machine-friendly label used to generate parquet store.
+    root: pathlib.Path
+        Root data directory.
+    start_time: pandas.Timestamp
+        First reference time.
+    end_time: pandas.Timestamp
+        Last reference time.
+    process: int, optional, default 1
+        Number of parallel processes to use for computation.
+    sites_per_chunk: int, optional, default 1
+        Maximum number of sites to load into memory at once.
+
+    Returns
+    -------
+    Generator[list[pandas.DataFrame]]
+    """
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
@@ -636,6 +678,17 @@ def main(
             # Save results
             logger.info("Saving %s", ofile)
             pl.DataFrame(results).write_parquet(ofile)
+
+def main() -> None:
+    """Main."""
+    evaluate(
+        label = "FY2024Q1",
+        root = Path("/ised/nwm_explorer_data"),
+        start_time = pd.Timestamp("2023-10-01"),
+        end_time = pd.Timestamp("2025-09-30T23:59"),
+        processes = 18,
+        sites_per_chunk = 500
+    )
 
 if __name__ == "__main__":
     main()
