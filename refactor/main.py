@@ -64,9 +64,9 @@ METRIC_FUNCTIONS: dict[Metric, MetricFunction] = {
 
 def bootstrap_metrics(
     data: pd.DataFrame,
-    # minimum_sample_size: int = 30,
-    # minimum_mean: float = 0.01,
-    # minimum_variance: float = 0.000025
+    minimum_sample_size: int = 30,
+    minimum_mean: float = 0.01,
+    minimum_variance: float = 0.000025
     ) -> dict[str, Any]:
     """
     Use stationary bootstrap to generate metrics with confidence intervals.
@@ -100,11 +100,65 @@ def bootstrap_metrics(
 
         # Compute each metric
         for label, func in METRIC_FUNCTIONS.items():
-            # NOTE Numba has magic that avoids instantiating point, but
+            # Point estimate
+            # NOTE Numba has magic that implicitly instantiates point, but
             #  it makes the linter mad.
             point = np.empty(shape=1, dtype=np.float64)
             func(y_true, y_pred, point)
             result[f"{label}_{rank}_point"] = point[0]
+
+            # Sample size too small reliably to compute confidence interval
+            if result["sample_size"] < minimum_sample_size:
+                result[f"{label}_{rank}_lower"] = np.nan
+                result[f"{label}_{rank}_upper"] = np.nan
+                continue
+
+            # Values too small to reliably compute confidence interval
+            if np.mean(y_true) < minimum_mean:
+                result[f"{label}_{rank}_lower"] = np.nan
+                result[f"{label}_{rank}_upper"] = np.nan
+                continue
+
+            # Variance too small to reliably compute confidence interval
+            if np.var(y_true) < minimum_variance:
+                result[f"{label}_{rank}_lower"] = np.nan
+                result[f"{label}_{rank}_upper"] = np.nan
+                continue
+
+            # Optimal block size
+            # NOTE Normalizing the values seems to produce more consistent
+            #  block sizes. Here we let the "true" values determine the block size.
+            max_value = np.max(y_true) * 1.01
+            normalized = y_true / max_value
+            block_size = optimal_block_length(normalized)["stationary"][0]
+            if np.isnan(block_size):
+                block_size = 1
+            else:
+                block_size = max(1, int(block_size))
+
+            # Resample the array index to apply to both y_true and y_pred
+            index = np.arange(y_true.size)
+            bs = StationaryBootstrap(
+                block_size,
+                index,
+                seed=2025
+                )
+
+            # Generate posterior distribution
+            posterior = []
+            estimate = np.empty(shape=1, dtype=np.float64)
+            for samples in bs.bootstrap(1000):
+                # Generate an index
+                idx = samples[0][0]
+
+                # Apply the new index and compute the metric
+                func(y_true[idx], y_pred[idx], estimate)
+                posterior.append(estimate[0])
+
+            # Compute confidence interval
+            ci = np.quantile(posterior, [0.025, 0.975])
+            result[f"{label}_{rank}_lower"] = ci[0]
+            result[f"{label}_{rank}_upper"] = ci[1]
     return result
 
 def load_pool(
