@@ -1,7 +1,7 @@
 """Methods to evaluate pairs."""
 from pathlib import Path
 import inspect
-from typing import Generator, Any, Callable
+from typing import Generator, Any, Callable, Literal
 from concurrent.futures import ProcessPoolExecutor
 from enum import StrEnum
 import itertools
@@ -36,6 +36,9 @@ MetricFunction = Callable[[
     npt.NDArray[np.float64]
     ], None]
 """Type hint for Numba functions that generate metrics."""
+
+SUBDIRECTORY: str = "evaluations"
+"""Subdirectory that indicates root of evaluation parquet store."""
 
 @guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
 def nash_sutcliffe_efficiency(
@@ -636,7 +639,7 @@ def evaluate(
         # Process each configuration
         for config, specs in GROUP_SPECIFICATIONS.items():
             # Prepare output file
-            ofile = root / f"evaluations/label={label}/configuration={config}/E0.parquet"
+            ofile = root / f"{SUBDIRECTORY}/label={label}/configuration={config}/E0.parquet"
             if ofile.exists():
                 logger.info("Found %s", ofile)
                 continue
@@ -679,16 +682,69 @@ def evaluate(
             logger.info("Saving %s", ofile)
             pl.DataFrame(results).write_parquet(ofile)
 
+def scan_evaluations(root: Path) -> pl.LazyFrame:
+    """
+    Return polars.LazyFrame of Evaluation results.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+
+    Returns
+    -------
+    polars.LazyFrame
+    """
+    return pl.scan_parquet(
+        root / f"{SUBDIRECTORY}/",
+        hive_schema={
+            "label": pl.String,
+            "configuration": pl.Enum(ModelConfiguration)
+        }
+    )
+
+def load_metrics(
+        root: Path,
+        label: str,
+        configuration: ModelConfiguration,
+        metric: Metric,
+        lead_time_hours_min: int = 0,
+        rank: Literal["min", "median", "max"] = "median"
+) -> pl.DataFrame:
+    """Get metrics."""
+    return scan_evaluations(
+        root
+    ).filter(
+        pl.col("label") == label,
+        pl.col("configuration") == configuration,
+        pl.col("lead_time_hours_min") == lead_time_hours_min
+    ).select(
+        [
+            "nwm_feature_id",
+            f"{metric}_{rank}_lower",
+            f"{metric}_{rank}_point",
+            f"{metric}_{rank}_upper"
+        ]
+    ).collect()
+
 def main() -> None:
     """Main."""
-    evaluate(
-        label = "FY2024Q1",
-        root = Path("/ised/nwm_explorer_data"),
-        start_time = pd.Timestamp("2023-10-01"),
-        end_time = pd.Timestamp("2025-09-30T23:59"),
-        processes = 18,
-        sites_per_chunk = 500
+    root = Path("/ised/nwm_explorer_data")
+    # evaluate(
+    #     label = "FY2024Q2",
+    #     root = root,
+    #     start_time = pd.Timestamp("2024-01-01"),
+    #     end_time = pd.Timestamp("2024-03-31T23:59"),
+    #     processes = 18,
+    #     sites_per_chunk = 500
+    # )
+    evals = load_metrics(
+        root=root,
+        label="FY2024Q2",
+        configuration=ModelConfiguration.MEDIUM_RANGE_MEM_1,
+        metric=Metric.KLING_GUPTA_EFFICIENCY
     )
+    print(evals)
 
 if __name__ == "__main__":
     main()
