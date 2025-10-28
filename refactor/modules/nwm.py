@@ -24,16 +24,10 @@ import xarray as xr
 
 from .logger import get_logger
 from .downloads import download_files, FileValidationError
+from .routelink import download_routelink, ModelDomain
 
 LRU_CACHE_SIZE: int = 9
 """Maximum size of functools.lru_cache."""
-
-class ModelDomain(StrEnum):
-    """Model domains."""
-    ALASKA = "alaska"
-    HAWAII = "hawaii"
-    CONUS = "conus"
-    PUERTO_RICO = "puertorico"
 
 class ModelConfiguration(StrEnum):
     """Model configurations."""
@@ -609,7 +603,6 @@ def build_nwm_filepath(
 def download_nwm(
         start: pd.Timestamp,
         end: pd.Timestamp,
-        routelink: pl.DataFrame,
         root: Path,
         jobs: int = 1,
         retries: int = 3
@@ -623,8 +616,6 @@ def download_nwm(
         First reference date to retrieve and process.
     end: pandas.Timestamp
         Last refrence date to retrieve and process.
-    routelink: polars.DataFrame
-        Crosswalk from NWM channel feature IDs to USGS site codes.
     root: pathlib.Path
         Root data directory.
     jobs: int, optional, default 1
@@ -635,6 +626,11 @@ def download_nwm(
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
+
+    # Load routelink
+    routelink = download_routelink(root).select(
+        ["nwm_feature_id", "domain"]
+    ).collect()
 
     # Generate reference dates
     logger.info("Generating reference dates")

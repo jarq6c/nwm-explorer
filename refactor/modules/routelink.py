@@ -3,6 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import inspect
 import tarfile
+from enum import StrEnum
 
 import pandas as pd
 import polars as pl
@@ -10,7 +11,13 @@ from yarl import URL
 
 from .logger import get_logger
 from .downloads import download_files
-from .nwm import ModelDomain
+
+class ModelDomain(StrEnum):
+    """Model domains."""
+    ALASKA = "alaska"
+    HAWAII = "hawaii"
+    CONUS = "conus"
+    PUERTO_RICO = "puertorico"
 
 ROUTELINK_URL: str = (
     "https://www.hydroshare.org/resource"
