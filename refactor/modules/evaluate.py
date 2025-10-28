@@ -14,10 +14,10 @@ import numpy.typing as npt
 from numba import float64, guvectorize
 from arch.bootstrap import StationaryBootstrap, optimal_block_length
 
-from modules.nwm import ModelConfiguration
-from modules.pairs import scan_pairs, GROUP_SPECIFICATIONS
-from modules.logger import get_logger
-from modules.routelink import download_routelink
+from .nwm import ModelConfiguration
+from .pairs import scan_pairs, GROUP_SPECIFICATIONS
+from .logger import get_logger
+from .routelink import download_routelink
 
 class Metric(StrEnum):
     """Symbols for common metrics."""
@@ -895,25 +895,3 @@ def load_metrics(
         lead_time_hours_min=lead_time_hours_min,
         rank=rank
     )
-
-def main() -> None:
-    """Main."""
-    root = Path("/ised/nwm_explorer_data")
-    evaluate(
-        label = "FY2025Q3",
-        root = root,
-        start_time = pd.Timestamp("2025-04-01"),
-        end_time = pd.Timestamp("2025-06-30T23:59"),
-        processes = 18,
-        sites_per_chunk = 500
-    )
-    # evals = load_metrics(
-    #     root=root,
-    #     label="FY2024Q3",
-    #     configuration=ModelConfiguration.MEDIUM_RANGE_MEM_1,
-    #     metric=Metric.KLING_GUPTA_EFFICIENCY
-    # )
-    # print(evals)
-
-if __name__ == "__main__":
-    main()
