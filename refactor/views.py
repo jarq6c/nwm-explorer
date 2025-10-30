@@ -13,6 +13,7 @@ import colorcet as cc
 from modules.nwm import ModelConfiguration
 from modules.evaluate import load_metrics, Metric
 from modules.routelink import download_routelink
+from modules.pairs import GROUP_SPECIFICATIONS
 
 pn.extension('tabulator')
 
@@ -44,12 +45,14 @@ DOMAIN_LOOKUP: dict[ModelConfiguration, ModelDomain] = {
 """Mapping from ModelConfiguration to ModelDomain."""
 
 CONFIGURATION_LOOKUP: dict[ModelConfiguration, str] = {
-    ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA: "Extended Analysis & Assimilation (MRMS/Stage IV, No-DA)",
+    ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA: "Extended Analysis & Assimilation"
+                                                    " (MRMS/Stage IV, No-DA)",
     ModelConfiguration.MEDIUM_RANGE_MEM_1: "Medium Range Deterministic (GFS)",
     ModelConfiguration.MEDIUM_RANGE_BLEND: "Medium Range Deterministic (NBM)",
     ModelConfiguration.MEDIUM_RANGE_NO_DA: "Medium Range Deterministic (GFS, No-DA)",
     ModelConfiguration.SHORT_RANGE: "Short Range (HRRR)",
-    ModelConfiguration.ANALYSIS_ASSIM_EXTEND_ALASKA_NO_DA: "Extended Analysis & Assimilation (MRMS/Stage IV, No-DA)",
+    ModelConfiguration.ANALYSIS_ASSIM_EXTEND_ALASKA_NO_DA: "Extended Analysis & Assimilation"
+                                                           " (MRMS/Stage IV, No-DA)",
     ModelConfiguration.MEDIUM_RANGE_ALASKA_MEM_1: "Medium Range Deterministic (GFS)",
     ModelConfiguration.MEDIUM_RANGE_BLEND_ALASKA: "Medium Range Deterministic (NBM)",
     ModelConfiguration.MEDIUM_RANGE_ALASKA_NO_DA: "Medium Range Deterministic (GFS, No-DA)",
@@ -82,7 +85,9 @@ class FilterWidgets(Viewer):
         super().__init__(**params)
 
         # Merge domain and configuration look-ups
-        self._configuration_lookup = {DOMAIN_LOOKUP[k]+v: (DOMAIN_LOOKUP[k], k) for k, v in CONFIGURATION_LOOKUP.items()}
+        self._configuration_lookup = {
+            DOMAIN_LOOKUP[k]+v: (DOMAIN_LOOKUP[k], k) for k, v in CONFIGURATION_LOOKUP.items()
+            }
 
         # Setup widgets
         self._widgets: dict[str, pn.widgets.Widget] = {
@@ -101,10 +106,34 @@ class FilterWidgets(Viewer):
             "rank": pn.widgets.RadioBoxGroup(
                 name="Flow aggregation",
                 inline=True,
-                options=["min", "median", "max"],
-                margin=(0, 10, 10, 10)
+                options=["min", "median", "max"]
             )
         }
+
+        # Generate lead times
+        self._lead_time_lookup: dict[ModelConfiguration, list[int]] = {}
+        for c, s in GROUP_SPECIFICATIONS.items():
+            self._lead_time_lookup[c] = list(
+                range(0, s.lead_time_hours_max+s.window_interval, s.window_interval)
+            )
+
+        # Add lead time widget
+        self._widgets["lead_time"] = pn.widgets.DiscreteSlider(
+            name="Minimum lead time (hours)",
+            options=self._lead_time_lookup[self.configuration]
+            )
+
+        # Update lead time
+        def update_lead_times(event) -> None:
+            if event is None:
+                return
+            if self.lead_time in self._lead_time_lookup[self.configuration]:
+                value = self.lead_time
+            else:
+                value = 0
+            self._widgets["lead_time"].options = self._lead_time_lookup[self.configuration]
+            self._widgets["lead_time"].value = value
+        pn.bind(update_lead_times, self._widgets["configuration"].param.value, watch=True)
 
         # Create layout
         self._layout = pn.Column(*list(self._widgets.values()))
@@ -146,6 +175,11 @@ class FilterWidgets(Viewer):
     def domain(self) -> ModelDomain:
         """Currently selected domain."""
         return self._configuration_lookup[self._widgets["configuration"].value][0]
+
+    @property
+    def lead_time(self) -> int:
+        """Currently selected minimum lead time in hours."""
+        return self._widgets["lead_time"].value
 
 class TableView(Viewer):
     """Handles tabular view of data."""
@@ -311,6 +345,7 @@ def main() -> None:
             label=filter_widgets.label,
             configuration=filter_widgets.configuration,
             metric=filter_widgets.metric,
+            lead_time_hours_min=filter_widgets.lead_time,
             rank=filter_widgets.rank,
             cache=True
         ).with_columns(
