@@ -79,6 +79,15 @@ METRIC_LOOKUP: dict[str, Metric] = {
 }
 """Mapping from pretty strings to evaluation Metric."""
 
+RANK_LOOKUP: dict[str, str] = {
+    "Median": "median",
+    "Minimum": "min",
+    "Maximum": "max"
+}
+"""Mapping from pretty strings to column label components. 'Rank' refers to the
+aggregation method used to resample streamflow.
+"""
+
 class FilterWidgets(Viewer):
     """Holds various data filtering widgets and values."""
     def __init__(self, **params):
@@ -103,10 +112,9 @@ class FilterWidgets(Viewer):
                 name="Metric",
                 options=list(METRIC_LOOKUP.keys())
             ),
-            "rank": pn.widgets.RadioBoxGroup(
-                name="Flow aggregation",
-                inline=True,
-                options=["min", "median", "max"]
+            "rank": pn.widgets.Select(
+                name="Streamflow aggregation method",
+                options=list(RANK_LOOKUP.keys())
             ),
             "lead_time": pn.pane.Placeholder()
         }
@@ -195,7 +203,7 @@ class FilterWidgets(Viewer):
     @property
     def rank(self) -> str:
         """Currently selected streamflow aggregation method."""
-        return self._widgets["rank"].value
+        return RANK_LOOKUP[self._widgets["rank"].value]
 
     @property
     def column(self) -> str:
