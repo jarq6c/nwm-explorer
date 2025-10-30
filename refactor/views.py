@@ -1,6 +1,6 @@
 """Methods to generate views of data."""
 from pathlib import Path
-from typing import TypedDict
+from typing import TypedDict, Callable
 from enum import StrEnum
 
 import polars as pl
@@ -107,7 +107,8 @@ class FilterWidgets(Viewer):
                 name="Flow aggregation",
                 inline=True,
                 options=["min", "median", "max"]
-            )
+            ),
+            "lead_time": pn.pane.Placeholder()
         }
 
         # Generate lead times
@@ -118,33 +119,63 @@ class FilterWidgets(Viewer):
             )
 
         # Add lead time widget
-        self._widgets["lead_time"] = pn.widgets.DiscreteSlider(
+        self._widgets["lead_time"].object = pn.widgets.DiscretePlayer(
             name="Minimum lead time (hours)",
-            options=self._lead_time_lookup[self.configuration]
+            options=self._lead_time_lookup[self.configuration],
+            show_loop_controls=False,
+            visible_buttons=["previous", "next"],
+            width=300,
+            value=0
             )
+
+        # Keep track of callbacks
+        self._callbacks: list[Callable] = []
 
         # Update lead time
         def update_lead_times(event) -> None:
+            # Ignore non-events
             if event is None:
                 return
+
+            # Maintain value
             if self.lead_time in self._lead_time_lookup[self.configuration]:
                 value = self.lead_time
             else:
                 value = 0
-            self._widgets["lead_time"].options = self._lead_time_lookup[self.configuration]
-            self._widgets["lead_time"].value = value
+
+            # Create new widget to force refresh
+            self._widgets["lead_time"].object = pn.widgets.DiscretePlayer(
+                name="Minimum lead time (hours)",
+                options=self._lead_time_lookup[self.configuration],
+                show_loop_controls=False,
+                visible_buttons=["previous", "next"],
+                width=300,
+                value=value
+                )
+
+            # Bind callbacks
+            for c in self._callbacks:
+                pn.bind(c, self._widgets["lead_time"].object.param.value, watch=True)
         pn.bind(update_lead_times, self._widgets["configuration"].param.value, watch=True)
 
         # Create layout
-        self._layout = pn.Column(*list(self._widgets.values()))
+        self._layout = pn.Card(
+            pn.Column(*list(self._widgets.values())),
+            title="Filters",
+            collapsible=False
+            )
 
     def __panel__(self):
         return self._layout
 
     def bind(self, function) -> None:
         """Bind a function to all filtering widgets."""
+        self._callbacks.append(function)
         for v in self._widgets.values():
-            pn.bind(function, v.param.value, watch=True)
+            if isinstance(v, pn.pane.Placeholder):
+                pn.bind(function, v.object.param.value, watch=True)
+            else:
+                pn.bind(function, v.param.value, watch=True)
 
     @property
     def label(self) -> str:
@@ -179,7 +210,7 @@ class FilterWidgets(Viewer):
     @property
     def lead_time(self) -> int:
         """Currently selected minimum lead time in hours."""
-        return self._widgets["lead_time"].value
+        return self._widgets["lead_time"].object.value
 
 class TableView(Viewer):
     """Handles tabular view of data."""
