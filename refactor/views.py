@@ -201,6 +201,11 @@ class FilterWidgets(Viewer):
         return METRIC_LOOKUP[self._widgets["metric"].value]
 
     @property
+    def metric_label(self) -> str:
+        """Currently selected evaluation metric label."""
+        return self._widgets["metric"].value
+
+    @property
     def rank(self) -> str:
         """Currently selected streamflow aggregation method."""
         return RANK_LOOKUP[self._widgets["rank"].value]
@@ -327,7 +332,11 @@ class MapView(Viewer):
         self._pane = pn.pane.Plotly(self._figure)
 
     def __panel__(self):
-        return self._pane
+        return pn.Card(
+            self._pane,
+            collapsible=False,
+            hide_header=True
+            )
 
     def update(
             self,
@@ -335,7 +344,8 @@ class MapView(Viewer):
             column: str,
             domain: ModelDomain,
             cmin: float,
-            cmax: float
+            cmax: float,
+            metric_label: str
             ) -> None:
         """Update map."""
         # Update markers
@@ -348,6 +358,7 @@ class MapView(Viewer):
             lat=dataframe["latitude"],
             lon=dataframe["longitude"]
         )
+        self._figure["data"][0]["marker"]["colorbar"]["title"].update(text=metric_label)
 
         # Update focus
         self._figure["layout"].update(
@@ -404,7 +415,8 @@ def main() -> None:
             column=filter_widgets.column,
             domain=filter_widgets.domain,
             cmin=METRIC_PLOTTING_LIMITS[filter_widgets.metric][0],
-            cmax=METRIC_PLOTTING_LIMITS[filter_widgets.metric][1]
+            cmax=METRIC_PLOTTING_LIMITS[filter_widgets.metric][1],
+            metric_label=filter_widgets.metric_label
             )
     handle_widget_updates(filter_widgets.label)
     filter_widgets.bind(handle_widget_updates)
