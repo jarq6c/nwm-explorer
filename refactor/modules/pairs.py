@@ -30,6 +30,7 @@ class NWMGroupSpecification:
     sort_columns: list[str] | None = None
     window_interval: int = 24
     state_code: str | None = None
+    lead_time_hours_max: int = 0
 
     def __post_init__(self) -> None:
         if self.group_by_columns is None:
@@ -48,17 +49,21 @@ GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
         select_columns=["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
     ),
     ModelConfiguration.MEDIUM_RANGE_ALASKA_MEM_1: NWMGroupSpecification(
-        state_code="ak"
+        state_code="ak",
+        lead_time_hours_max=240
     ),
     ModelConfiguration.MEDIUM_RANGE_BLEND_ALASKA: NWMGroupSpecification(
-        state_code="ak"
+        state_code="ak",
+        lead_time_hours_max=240
     ),
     ModelConfiguration.MEDIUM_RANGE_ALASKA_NO_DA: NWMGroupSpecification(
-        state_code="ak"
+        state_code="ak",
+        lead_time_hours_max=240
     ),
     ModelConfiguration.SHORT_RANGE_ALASKA: NWMGroupSpecification(
         window_interval=5,
-        state_code="ak"
+        state_code="ak",
+        lead_time_hours_max=45
     ),
     ModelConfiguration.ANALYSIS_ASSIM_HAWAII_NO_DA: NWMGroupSpecification(
         group_by_columns=["nwm_feature_id"],
@@ -67,11 +72,13 @@ GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
     ),
     ModelConfiguration.SHORT_RANGE_HAWAII: NWMGroupSpecification(
         window_interval=6,
-        state_code="hi"
+        state_code="hi",
+        lead_time_hours_max=48
     ),
     ModelConfiguration.SHORT_RANGE_HAWAII_NO_DA: NWMGroupSpecification(
         window_interval=6,
-        state_code="hi"
+        state_code="hi",
+        lead_time_hours_max=48
     ),
     ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA: NWMGroupSpecification(
         group_by_columns=["nwm_feature_id"],
@@ -80,21 +87,24 @@ GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
     ),
     ModelConfiguration.SHORT_RANGE_PUERTO_RICO: NWMGroupSpecification(
         window_interval=6,
-        state_code="pr"
+        state_code="pr",
+        lead_time_hours_max=48
     ),
     ModelConfiguration.SHORT_RANGE_PUERTO_RICO_NO_DA: NWMGroupSpecification(
         window_interval=6,
-        state_code="pr"
+        state_code="pr",
+        lead_time_hours_max=48
     ),
     ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA: NWMGroupSpecification(
         group_by_columns=["nwm_feature_id"],
         select_columns=["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
     ),
-    ModelConfiguration.MEDIUM_RANGE_MEM_1: NWMGroupSpecification(),
-    ModelConfiguration.MEDIUM_RANGE_BLEND: NWMGroupSpecification(),
-    ModelConfiguration.MEDIUM_RANGE_NO_DA: NWMGroupSpecification(),
+    ModelConfiguration.MEDIUM_RANGE_MEM_1: NWMGroupSpecification(lead_time_hours_max=240),
+    ModelConfiguration.MEDIUM_RANGE_BLEND: NWMGroupSpecification(lead_time_hours_max=240),
+    ModelConfiguration.MEDIUM_RANGE_NO_DA: NWMGroupSpecification(lead_time_hours_max=240),
     ModelConfiguration.SHORT_RANGE: NWMGroupSpecification(
-        window_interval=6
+        window_interval=6,
+        lead_time_hours_max=18
     )
 }
 """Mapping from ModelConfiguration to group-by specifications."""
