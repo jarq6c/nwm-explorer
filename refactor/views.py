@@ -11,7 +11,7 @@ from plotly.basedatatypes import BaseTraceType
 import colorcet as cc
 
 from modules.nwm import ModelConfiguration
-from modules.evaluate import load_metrics, Metric
+from modules.evaluate import load_metrics, Metric, scan_evaluations
 from modules.routelink import download_routelink
 from modules.pairs import GROUP_SPECIFICATIONS
 
@@ -90,7 +90,7 @@ aggregation method used to resample streamflow.
 
 class FilterWidgets(Viewer):
     """Holds various data filtering widgets and values."""
-    def __init__(self, **params):
+    def __init__(self, evaluation_options: list[str], **params):
         super().__init__(**params)
 
         # Merge domain and configuration look-ups
@@ -102,7 +102,7 @@ class FilterWidgets(Viewer):
         self._widgets: dict[str, pn.widgets.Widget] = {
             "label": pn.widgets.Select(
                 name="Evaluation",
-                options=["FY2024Q1", "FY2024Q2"]
+                options=evaluation_options
             ),
             "configuration": pn.widgets.Select(
                 name="Model Configuration",
@@ -380,7 +380,10 @@ def main() -> None:
         ["nwm_feature_id", "latitude", "longitude"]
     ).collect()
 
-    filter_widgets = FilterWidgets()
+    filter_widgets = FilterWidgets(
+        evaluation_options=scan_evaluations(root, cache=True).select(
+            "label").collect().unique()["label"].to_list()
+    )
 
     site_map = MapView()
 
