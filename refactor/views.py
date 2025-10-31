@@ -428,7 +428,7 @@ def main() -> None:
             metric=filter_widgets.metric,
             lead_time_hours_min=filter_widgets.lead_time,
             rank=filter_widgets.rank,
-            additional_columns=("nwm_feature_id", "usgs_site_code"),
+            additional_columns=("nwm_feature_id", "usgs_site_code", "sample_size"),
             significant=filter_widgets.significant,
             cache=True
         ).with_columns(
@@ -454,12 +454,14 @@ def main() -> None:
                     "nwm_feature_id",
                     "usgs_site_code",
                     filter_widgets.lower_column,
-                    filter_widgets.upper_column
+                    filter_widgets.upper_column,
+                    "sample_size"
                 ]],
             hover_template=(
                     f"{filter_widgets.metric_label}: "
                     "%{marker.color:.2f}<br>"
                     "95% CI: %{customdata[2]:.2f} -- %{customdata[3]:.2f}<br>"
+                    "Samples: %{customdata[4]:.0f}<br>"
                     "NWM Feature ID: %{customdata[0]}<br>"
                     "USGS Site Code: %{customdata[1]}<br>"
                     "Longitude: %{lon}<br>"
