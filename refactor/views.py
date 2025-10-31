@@ -9,6 +9,7 @@ from panel.viewable import Viewer
 import plotly.graph_objects as go
 from plotly.basedatatypes import BaseTraceType
 import colorcet as cc
+import pandas as pd
 
 from modules.nwm import ModelConfiguration
 from modules.evaluate import load_metrics, Metric, scan_evaluations
@@ -338,6 +339,10 @@ class MapView(Viewer):
             hide_header=True
             )
 
+    def bind_click(self, function) -> None:
+        """Bind a function to click event."""
+        pn.bind(function, self._pane.param.click_data, watch=True)
+
     def update(
             self,
             dataframe: pl.DataFrame,
@@ -345,7 +350,9 @@ class MapView(Viewer):
             domain: ModelDomain,
             cmin: float,
             cmax: float,
-            metric_label: str
+            metric_label: str,
+            custom_data: pd.DataFrame | None = None,
+            hover_template: str | None = None
             ) -> None:
         """Update map."""
         # Update markers
@@ -356,7 +363,9 @@ class MapView(Viewer):
         )
         self._figure["data"][0].update(
             lat=dataframe["latitude"],
-            lon=dataframe["longitude"]
+            lon=dataframe["longitude"],
+            customdata=custom_data,
+            hovertemplate=hover_template
         )
         self._figure["data"][0]["marker"]["colorbar"]["title"].update(text=metric_label)
 
@@ -400,6 +409,7 @@ def main() -> None:
             metric=filter_widgets.metric,
             lead_time_hours_min=filter_widgets.lead_time,
             rank=filter_widgets.rank,
+            additional_columns=["nwm_feature_id", "usgs_site_code"],
             cache=True
         ).with_columns(
             latitude=pl.col("nwm_feature_id").replace_strict(
@@ -419,10 +429,23 @@ def main() -> None:
             domain=filter_widgets.domain,
             cmin=METRIC_PLOTTING_LIMITS[filter_widgets.metric][0],
             cmax=METRIC_PLOTTING_LIMITS[filter_widgets.metric][1],
-            metric_label=filter_widgets.metric_label
+            metric_label=filter_widgets.metric_label,
+            custom_data=data.to_pandas()[["nwm_feature_id", "usgs_site_code"]],
+            hover_template=(
+                    f"{filter_widgets.metric_label}: "
+                    "%{marker.color:.2f}<br>"
+                    "NWM Feature ID: %{customdata[0]}<br>"
+                    "USGS Site Code: %{customdata[1]}<br>"
+                    "Longitude: %{lon}<br>"
+                    "Latitude: %{lat}"
+                )
             )
     handle_widget_updates(filter_widgets.label)
     filter_widgets.bind(handle_widget_updates)
+
+    def handle_click(event) -> None:
+        print(event)
+    site_map.bind_click(handle_click)
 
     pn.serve(pn.Row(filter_widgets, site_map))
 

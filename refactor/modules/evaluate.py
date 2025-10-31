@@ -748,7 +748,8 @@ def load_metrics_no_cache(
         configuration: ModelConfiguration,
         metric: Metric,
         lead_time_hours_min: int = 0,
-        rank: Literal["min", "median", "max"] = "median"
+        rank: Literal["min", "median", "max"] = "median",
+        additional_columns: list[str] | None = None
 ) -> pl.DataFrame:
     """
     Returns DataFrame of metrics.
@@ -771,11 +772,18 @@ def load_metrics_no_cache(
         will typically return daily streamflow aggregated to minimum, median, or
         maximum streamflow. Short Range CONUS, Hawaii, and Puerto Rico return
         6-hourly aggregation. Short Range Alaska returns 5-hourly aggregations.
+    additional_columns: list[str], optional, default ["nwm_feature_id"]
+        Additional columns (often metadata) to return with metric values.
     
     Returns
     -------
     polars.DataFrame
     """
+    # Check additional columns
+    if additional_columns is None:
+        additional_columns = ["nwm_feature_id"]
+
+    # Retrieve
     return scan_evaluations(
         root
     ).filter(
@@ -784,11 +792,10 @@ def load_metrics_no_cache(
         pl.col("lead_time_hours_min") == lead_time_hours_min
     ).select(
         [
-            "nwm_feature_id",
             f"{metric}_{rank}_lower",
             f"{metric}_{rank}_point",
             f"{metric}_{rank}_upper"
-        ]
+        ] + additional_columns
     ).collect()
 
 @functools.lru_cache(LRU_CACHE_SIZE)
@@ -798,7 +805,8 @@ def load_metrics_cache(
         configuration: ModelConfiguration,
         metric: Metric,
         lead_time_hours_min: int = 0,
-        rank: Literal["min", "median", "max"] = "median"
+        rank: Literal["min", "median", "max"] = "median",
+        additional_columns: list[str] | None = None
 ) -> pl.DataFrame:
     """
     Returns DataFrame of metrics. Cache result.
@@ -821,11 +829,18 @@ def load_metrics_cache(
         will typically return daily streamflow aggregated to minimum, median, or
         maximum streamflow. Short Range CONUS, Hawaii, and Puerto Rico return
         6-hourly aggregation. Short Range Alaska returns 5-hourly aggregations.
+    additional_columns: list[str], optional, default ["nwm_feature_id"]
+        Additional columns (often metadata) to return with metric values.
     
     Returns
     -------
     polars.DataFrame
     """
+    # Check additional columns
+    if additional_columns is None:
+        additional_columns = ["nwm_feature_id"]
+
+    # Retrieve
     return scan_evaluations(
         root, cache=True
     ).filter(
@@ -848,6 +863,7 @@ def load_metrics(
         metric: Metric,
         lead_time_hours_min: int = 0,
         rank: Literal["min", "median", "max"] = "median",
+        additional_columns: list[str] | None = None,
         cache: bool = False
 ) -> pl.DataFrame:
     """
@@ -871,6 +887,8 @@ def load_metrics(
         will typically return daily streamflow aggregated to minimum, median, or
         maximum streamflow. Short Range CONUS, Hawaii, and Puerto Rico return
         6-hourly aggregation. Short Range Alaska returns 5-hourly aggregations.
+    additional_columns: list[str], optional, default ["nwm_feature_id"]
+        Additional columns (often metadata) to return with metric values.
     cache: bool, optional, default False
         If true, cache result.
     
@@ -878,6 +896,7 @@ def load_metrics(
     -------
     polars.DataFrame
     """
+    # Retrieve
     if cache:
         return load_metrics_cache(
             root=root,
@@ -885,7 +904,8 @@ def load_metrics(
             configuration=configuration,
             metric=metric,
             lead_time_hours_min=lead_time_hours_min,
-            rank=rank
+            rank=rank,
+            additional_columns=additional_columns
         )
     return load_metrics_no_cache(
         root=root,
@@ -893,5 +913,6 @@ def load_metrics(
         configuration=configuration,
         metric=metric,
         lead_time_hours_min=lead_time_hours_min,
-        rank=rank
+        rank=rank,
+        additional_columns=additional_columns
     )
