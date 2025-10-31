@@ -14,7 +14,7 @@ import pandas as pd
 from modules.nwm import ModelConfiguration
 from modules.evaluate import load_metrics, Metric, scan_evaluations
 from modules.routelink import download_routelink
-from modules.pairs import GROUP_SPECIFICATIONS
+from modules.pairs import GROUP_SPECIFICATIONS, NWMGroupSpecification
 
 pn.extension('tabulator')
 
@@ -89,6 +89,44 @@ RANK_LOOKUP: dict[str, str] = {
 aggregation method used to resample streamflow.
 """
 
+def build_lead_time_lookup(
+        group_specificiations: dict[ModelConfiguration, NWMGroupSpecification] | None = None
+) -> dict[ModelConfiguration, list[int]]:
+    """build."""
+    # Check specifications
+    if group_specificiations is None:
+        group_specificiations = GROUP_SPECIFICATIONS
+
+    # Build lead time lists
+    lead_time_lookup = {}
+    for c, s in group_specificiations.items():
+        lead_time_lookup[c] = list(
+            range(0, s.lead_time_hours_max+s.window_interval, s.window_interval)
+        )
+    return lead_time_lookup
+
+def build_lead_time_strings(
+        lead_time_lookup: dict[ModelConfiguration, list[int]] | None = None
+) -> dict[ModelConfiguration, list[str]]:
+    """build."""
+    # Check specifications
+    if lead_time_lookup is None:
+        lead_time_lookup = build_lead_time_lookup()
+
+    # Build lead time lists
+    lead_time_strings = {}
+    for c, lead_times in lead_time_lookup.items():
+        if len(lead_times) == 1:
+            lead_time_strings[c] = [str(l) for l in lead_times]
+            continue
+
+        lead_time_strings[c] = []
+        for idx in range(0, len(lead_times)-1):
+            lead_time_strings[c].append(f"{lead_times[idx]} to <{lead_times[idx+1]}")
+        lead_time_strings[c].append(f"{lead_times[-1]}")
+
+    return lead_time_strings
+
 class FilterWidgets(Viewer):
     """Holds various data filtering widgets and values."""
     def __init__(self, evaluation_options: list[str], **params):
@@ -125,20 +163,17 @@ class FilterWidgets(Viewer):
         }
 
         # Generate lead times
-        self._lead_time_lookup: dict[ModelConfiguration, list[int]] = {}
-        for c, s in GROUP_SPECIFICATIONS.items():
-            self._lead_time_lookup[c] = list(
-                range(0, s.lead_time_hours_max+s.window_interval, s.window_interval)
-            )
+        self._lead_time_lookup = build_lead_time_lookup()
+        self._lead_time_strings = build_lead_time_strings()
 
         # Add lead time widget
         self._widgets["lead_time"].object = pn.widgets.DiscretePlayer(
-            name="Minimum lead time (hours)",
-            options=self._lead_time_lookup[self.configuration],
+            name="Lead time (hours)",
+            options=self._lead_time_strings[self.configuration],
             show_loop_controls=False,
             visible_buttons=["previous", "next"],
             width=300,
-            value=0
+            value=self._lead_time_strings[self.configuration][0]
             )
 
         # Keep track of callbacks
@@ -151,15 +186,14 @@ class FilterWidgets(Viewer):
                 return
 
             # Maintain value
-            if self.lead_time in self._lead_time_lookup[self.configuration]:
-                value = self.lead_time
-            else:
-                value = 0
+            value = self._widgets["lead_time"].object.value
+            if value not in self._lead_time_strings[self.configuration]:
+                value = self._lead_time_strings[self.configuration][0]
 
             # Create new widget to force refresh
             self._widgets["lead_time"].object = pn.widgets.DiscretePlayer(
-                name="Minimum lead time (hours)",
-                options=self._lead_time_lookup[self.configuration],
+                name="Lead time (hours)",
+                options=self._lead_time_strings[self.configuration],
                 show_loop_controls=False,
                 visible_buttons=["previous", "next"],
                 width=300,
@@ -243,7 +277,9 @@ class FilterWidgets(Viewer):
     @property
     def lead_time(self) -> int:
         """Currently selected minimum lead time in hours."""
-        return self._widgets["lead_time"].object.value
+        lead_time_string = self._widgets["lead_time"].object.value
+        idx = self._lead_time_strings[self.configuration].index(lead_time_string)
+        return self._lead_time_lookup[self.configuration][idx]
 
 class TableView(Viewer):
     """Handles tabular view of data."""
