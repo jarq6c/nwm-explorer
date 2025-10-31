@@ -10,11 +10,13 @@ import plotly.graph_objects as go
 from plotly.basedatatypes import BaseTraceType
 import colorcet as cc
 import pandas as pd
+import numpy.typing as npt
 
-from modules.nwm import ModelConfiguration
+from modules.nwm import ModelConfiguration, load_nwm_site
 from modules.evaluate import load_metrics, Metric, scan_evaluations
 from modules.routelink import download_routelink
 from modules.pairs import GROUP_SPECIFICATIONS, NWMGroupSpecification
+from modules.usgs import load_usgs_site
 
 pn.extension('tabulator')
 
@@ -375,7 +377,7 @@ class MapView(Viewer):
                 map=dict(
                     style="satellite-streets"
                 ),
-                clickmode="event",
+                clickmode="event+select",
                 modebar=dict(
                     remove=["lasso", "select", "resetview"],
                     orientation="v"
@@ -436,6 +438,50 @@ class MapView(Viewer):
         # Send updates to frontend
         self._pane.object = self._figure
 
+class TimeSeriesView(Viewer):
+    """Display time series data."""
+    def __init__(self, **params):
+        super().__init__(**params)
+
+        # Setup
+        self._figure = PlotlyFigure(
+            data=[go.Scatter()],
+            layout=go.Layout(
+                height=250,
+                width=1045,
+                margin=dict(l=0, r=0, t=0, b=0)
+            )
+        )
+
+        # Create layout
+        self._pane = pn.pane.Plotly(self._figure)
+
+    def __panel__(self):
+        return pn.Card(
+            self._pane,
+            collapsible=False,
+            hide_header=True
+            )
+
+    def replace_data(
+            self,
+            xdata: list[npt.ArrayLike],
+            ydata: list[npt.ArrayLike],
+            names: list[str]
+        ) -> None:
+        """Completely replace displayed time series."""
+        # Overwrite old traces
+        self._figure["data"] = [go.Scatter(
+            x=x,
+            y=y,
+            mode="lines",
+            line=dict(color="#3C00FF", width=2),
+            name=n
+        ) for x, y, n in zip(xdata, ydata, names)]
+
+        # Refresh
+        self._pane.object = self._figure
+
 def main() -> None:
     """Main."""
     root = Path("/ised/nwm_explorer_data")
@@ -448,10 +494,17 @@ def main() -> None:
         evaluation_options=scan_evaluations(root, cache=True).select(
             "label").collect().unique()["label"].to_list()
     )
+    data_ranges: dict[str, pd.Timestamp] = {
+        "observed_value_time_min": None,
+        "observed_value_time_max": None,
+        "reference_time_min": None,
+        "reference_time_max": None,
+    }
 
     site_map = MapView()
+    hydrograph = TimeSeriesView()
 
-    def handle_widget_updates(event: str) -> None:
+    def handle_filter_updates(event: str) -> None:
         # Ignore non-calls
         if event is None:
             return
@@ -464,7 +517,15 @@ def main() -> None:
             metric=filter_widgets.metric,
             lead_time_hours_min=filter_widgets.lead_time,
             rank=filter_widgets.rank,
-            additional_columns=("nwm_feature_id", "usgs_site_code", "sample_size"),
+            additional_columns=(
+                "nwm_feature_id",
+                "usgs_site_code",
+                "sample_size",
+                "observed_value_time_min",
+                "observed_value_time_max",
+                "reference_time_min",
+                "reference_time_max"
+                ),
             significant=filter_widgets.significant,
             cache=True
         ).with_columns(
@@ -478,7 +539,13 @@ def main() -> None:
             )
         )
 
-        # Update table
+        # Update date range
+        data_ranges["observed_value_time_min"] = data["observed_value_time_min"].min()
+        data_ranges["observed_value_time_max"] = data["observed_value_time_max"].max()
+        data_ranges["reference_time_min"] = data["reference_time_min"].min()
+        data_ranges["reference_time_max"] = data["reference_time_max"].max()
+
+        # Update map
         site_map.update(
             dataframe=data,
             column=filter_widgets.point_column,
@@ -504,14 +571,50 @@ def main() -> None:
                     "Latitude: %{lat}"
                 )
             )
-    handle_widget_updates(filter_widgets.label)
-    filter_widgets.bind(handle_widget_updates)
+    handle_filter_updates(filter_widgets.label)
+    filter_widgets.bind(handle_filter_updates)
 
     def handle_click(event) -> None:
-        print(event)
+        if event is None:
+            return
+
+        # Parse custom data
+        metadata = event["points"][0]["customdata"]
+        nwm_feature_id = metadata[0]
+        usgs_site_code = metadata[1]
+
+        # Load observations
+        observations = load_usgs_site(
+            root=root,
+            usgs_site_code=usgs_site_code,
+            start_time=data_ranges["observed_value_time_min"],
+            end_time=data_ranges["observed_value_time_max"],
+            cache=True
+        )
+
+        # Replace data
+        hydrograph.replace_data(
+            xdata=[observations["value_time"].to_numpy()],
+            ydata=[observations["observed_cfs"].to_numpy()],
+            names=[f"USGS-{usgs_site_code}"]
+        )
+
+        # Load predictions
+        predictions = load_nwm_site(
+            root=root,
+            configuration=filter_widgets.configuration,
+            nwm_feature_id=nwm_feature_id,
+            start_time=data_ranges["reference_time_min"],
+            end_time=data_ranges["reference_time_max"],
+            cache=True
+        )
+        print(predictions.head(1))
     site_map.bind_click(handle_click)
 
-    pn.serve(pn.Row(filter_widgets, site_map))
+    pn.serve(pn.Column(
+        pn.Row(filter_widgets, site_map),
+        hydrograph)
+        )
 
 if __name__ == "__main__":
     main()

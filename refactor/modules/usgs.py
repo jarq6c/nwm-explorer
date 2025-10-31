@@ -695,4 +695,4 @@ def load_usgs_site(
     return pl.concat(dataframes).filter(
         pl.col("value_time") >= start_time,
         pl.col("value_time") <= end_time
-    )
+    ).unique("value_time").sort("value_time")
