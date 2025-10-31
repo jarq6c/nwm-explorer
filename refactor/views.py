@@ -212,9 +212,19 @@ class FilterWidgets(Viewer):
         return RANK_LOOKUP[self._widgets["rank"].value]
 
     @property
-    def column(self) -> str:
+    def point_column(self) -> str:
         """Construct a metrics dataframe column label from current selection."""
         return self.metric + "_" + self.rank + "_point"
+
+    @property
+    def upper_column(self) -> str:
+        """Construct a metrics dataframe column label from current selection."""
+        return self.metric + "_" + self.rank + "_upper"
+
+    @property
+    def lower_column(self) -> str:
+        """Construct a metrics dataframe column label from current selection."""
+        return self.metric + "_" + self.rank + "_lower"
 
     @property
     def domain(self) -> ModelDomain:
@@ -409,7 +419,7 @@ def main() -> None:
             metric=filter_widgets.metric,
             lead_time_hours_min=filter_widgets.lead_time,
             rank=filter_widgets.rank,
-            additional_columns=["nwm_feature_id", "usgs_site_code"],
+            additional_columns=("nwm_feature_id", "usgs_site_code"),
             cache=True
         ).with_columns(
             latitude=pl.col("nwm_feature_id").replace_strict(
@@ -425,15 +435,21 @@ def main() -> None:
         # Update table
         site_map.update(
             dataframe=data,
-            column=filter_widgets.column,
+            column=filter_widgets.point_column,
             domain=filter_widgets.domain,
             cmin=METRIC_PLOTTING_LIMITS[filter_widgets.metric][0],
             cmax=METRIC_PLOTTING_LIMITS[filter_widgets.metric][1],
             metric_label=filter_widgets.metric_label,
-            custom_data=data.to_pandas()[["nwm_feature_id", "usgs_site_code"]],
+            custom_data=data.to_pandas()[[
+                    "nwm_feature_id",
+                    "usgs_site_code",
+                    filter_widgets.lower_column,
+                    filter_widgets.upper_column
+                ]],
             hover_template=(
                     f"{filter_widgets.metric_label}: "
                     "%{marker.color:.2f}<br>"
+                    "95% CI: %{customdata[2]:.2f} -- %{customdata[3]:.2f}<br>"
                     "NWM Feature ID: %{customdata[0]}<br>"
                     "USGS Site Code: %{customdata[1]}<br>"
                     "Longitude: %{lon}<br>"

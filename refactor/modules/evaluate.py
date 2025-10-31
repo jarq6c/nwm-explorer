@@ -749,7 +749,7 @@ def load_metrics_no_cache(
         metric: Metric,
         lead_time_hours_min: int = 0,
         rank: Literal["min", "median", "max"] = "median",
-        additional_columns: list[str] | None = None
+        additional_columns: tuple[str] | None = None
 ) -> pl.DataFrame:
     """
     Returns DataFrame of metrics.
@@ -772,7 +772,7 @@ def load_metrics_no_cache(
         will typically return daily streamflow aggregated to minimum, median, or
         maximum streamflow. Short Range CONUS, Hawaii, and Puerto Rico return
         6-hourly aggregation. Short Range Alaska returns 5-hourly aggregations.
-    additional_columns: list[str], optional, default ["nwm_feature_id"]
+    additional_columns: tuple[str], optional, default ("nwm_feature_id",)
         Additional columns (often metadata) to return with metric values.
     
     Returns
@@ -782,6 +782,8 @@ def load_metrics_no_cache(
     # Check additional columns
     if additional_columns is None:
         additional_columns = ["nwm_feature_id"]
+    else:
+        additional_columns = list(additional_columns)
 
     # Retrieve
     return scan_evaluations(
@@ -806,7 +808,7 @@ def load_metrics_cache(
         metric: Metric,
         lead_time_hours_min: int = 0,
         rank: Literal["min", "median", "max"] = "median",
-        additional_columns: list[str] | None = None
+        additional_columns: tuple[str] | None = None
 ) -> pl.DataFrame:
     """
     Returns DataFrame of metrics. Cache result.
@@ -829,7 +831,7 @@ def load_metrics_cache(
         will typically return daily streamflow aggregated to minimum, median, or
         maximum streamflow. Short Range CONUS, Hawaii, and Puerto Rico return
         6-hourly aggregation. Short Range Alaska returns 5-hourly aggregations.
-    additional_columns: list[str], optional, default ["nwm_feature_id"]
+    additional_columns: tuple[str], optional, default ("nwm_feature_id",)
         Additional columns (often metadata) to return with metric values.
     
     Returns
@@ -839,6 +841,8 @@ def load_metrics_cache(
     # Check additional columns
     if additional_columns is None:
         additional_columns = ["nwm_feature_id"]
+    else:
+        additional_columns = list(additional_columns)
 
     # Retrieve
     return scan_evaluations(
@@ -849,11 +853,10 @@ def load_metrics_cache(
         pl.col("lead_time_hours_min") == lead_time_hours_min
     ).select(
         [
-            "nwm_feature_id",
             f"{metric}_{rank}_lower",
             f"{metric}_{rank}_point",
             f"{metric}_{rank}_upper"
-        ]
+        ] + additional_columns
     ).collect()
 
 def load_metrics(
@@ -863,7 +866,7 @@ def load_metrics(
         metric: Metric,
         lead_time_hours_min: int = 0,
         rank: Literal["min", "median", "max"] = "median",
-        additional_columns: list[str] | None = None,
+        additional_columns: tuple[str] | None = None,
         cache: bool = False
 ) -> pl.DataFrame:
     """
@@ -887,7 +890,7 @@ def load_metrics(
         will typically return daily streamflow aggregated to minimum, median, or
         maximum streamflow. Short Range CONUS, Hawaii, and Puerto Rico return
         6-hourly aggregation. Short Range Alaska returns 5-hourly aggregations.
-    additional_columns: list[str], optional, default ["nwm_feature_id"]
+    additional_columns: tuple[str], optional, default ("nwm_feature_id",)
         Additional columns (often metadata) to return with metric values.
     cache: bool, optional, default False
         If true, cache result.
