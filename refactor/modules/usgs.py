@@ -15,6 +15,7 @@ from tempfile import TemporaryDirectory
 from enum import StrEnum
 from time import sleep
 import functools
+from typing import Generator
 
 import us
 import pandas as pd
@@ -640,15 +641,15 @@ def load_usgs(
         return load_usgs_cache(root, state_code, year, month)
     return load_usgs_no_cache(root, state_code, year, month)
 
-def load_usgs_site(
+def usgs_site_generator(
     root: Path,
     usgs_site_code: str,
     start_time: pd.Timestamp,
     end_time: pd.Timestamp,
     cache: bool = False
-    ) -> pl.DataFrame:
+    ) -> Generator[pl.DataFrame]:
     """
-    Return polars.DataFrame of USGS observations.
+    Iteratively return polars.DataFrames of USGS observations.
 
     Parameters
     ----------
@@ -680,7 +681,6 @@ def load_usgs_site(
         end_time += pd.Timedelta("31D")
 
     # Load data
-    dataframes = []
     for m in pd.date_range(start_time, end_time, freq="1ME"):
         # Get month of data
         if cache:
@@ -689,10 +689,47 @@ def load_usgs_site(
             df = load_usgs_no_cache(root, state_code, m.year, m.month)
 
         # Filter to relevant site, add to rest
-        dataframes.append(df.filter(pl.col("usgs_site_code") == usgs_site_code))
+        yield df.filter(
+            pl.col("usgs_site_code") == usgs_site_code,
+            pl.col("value_time") >= start_time,
+            pl.col("value_time") <= end_time
+            ).unique("value_time").sort("value_time")
 
-    # Concatenate
-    return pl.concat(dataframes).filter(
-        pl.col("value_time") >= start_time,
-        pl.col("value_time") <= end_time
-    ).unique("value_time").sort("value_time")
+def load_usgs_site(
+    root: Path,
+    usgs_site_code: str,
+    start_time: pd.Timestamp,
+    end_time: pd.Timestamp,
+    cache: bool = False
+    ) -> pl.DataFrame:
+    """
+    Return polars.DataFrame of USGS observations.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    usgs_site_code: str
+        USGS site code.
+    start_time: pandas.Timestamp
+        Earliest datetime to retrieve.
+    end_time: pandas.Timestamp
+        Latest datetime to retrieve.
+    cache: bool, optional, default False
+        Whether to cache the underlying DataFrames for subsequent calls.
+    
+    Returns
+    -------
+    polars.DataFrame
+    """
+    # Collect dataframes
+    dataframes = []
+    for df in usgs_site_generator(
+        root=root,
+        usgs_site_code=usgs_site_code,
+        start_time=start_time,
+        end_time=end_time,
+        cache=cache
+    ):
+        dataframes.append(df)
+    return pl.concat(dataframes)

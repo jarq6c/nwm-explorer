@@ -16,7 +16,7 @@ from modules.nwm import ModelConfiguration, load_nwm_site
 from modules.evaluate import load_metrics, Metric, scan_evaluations
 from modules.routelink import download_routelink
 from modules.pairs import GROUP_SPECIFICATIONS, NWMGroupSpecification
-from modules.usgs import load_usgs_site
+from modules.usgs import usgs_site_generator
 
 pn.extension('tabulator')
 
@@ -463,21 +463,38 @@ class TimeSeriesView(Viewer):
             hide_header=True
             )
 
-    def replace_data(
-            self,
-            xdata: list[npt.ArrayLike],
-            ydata: list[npt.ArrayLike],
-            names: list[str]
+    def erase_data(
+            self
         ) -> None:
-        """Completely replace displayed time series."""
+        """Completely erase displayed time series."""
         # Overwrite old traces
         self._figure["data"] = [go.Scatter(
-            x=x,
-            y=y,
             mode="lines",
-            line=dict(color="#3C00FF", width=2),
-            name=n
-        ) for x, y, n in zip(xdata, ydata, names)]
+            line={"color": "#3C00FF", "width": 2.0}
+        )]
+
+        # Refresh
+        self._pane.object = self._figure
+
+    def update_trace(
+            self,
+            xdata: npt.ArrayLike,
+            ydata: npt.ArrayLike,
+            index: int = 0,
+            name: str | None = None,
+        ) -> None:
+        """Update specific time series."""
+        # Update x-y data
+        self._figure["data"][index].update(
+            x=xdata,
+            y=ydata
+        )
+
+        # Update name
+        if name:
+            self._figure["data"][index].update(
+                name=name
+            )
 
         # Refresh
         self._pane.object = self._figure
@@ -583,21 +600,26 @@ def main() -> None:
         nwm_feature_id = metadata[0]
         usgs_site_code = metadata[1]
 
-        # Load observations
-        observations = load_usgs_site(
+        # Stream observations
+        hydrograph.erase_data()
+        dataframes = []
+        for df in usgs_site_generator(
             root=root,
             usgs_site_code=usgs_site_code,
             start_time=data_ranges["observed_value_time_min"],
             end_time=data_ranges["observed_value_time_max"],
             cache=True
-        )
+        ):
+            # Append data
+            dataframes.append(df)
+            observations = pl.concat(dataframes)
 
-        # Replace data
-        hydrograph.replace_data(
-            xdata=[observations["value_time"].to_numpy()],
-            ydata=[observations["observed_cfs"].to_numpy()],
-            names=[f"USGS-{usgs_site_code}"]
-        )
+            # Replace data
+            hydrograph.update_trace(
+                xdata=observations["value_time"].to_numpy(),
+                ydata=observations["observed_cfs"].to_numpy(),
+                name=f"USGS-{usgs_site_code}"
+            )
 
         # Load predictions
         predictions = load_nwm_site(
