@@ -31,6 +31,22 @@ class Metric(StrEnum):
     RELATIVE_STANDARD_DEVIATION = "relative_standard_deviation"
     KLING_GUPTA_EFFICIENCY = "kling_gupta_efficiency"
 
+METRIC_SIGNIFICANCE_THRESHOLD: dict[Metric, float] = {
+    Metric.RELATIVE_MEAN_BIAS: 0.0,
+    Metric.PEARSON_CORRELATION_COEFFICIENT: 0.0,
+    Metric.NASH_SUTCLIFFE_EFFICIENCY: 0.0,
+    Metric.RELATIVE_MEAN: 1.0,
+    Metric.RELATIVE_STANDARD_DEVIATION: 1.0,
+    Metric.RELATIVE_MEDIAN: 1.0,
+    Metric.RELATIVE_MINIMUM: 1.0,
+    Metric.RELATIVE_MAXIMUM: 1.0,
+    Metric.KLING_GUPTA_EFFICIENCY: 0.0
+}
+"""
+Mapping from Metrics to a value that if it falls outside the 95% confidence interval,
+indicates 'statistical significance.'
+"""
+
 MetricFunction = Callable[[
     npt.NDArray[np.float64],
     npt.NDArray[np.float64],
@@ -749,7 +765,8 @@ def load_metrics_no_cache(
         metric: Metric,
         lead_time_hours_min: int = 0,
         rank: Literal["min", "median", "max"] = "median",
-        additional_columns: tuple[str] | None = None
+        additional_columns: tuple[str] | None = None,
+        significant: bool = False,
 ) -> pl.DataFrame:
     """
     Returns DataFrame of metrics.
@@ -774,6 +791,8 @@ def load_metrics_no_cache(
         6-hourly aggregation. Short Range Alaska returns 5-hourly aggregations.
     additional_columns: tuple[str], optional, default ("nwm_feature_id",)
         Additional columns (often metadata) to return with metric values.
+    significant: bool, optional, default False
+        If True, only return 'statistically significant' values.
     
     Returns
     -------
@@ -786,7 +805,7 @@ def load_metrics_no_cache(
         additional_columns = list(additional_columns)
 
     # Retrieve
-    return scan_evaluations(
+    data = scan_evaluations(
         root
     ).filter(
         pl.col("label") == label,
@@ -800,6 +819,17 @@ def load_metrics_no_cache(
         ] + additional_columns
     ).collect()
 
+    # Apply significance test
+    if significant:
+        threshold = METRIC_SIGNIFICANCE_THRESHOLD[metric]
+        return data.with_columns(
+            significant=~(
+                (pl.col(f"{metric}_{rank}_lower") <= threshold) &
+                (pl.col(f"{metric}_{rank}_upper") >= threshold)
+            )
+        ).filter(pl.col("significant"))
+    return data
+
 @functools.lru_cache(LRU_CACHE_SIZE)
 def load_metrics_cache(
         root: Path,
@@ -808,7 +838,8 @@ def load_metrics_cache(
         metric: Metric,
         lead_time_hours_min: int = 0,
         rank: Literal["min", "median", "max"] = "median",
-        additional_columns: tuple[str] | None = None
+        additional_columns: tuple[str] | None = None,
+        significant: bool = False
 ) -> pl.DataFrame:
     """
     Returns DataFrame of metrics. Cache result.
@@ -833,6 +864,8 @@ def load_metrics_cache(
         6-hourly aggregation. Short Range Alaska returns 5-hourly aggregations.
     additional_columns: tuple[str], optional, default ("nwm_feature_id",)
         Additional columns (often metadata) to return with metric values.
+    significant: bool, optional, default False
+        If True, only return 'statistically significant' values.
     
     Returns
     -------
@@ -845,7 +878,7 @@ def load_metrics_cache(
         additional_columns = list(additional_columns)
 
     # Retrieve
-    return scan_evaluations(
+    data = scan_evaluations(
         root, cache=True
     ).filter(
         pl.col("label") == label,
@@ -859,6 +892,17 @@ def load_metrics_cache(
         ] + additional_columns
     ).collect()
 
+    # Apply significance test
+    if significant:
+        threshold = METRIC_SIGNIFICANCE_THRESHOLD[metric]
+        return data.with_columns(
+            significant=~(
+                (pl.col(f"{metric}_{rank}_lower") <= threshold) &
+                (pl.col(f"{metric}_{rank}_upper") >= threshold)
+            )
+        ).filter(pl.col("significant"))
+    return data
+
 def load_metrics(
         root: Path,
         label: str,
@@ -867,6 +911,7 @@ def load_metrics(
         lead_time_hours_min: int = 0,
         rank: Literal["min", "median", "max"] = "median",
         additional_columns: tuple[str] | None = None,
+        significant: bool = False,
         cache: bool = False
 ) -> pl.DataFrame:
     """
@@ -892,6 +937,8 @@ def load_metrics(
         6-hourly aggregation. Short Range Alaska returns 5-hourly aggregations.
     additional_columns: tuple[str], optional, default ("nwm_feature_id",)
         Additional columns (often metadata) to return with metric values.
+    significant: bool, optional, default False
+        If True, only return 'statistically significant' values.
     cache: bool, optional, default False
         If true, cache result.
     
@@ -908,7 +955,8 @@ def load_metrics(
             metric=metric,
             lead_time_hours_min=lead_time_hours_min,
             rank=rank,
-            additional_columns=additional_columns
+            additional_columns=additional_columns,
+            significant=significant
         )
     return load_metrics_no_cache(
         root=root,
@@ -917,5 +965,6 @@ def load_metrics(
         metric=metric,
         lead_time_hours_min=lead_time_hours_min,
         rank=rank,
-        additional_columns=additional_columns
+        additional_columns=additional_columns,
+        significant=significant
     )

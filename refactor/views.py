@@ -117,6 +117,10 @@ class FilterWidgets(Viewer):
                 name="Streamflow aggregation method",
                 options=list(RANK_LOOKUP.keys())
             ),
+            "significant": pn.widgets.Select(
+                name="Show",
+                options=["All sites", "Statistically significant"]
+            ),
             "lead_time": pn.pane.Placeholder()
         }
 
@@ -210,6 +214,11 @@ class FilterWidgets(Viewer):
     def rank(self) -> str:
         """Currently selected streamflow aggregation method."""
         return RANK_LOOKUP[self._widgets["rank"].value]
+
+    @property
+    def significant(self) -> bool:
+        """Only show 'statistically significant sites."""
+        return self._widgets["significant"].value == "Statistically significant"
 
     @property
     def point_column(self) -> str:
@@ -420,6 +429,7 @@ def main() -> None:
             lead_time_hours_min=filter_widgets.lead_time,
             rank=filter_widgets.rank,
             additional_columns=("nwm_feature_id", "usgs_site_code"),
+            significant=filter_widgets.significant,
             cache=True
         ).with_columns(
             latitude=pl.col("nwm_feature_id").replace_strict(
