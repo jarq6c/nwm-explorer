@@ -1,6 +1,6 @@
 """Methods to generate views of data."""
 from pathlib import Path
-from typing import TypedDict, Callable
+from typing import TypedDict, Callable, Any
 from enum import StrEnum
 
 import polars as pl
@@ -389,6 +389,21 @@ class MapView(Viewer):
         # Create layout
         self._pane = pn.pane.Plotly(self._figure)
 
+        # Track selection state
+        self.state: dict[str, Any] = {}
+        def catch_click(event) -> None:
+            if event is None:
+                return
+
+            # Handle deselection
+            if self.state == event["points"][0]:
+                self.state = {}
+                return
+
+            # Update state
+            self.state.update(event["points"][0])
+        pn.bind(catch_click, self._pane.param.click_data, watch=True)
+
     def __panel__(self):
         return pn.Card(
             self._pane,
@@ -619,23 +634,24 @@ def main() -> None:
         if event is None:
             return
 
-        # Parse custom data
-        metadata = event["points"][0]["customdata"]
-        nwm_feature_id = metadata[0]
-        usgs_site_code = metadata[1]
-
-        # Ignore duplicate selections
-        if state.get("site") == usgs_site_code:
-            return
-        state["site"] = usgs_site_code
-
-        # Stream observations
+        # Clear hydrograph
         hydrograph.erase_data(
             xrange=(
                 data_ranges["observed_value_time_min"],
                 data_ranges["observed_value_time_max"]
                 )
         )
+
+        # Check for state
+        if not site_map.state:
+            return
+
+        # Parse custom data
+        metadata = site_map.state["customdata"]
+        nwm_feature_id = metadata[0]
+        usgs_site_code = metadata[1]
+
+        # Stream observations
         dataframes = []
         for df in usgs_site_generator(
             root=root,
