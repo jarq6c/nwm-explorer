@@ -443,7 +443,8 @@ class MapView(Viewer):
 
         # Update focus
         self._figure["layout"].update(
-            uirevision=domain
+            uirevision=domain,
+            selectionrevision=(self.state.get("lat"), self.state.get("lon"))
         )
         self._figure["layout"]["map"].update(
             center=DEFAULT_CENTER[domain],
@@ -555,7 +556,6 @@ def main() -> None:
         "reference_time_min": None,
         "reference_time_max": None,
     }
-    state: dict[str, str] = {}
 
     site_map = MapView()
     hydrograph = TimeSeriesView()
@@ -627,6 +627,14 @@ def main() -> None:
                     "Latitude: %{lat}"
                 )
             )
+
+        # Clear hydrograph
+        hydrograph.erase_data(
+            xrange=(
+                data_ranges["observed_value_time_min"],
+                data_ranges["observed_value_time_max"]
+                )
+        )
     handle_filter_updates(filter_widgets.label)
     filter_widgets.bind(handle_filter_updates)
 
