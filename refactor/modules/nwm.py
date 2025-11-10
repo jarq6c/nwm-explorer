@@ -7,7 +7,7 @@ Methods
 - scan_nwm
 """
 from tempfile import TemporaryDirectory
-from typing import Callable
+from typing import Callable, Generator
 from dataclasses import dataclass
 from pathlib import Path
 import inspect
@@ -875,6 +875,53 @@ def load_nwm(
         return load_nwm_cache(root, configuration, year, month)
     return load_nwm_no_cache(root, configuration, year, month)
 
+def nwm_site_generator(
+    root: Path,
+    configuration: ModelConfiguration,
+    nwm_feature_id: int,
+    start_time: pd.Timestamp,
+    end_time: pd.Timestamp,
+    cache: bool = False
+    ) -> Generator[pl.DataFrame]:
+    """
+    Iteratively return polars.DataFrame of NWM output.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root data directory.
+    configuration: ModelConfiguration
+        Model configuration (e.g. ModelConfiguration.MEDIUM_RANGE_MEM_1)
+    nwm_feature_id: str
+        NWM channel feature ID.
+    start_time: pandas.Timestamp
+        Earliest reference time to retrieve.
+    end_time: pandas.Timestamp
+        Latest reference time to retrieve.
+    cache: bool, optional, default False
+        Whether to cache the underlying DataFrames for subsequent calls.
+    
+    Returns
+    -------
+    polars.DataFrame
+    """
+    # Check end month
+    if start_time.strftime("%Y%m") == end_time.strftime("%Y%m"):
+        end_time += pd.Timedelta("31D")
+
+    # Load data
+    for m in pd.date_range(start_time, end_time, freq="1ME"):
+        # Get month of data
+        if cache:
+            df = load_nwm_cache(root, configuration, m.year, m.month, nwm_feature_id)
+        else:
+            df = load_nwm_no_cache(root, configuration, m.year, m.month, nwm_feature_id)
+
+        yield df.filter(
+            pl.col("reference_time") >= start_time,
+            pl.col("reference_time") <= end_time
+        ).unique(["reference_time", "value_time"]).sort(["reference_time", "value_time"])
+
 def load_nwm_site(
     root: Path,
     configuration: ModelConfiguration,
@@ -905,24 +952,15 @@ def load_nwm_site(
     -------
     polars.DataFrame
     """
-    # Check end month
-    if start_time.strftime("%Y%m") == end_time.strftime("%Y%m"):
-        end_time += pd.Timedelta("31D")
-
-    # Load data
+    # Collect dataframes
     dataframes = []
-    for m in pd.date_range(start_time, end_time, freq="1ME"):
-        # Get month of data
-        if cache:
-            df = load_nwm_cache(root, configuration, m.year, m.month, nwm_feature_id)
-        else:
-            df = load_nwm_no_cache(root, configuration, m.year, m.month, nwm_feature_id)
-
-        # Add to list
+    for df in nwm_site_generator(
+        root=root,
+        configuration=configuration,
+        nwm_feature_id=nwm_feature_id,
+        start_time=start_time,
+        end_time=end_time,
+        cache=cache
+    ):
         dataframes.append(df)
-
-    # Concatenate
-    return pl.concat(dataframes).filter(
-        pl.col("reference_time") >= start_time,
-        pl.col("reference_time") <= end_time
-    )
+    return pl.concat(dataframes)

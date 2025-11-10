@@ -464,7 +464,8 @@ class TimeSeriesView(Viewer):
             )
 
     def erase_data(
-            self
+            self,
+            xrange: tuple[pd.Timestamp, pd.Timestamp] | None = None
         ) -> None:
         """Completely erase displayed time series."""
         # Overwrite old traces
@@ -472,6 +473,10 @@ class TimeSeriesView(Viewer):
             mode="lines",
             line={"color": "#3C00FF", "width": 2.0}
         )]
+
+        # Update x-range
+        if xrange is not None:
+            self._figure["layout"]["xaxis"].update(range=xrange)
 
         # Refresh
         self._pane.object = self._figure
@@ -517,6 +522,7 @@ def main() -> None:
         "reference_time_min": None,
         "reference_time_max": None,
     }
+    state: dict[str, str] = {}
 
     site_map = MapView()
     hydrograph = TimeSeriesView()
@@ -600,8 +606,18 @@ def main() -> None:
         nwm_feature_id = metadata[0]
         usgs_site_code = metadata[1]
 
+        # Ignore duplicate selections
+        if state.get("site") == usgs_site_code:
+            return
+        state["site"] = usgs_site_code
+
         # Stream observations
-        hydrograph.erase_data()
+        hydrograph.erase_data(
+            xrange=(
+                data_ranges["observed_value_time_min"],
+                data_ranges["observed_value_time_max"]
+                )
+        )
         dataframes = []
         for df in usgs_site_generator(
             root=root,
