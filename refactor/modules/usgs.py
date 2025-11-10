@@ -563,7 +563,7 @@ def load_usgs_no_cache(
     ).select(
         ["usgs_site_code", "value_time", "observed_cfs"]
     ).collect().unique(
-        ["usgs_site_code", "value_time"]
+        ["usgs_site_code", "value_time"], keep="first"
     ).sort(
         ["usgs_site_code", "value_time"]
     )
@@ -600,7 +600,7 @@ def load_usgs_cache(
     ).select(
         ["usgs_site_code", "value_time", "observed_cfs"]
     ).collect().unique(
-        ["usgs_site_code", "value_time"]
+        ["usgs_site_code", "value_time"], keep="first"
     ).sort(
         ["usgs_site_code", "value_time"]
     )
@@ -676,9 +676,9 @@ def usgs_site_generator(
     logger.info("Looking up state code for %s", usgs_site_code)
     state_code = lookup_site_state_code(root, usgs_site_code)
 
-    # Check end month
-    if start_time.strftime("%Y%m") == end_time.strftime("%Y%m"):
-        end_time += pd.Timedelta("31D")
+    # Pad retrieval
+    start_time -= pd.Timedelta("31D")
+    end_time += pd.Timedelta("31D")
 
     # Load data
     for m in pd.date_range(start_time, end_time, freq="1ME"):
@@ -693,7 +693,7 @@ def usgs_site_generator(
             pl.col("usgs_site_code") == usgs_site_code,
             pl.col("value_time") >= start_time,
             pl.col("value_time") <= end_time
-            ).unique("value_time").sort("value_time")
+            ).unique("value_time", keep="first").sort("value_time")
 
 def load_usgs_site(
     root: Path,

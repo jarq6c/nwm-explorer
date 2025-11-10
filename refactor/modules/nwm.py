@@ -905,9 +905,9 @@ def nwm_site_generator(
     -------
     polars.DataFrame
     """
-    # Check end month
-    if start_time.strftime("%Y%m") == end_time.strftime("%Y%m"):
-        end_time += pd.Timedelta("31D")
+    # Pad retrieval
+    start_time -= pd.Timedelta("31D")
+    end_time += pd.Timedelta("31D")
 
     # Load data
     for m in pd.date_range(start_time, end_time, freq="1ME"):
