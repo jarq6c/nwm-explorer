@@ -12,7 +12,7 @@ import colorcet as cc
 import pandas as pd
 import numpy.typing as npt
 
-from modules.nwm import ModelConfiguration, load_nwm_site
+from modules.nwm import ModelConfiguration, nwm_site_generator
 from modules.evaluate import load_metrics, Metric, scan_evaluations
 from modules.routelink import download_routelink
 from modules.pairs import GROUP_SPECIFICATIONS, NWMGroupSpecification
@@ -504,6 +504,24 @@ class TimeSeriesView(Viewer):
         # Refresh
         self._pane.object = self._figure
 
+    def append_traces(
+            self,
+            traces: list[tuple[npt.ArrayLike, npt.ArrayLike, str]]
+        ) -> None:
+        """Add time series."""
+        # Add new traces
+        for trace in traces:
+            self._figure["data"].append(go.Scatter(
+                x=trace[0],
+                y=trace[1],
+                mode="lines",
+                line={"color": "#FF003C", "width": 1.0},
+                name=trace[2]
+            ))
+
+        # Refresh
+        self._pane.object = self._figure
+
 def main() -> None:
     """Main."""
     root = Path("/ised/nwm_explorer_data")
@@ -637,16 +655,30 @@ def main() -> None:
                 name=f"USGS-{usgs_site_code}"
             )
 
-        # Load predictions
-        predictions = load_nwm_site(
+        # Stream predictions
+        for df in nwm_site_generator(
             root=root,
             configuration=filter_widgets.configuration,
             nwm_feature_id=nwm_feature_id,
             start_time=data_ranges["reference_time_min"],
             end_time=data_ranges["reference_time_max"],
             cache=True
-        )
-        print(predictions.head(1))
+        ):
+            # Add each reference time
+            trace_data = []
+            for rt in df["reference_time"].unique():
+                # Extract predictions
+                predictions = df.filter(pl.col("reference_time") == rt)
+
+                # Add trace data
+                trace_data.append((
+                    predictions["value_time"].to_numpy(),
+                    predictions["predicted_cfs"].to_numpy(),
+                    str(rt)
+                ))
+
+            # Add to plot
+            hydrograph.append_traces(trace_data)
     site_map.bind_click(handle_click)
 
     pn.serve(pn.Column(
