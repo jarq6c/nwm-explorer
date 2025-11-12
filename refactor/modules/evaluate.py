@@ -968,3 +968,54 @@ def load_metrics(
         additional_columns=additional_columns,
         significant=significant
     )
+
+def load_site_metrics(
+        root: Path,
+        label: str,
+        configuration: ModelConfiguration,
+        metric: Metric,
+        nwm_feature_id: int,
+        rank: Literal["min", "median", "max"] = "median",
+        cache: bool = False
+) -> pl.DataFrame:
+    """
+    Returns DataFrame of metrics for a single site.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root of data directory.
+    label: str
+        Label of evaluation.
+    configuration: ModelConfiguration
+        National Water Model configuration.
+    metric: Metric
+        Evaluation metric.
+    nwm_feature_id: int
+        National Water Model channel feature identifier.
+    rank: Literal["min", "median", "max"], optional, default "median"
+        Aggregated function applied to predictions and observations. Varies by
+        configuration. Analysis & Assimilation and Medium Range configurations
+        will typically return daily streamflow aggregated to minimum, median, or
+        maximum streamflow. Short Range CONUS, Hawaii, and Puerto Rico return
+        6-hourly aggregation. Short Range Alaska returns 5-hourly aggregations.
+    cache: bool, optional, default False
+        If true, cache underlying polars.LazyFrame.
+    
+    Returns
+    -------
+    polars.DataFrame
+    """
+    # Retrieve
+    return scan_evaluations(root, cache).filter(
+        pl.col("label") == label,
+        pl.col("configuration") == configuration,
+        pl.col("nwm_feature_id") == nwm_feature_id
+    ).select(
+        [
+            "lead_time_hours_min",
+            f"{metric}_{rank}_lower",
+            f"{metric}_{rank}_point",
+            f"{metric}_{rank}_upper"
+        ]
+    ).collect().sort("lead_time_hours_min")

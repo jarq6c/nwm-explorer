@@ -15,7 +15,7 @@ import numpy.typing as npt
 import numpy as np
 
 from modules.nwm import ModelConfiguration, nwm_site_generator
-from modules.evaluate import load_metrics, Metric, scan_evaluations
+from modules.evaluate import load_metrics, Metric, scan_evaluations, load_site_metrics
 from modules.routelink import download_routelink
 from modules.pairs import GROUP_SPECIFICATIONS, NWMGroupSpecification
 from modules.usgs import usgs_site_generator
@@ -737,6 +737,18 @@ def main() -> None:
         metadata = site_map.click_data["customdata"]
         nwm_feature_id = metadata[0]
         usgs_site_code = metadata[1]
+
+        # Retrieve metrics
+        metric_data = load_site_metrics(
+            root=root,
+            label=filter_widgets.label,
+            configuration=filter_widgets.configuration,
+            metric=filter_widgets.metric,
+            nwm_feature_id=nwm_feature_id,
+            rank=filter_widgets.rank,
+            cache=True
+        )
+        print(metric_data)
 
         # Stream observations
         dataframes = []
