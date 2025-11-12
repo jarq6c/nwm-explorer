@@ -2,6 +2,7 @@
 from pathlib import Path
 from typing import TypedDict, Callable, Any
 from enum import StrEnum
+from itertools import cycle
 
 import polars as pl
 import panel as pn
@@ -465,12 +466,16 @@ class TimeSeriesView(Viewer):
             layout=go.Layout(
                 height=250,
                 width=1045,
-                margin=dict(l=0, r=0, t=0, b=0)
+                margin=dict(l=0, r=0, t=0, b=0),
+                yaxis=dict(title=dict(text="Streamflow (CFS)"))
             )
         )
 
         # Create layout
         self._pane = pn.pane.Plotly(self._figure)
+
+        # Color ramp
+        self._color_ramp = cycle(cc.CET_L8)
 
     def __panel__(self):
         return pn.Card(
@@ -487,7 +492,7 @@ class TimeSeriesView(Viewer):
         # Overwrite old traces
         self._figure["data"] = [go.Scatter(
             mode="lines",
-            line={"color": "#3C00FF", "width": 2.0}
+            line={"color": "#3C00FF", "width": 3.0}
         )]
 
         # Update x-range
@@ -531,7 +536,7 @@ class TimeSeriesView(Viewer):
                 x=trace[0],
                 y=trace[1],
                 mode="lines",
-                line={"color": "#FF003C", "width": 1.0},
+                line={"color": next(self._color_ramp), "width": 2.0},
                 name=trace[2]
             ))
 
