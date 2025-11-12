@@ -211,7 +211,7 @@ class FilterWidgets(Viewer):
 
         # Create layout
         self._layout = pn.Card(
-            pn.Column(*list(self._widgets.values())),
+            pn.WidgetBox(*list(self._widgets.values())),
             title="Filters",
             collapsible=False
             )
