@@ -747,6 +747,11 @@ def scan_nwm(root: Path, cache: bool = False) -> pl.LazyFrame:
     cache: bool, optional, default False
         If True, cache underlying LazyFrame.
     """
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+
+    logger.info("Scanning predictions")
     if cache:
         return scan_nwm_cache(root)
     return scan_nwm_no_cache(root)
@@ -906,11 +911,11 @@ def nwm_site_generator(
     polars.DataFrame
     """
     # Pad retrieval
-    start_time -= pd.Timedelta("31D")
-    end_time += pd.Timedelta("31D")
+    padded_start_time = start_time - pd.Timedelta("31D")
+    padded_end_time = end_time + pd.Timedelta("31D")
 
     # Load data
-    for m in pd.date_range(start_time, end_time, freq="1ME"):
+    for m in pd.date_range(padded_start_time, padded_end_time, freq="1ME"):
         # Get month of data
         if cache:
             df = load_nwm_cache(root, configuration, m.year, m.month, nwm_feature_id)

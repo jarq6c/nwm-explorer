@@ -677,11 +677,11 @@ def usgs_site_generator(
     state_code = lookup_site_state_code(root, usgs_site_code)
 
     # Pad retrieval
-    start_time -= pd.Timedelta("31D")
-    end_time += pd.Timedelta("31D")
+    padded_start_time = start_time - pd.Timedelta("31D")
+    padded_end_time = end_time + pd.Timedelta("31D")
 
     # Load data
-    for m in pd.date_range(start_time, end_time, freq="1ME"):
+    for m in pd.date_range(padded_start_time, padded_end_time, freq="1ME"):
         # Get month of data
         if cache:
             df = load_usgs_cache(root, state_code, m.year, m.month)

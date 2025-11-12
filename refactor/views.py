@@ -467,7 +467,12 @@ class TimeSeriesView(Viewer):
                 height=250,
                 width=1045,
                 margin=dict(l=0, r=0, t=0, b=0),
-                yaxis=dict(title=dict(text="Streamflow (CFS)"))
+                yaxis=dict(title=dict(text="Streamflow (CFS)")),
+                clickmode="event+select",
+                modebar=dict(
+                    remove=["resetview"],
+                    orientation="v"
+                ),
             )
         )
 
