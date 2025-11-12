@@ -12,6 +12,7 @@ from plotly.basedatatypes import BaseTraceType
 import colorcet as cc
 import pandas as pd
 import numpy.typing as npt
+import numpy as np
 
 from modules.nwm import ModelConfiguration, nwm_site_generator
 from modules.evaluate import load_metrics, Metric, scan_evaluations
@@ -391,18 +392,18 @@ class MapView(Viewer):
         self._pane = pn.pane.Plotly(self._figure)
 
         # Track selection state
-        self.state: dict[str, Any] = {}
+        self.click_data: dict[str, Any] = {}
         def catch_click(event) -> None:
             if event is None:
                 return
 
             # Handle deselection
-            if self.state == event["points"][0]:
-                self.state = {}
+            if self.click_data == event["points"][0]:
+                self.click_data = {}
                 return
 
             # Update state
-            self.state.update(event["points"][0])
+            self.click_data.update(event["points"][0])
         pn.bind(catch_click, self._pane.param.click_data, watch=True)
 
     def __panel__(self):
@@ -445,7 +446,7 @@ class MapView(Viewer):
         # Update focus
         self._figure["layout"].update(
             uirevision=domain,
-            selectionrevision=(self.state.get("lat"), self.state.get("lon"))
+            selectionrevision=(self.click_data.get("lat"), self.click_data.get("lon"))
         )
         self._figure["layout"]["map"].update(
             center=DEFAULT_CENTER[domain],
@@ -548,6 +549,73 @@ class TimeSeriesView(Viewer):
         # Refresh
         self._pane.object = self._figure
 
+class BarPlot(Viewer):
+    """Display barplots."""
+    def __init__(self, **params) -> None:
+        super().__init__(**params)
+
+        # Setup
+        self.data = [go.Bar(
+            name=""
+        )]
+        self.layout = go.Layout(
+            height=250,
+            width=440,
+            margin=dict(l=0, r=0, t=0, b=0),
+            modebar=dict(
+                remove=["lasso", "select", "pan", "autoscale", "zoomin", "zoomout"],
+                orientation="v"
+            )
+        )
+        self.figure = dict(data=self.data, layout=self.layout)
+        self.pane = pn.pane.Plotly(self.figure)
+
+    def update(
+            self,
+            xdata: npt.ArrayLike,
+            ydata: npt.ArrayLike,
+            ydata_lower: npt.ArrayLike,
+            ydata_upper: npt.ArrayLike,
+            xlabel: str,
+            ylabel: str
+        ) -> None:
+        """Update data."""
+        # Construct custom data
+        custom_data = np.hstack((ydata_lower[:, np.newaxis], ydata_upper[:, np.newaxis]))
+
+        # Update trace
+        self.data[0].update(dict(
+            x=xdata,
+            y=ydata,
+            customdata=custom_data,
+            hovertemplate=(
+                f"{xlabel}: " + "%{x}<br>" +
+                f"{ylabel}: " + "%{customdata[0]:.2f} -- %{customdata[1]:.2f} (%{y:.2f})"
+            ),
+            error_y=dict(
+                type="data",
+                array=ydata_upper - ydata,
+                arrayminus=ydata - ydata_lower
+            )
+        ))
+
+        # Update axes
+        self.layout.update(dict(
+            xaxis=dict(title=dict(text=xlabel)),
+            yaxis=dict(title=dict(text=ylabel))
+        ))
+
+        # Update frontend
+        self.figure.update(dict(data=self.data, layout=self.layout))
+        self.pane.object = self.figure
+
+    def __panel__(self) -> pn.Card:
+        return pn.Card(
+            self.pane,
+            collapsible=False,
+            hide_header=True
+        )
+
 def main() -> None:
     """Main."""
     root = Path("/ised/nwm_explorer_data")
@@ -569,6 +637,7 @@ def main() -> None:
 
     site_map = MapView()
     hydrograph = TimeSeriesView()
+    barplot = BarPlot()
 
     def handle_filter_updates(event: str) -> None:
         # Ignore non-calls
@@ -661,11 +730,11 @@ def main() -> None:
         )
 
         # Check for state
-        if not site_map.state:
+        if not site_map.click_data:
             return
 
         # Parse custom data
-        metadata = site_map.state["customdata"]
+        metadata = site_map.click_data["customdata"]
         nwm_feature_id = metadata[0]
         usgs_site_code = metadata[1]
 
@@ -717,7 +786,7 @@ def main() -> None:
 
     pn.serve(pn.Column(
         pn.Row(filter_widgets, site_map),
-        hydrograph)
+        pn.Row(hydrograph, barplot))
         )
 
 if __name__ == "__main__":
