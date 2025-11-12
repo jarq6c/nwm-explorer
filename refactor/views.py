@@ -357,20 +357,28 @@ class MapView(Viewer):
 
         # Setup
         self._figure = PlotlyFigure(
-            data=[go.Scattermap(
-                marker=dict(
-                    colorbar=dict(
-                        title=dict(
-                            side="right"
-                            )
-                        ),
-                    size=15,
-                    colorscale=cc.gouldian
+            data=[
+                go.Scattermap(
+                    showlegend=False,
+                    name="",
+                    mode="markers",
+                    marker=dict(size=20, color="#00FFF2")
                 ),
-                showlegend=False,
-                name="",
-                mode="markers"
-            )],
+                go.Scattermap(
+                    marker=dict(
+                        colorbar=dict(
+                            title=dict(
+                                side="right"
+                                )
+                            ),
+                        size=15,
+                        colorscale=cc.CET_L17
+                    ),
+                    showlegend=False,
+                    name="",
+                    mode="markers"
+                    )
+                ],
             layout=go.Layout(
                 showlegend=False,
                 height=540,
@@ -379,7 +387,7 @@ class MapView(Viewer):
                 map=dict(
                     style="satellite-streets"
                 ),
-                clickmode="event+select",
+                clickmode="event",
                 modebar=dict(
                     remove=["lasso", "select", "resetview"],
                     orientation="v"
@@ -397,13 +405,15 @@ class MapView(Viewer):
             if event is None:
                 return
 
-            # Handle deselection
-            if self.click_data == event["points"][0]:
+            # Handle selection/deselection
+            lat, lon = event["points"][0].get("lat"), event["points"][0].get("lon")
+            if (self.click_data.get("lat") == lat) & (self.click_data.get("lon") == lon):
                 self.click_data = {}
-                return
+            else:
+                self.click_data.update(event["points"][0])
 
-            # Update state
-            self.click_data.update(event["points"][0])
+            # Update marker
+            self.update_marker()
         pn.bind(catch_click, self._pane.param.click_data, watch=True)
 
     def __panel__(self):
@@ -412,6 +422,14 @@ class MapView(Viewer):
             collapsible=False,
             hide_header=True
             )
+
+    def update_marker(self) -> None:
+        """Move or remove selection marker."""
+        self._figure["data"][0].update(
+            lat=[self.click_data.get("lat")],
+            lon=[self.click_data.get("lon")]
+        )
+        self._pane.object = self._figure
 
     def bind_click(self, function) -> None:
         """Bind a function to click event."""
@@ -429,19 +447,26 @@ class MapView(Viewer):
             hover_template: str | None = None
             ) -> None:
         """Update map."""
+        # Handle selection
+        show_marker = self.click_data.get("lat") in dataframe["latitude"]
+        show_marker &= self.click_data.get("lon") in dataframe["longitude"]
+        if not show_marker:
+            self.click_data = {}
+            self.update_marker()
+
         # Update markers
-        self._figure["data"][0]["marker"].update(
+        self._figure["data"][1]["marker"].update(
             color=dataframe[column],
             cmin=cmin,
             cmax=cmax
         )
-        self._figure["data"][0].update(
+        self._figure["data"][1].update(
             lat=dataframe["latitude"],
             lon=dataframe["longitude"],
             customdata=custom_data,
             hovertemplate=hover_template
         )
-        self._figure["data"][0]["marker"]["colorbar"]["title"].update(text=metric_label)
+        self._figure["data"][1]["marker"]["colorbar"]["title"].update(text=metric_label)
 
         # Update focus
         self._figure["layout"].update(
@@ -469,7 +494,7 @@ class TimeSeriesView(Viewer):
                 width=1045,
                 margin=dict(l=0, r=0, t=0, b=0),
                 yaxis=dict(title=dict(text="Streamflow (CFS)")),
-                clickmode="event+select",
+                clickmode="event",
                 modebar=dict(
                     remove=["resetview"],
                     orientation="v"
@@ -481,7 +506,7 @@ class TimeSeriesView(Viewer):
         self._pane = pn.pane.Plotly(self._figure)
 
         # Color ramp
-        self._color_ramp = cycle(cc.CET_L8)
+        self._color_ramp = cycle(cc.CET_C7)
 
     def __panel__(self):
         return pn.Card(
@@ -498,7 +523,7 @@ class TimeSeriesView(Viewer):
         # Overwrite old traces
         self._figure["data"] = [go.Scatter(
             mode="lines",
-            line={"color": "#3C00FF", "width": 3.0}
+            line={"color": "#000000", "width": 4.0}
         )]
 
         # Update x-range
