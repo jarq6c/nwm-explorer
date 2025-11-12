@@ -609,6 +609,18 @@ class BarPlot(Viewer):
         self.figure.update(dict(data=self.data, layout=self.layout))
         self.pane.object = self.figure
 
+    def erase(
+            self
+        ) -> None:
+        """Erase data."""
+        self.data = [go.Bar(
+            name=""
+        )]
+
+        # Update frontend
+        self.figure.update(dict(data=self.data, layout=self.layout))
+        self.pane.object = self.figure
+
     def __panel__(self) -> pn.Card:
         return pn.Card(
             self.pane,
@@ -638,6 +650,96 @@ def main() -> None:
     site_map = MapView()
     hydrograph = TimeSeriesView()
     barplot = BarPlot()
+
+    def handle_click(event) -> None:
+        if event is None:
+            return
+        # Clear barplot
+        barplot.erase()
+
+        # Clear hydrograph
+        hydrograph.erase_data(
+            xrange=(
+                data_ranges["observed_value_time_min"],
+                data_ranges["observed_value_time_max"]
+                )
+        )
+
+        # Check for state
+        if not site_map.click_data:
+            return
+
+        # Parse custom data
+        metadata = site_map.click_data["customdata"]
+        nwm_feature_id = metadata[0]
+        usgs_site_code = metadata[1]
+
+        # Retrieve metrics
+        metric_data = load_site_metrics(
+            root=root,
+            label=filter_widgets.label,
+            configuration=filter_widgets.configuration,
+            metric=filter_widgets.metric,
+            nwm_feature_id=nwm_feature_id,
+            rank=filter_widgets.rank,
+            cache=True
+        )
+
+        # Update barplot
+        barplot.update(
+            xdata=metric_data["lead_time_hours_min"],
+            ydata=metric_data[filter_widgets.point_column].to_numpy(),
+            ydata_lower=metric_data[filter_widgets.lower_column].to_numpy(),
+            ydata_upper=metric_data[filter_widgets.upper_column].to_numpy(),
+            xlabel="Minimum Lead Time (h)",
+            ylabel=filter_widgets.metric_label
+        )
+
+        # Stream observations
+        dataframes = []
+        for df in usgs_site_generator(
+            root=root,
+            usgs_site_code=usgs_site_code,
+            start_time=data_ranges["observed_value_time_min"],
+            end_time=data_ranges["observed_value_time_max"],
+            cache=True
+        ):
+            # Append data
+            dataframes.append(df)
+            observations = pl.concat(dataframes)
+
+            # Replace data
+            hydrograph.update_trace(
+                xdata=observations["value_time"].to_numpy(),
+                ydata=observations["observed_cfs"].to_numpy(),
+                name=f"USGS-{usgs_site_code}"
+            )
+
+        # Stream predictions
+        for df in nwm_site_generator(
+            root=root,
+            configuration=filter_widgets.configuration,
+            nwm_feature_id=nwm_feature_id,
+            start_time=data_ranges["reference_time_min"],
+            end_time=data_ranges["reference_time_max"],
+            cache=True
+        ):
+            # Add each reference time
+            trace_data = []
+            for rt in df["reference_time"].unique():
+                # Extract predictions
+                predictions = df.filter(pl.col("reference_time") == rt)
+
+                # Add trace data
+                trace_data.append((
+                    predictions["value_time"].to_numpy(),
+                    predictions["predicted_cfs"].to_numpy(),
+                    str(rt)
+                ))
+
+            # Add to plot
+            hydrograph.append_traces(trace_data)
+    site_map.bind_click(handle_click)
 
     def handle_filter_updates(event: str) -> None:
         # Ignore non-calls
@@ -707,94 +809,10 @@ def main() -> None:
                 )
             )
 
-        # Clear hydrograph
-        hydrograph.erase_data(
-            xrange=(
-                data_ranges["observed_value_time_min"],
-                data_ranges["observed_value_time_max"]
-                )
-        )
+        # Update barplot and hydrograph
+        handle_click(0)
     handle_filter_updates(filter_widgets.label)
     filter_widgets.bind(handle_filter_updates)
-
-    def handle_click(event) -> None:
-        if event is None:
-            return
-
-        # Clear hydrograph
-        hydrograph.erase_data(
-            xrange=(
-                data_ranges["observed_value_time_min"],
-                data_ranges["observed_value_time_max"]
-                )
-        )
-
-        # Check for state
-        if not site_map.click_data:
-            return
-
-        # Parse custom data
-        metadata = site_map.click_data["customdata"]
-        nwm_feature_id = metadata[0]
-        usgs_site_code = metadata[1]
-
-        # Retrieve metrics
-        metric_data = load_site_metrics(
-            root=root,
-            label=filter_widgets.label,
-            configuration=filter_widgets.configuration,
-            metric=filter_widgets.metric,
-            nwm_feature_id=nwm_feature_id,
-            rank=filter_widgets.rank,
-            cache=True
-        )
-        print(metric_data)
-
-        # Stream observations
-        dataframes = []
-        for df in usgs_site_generator(
-            root=root,
-            usgs_site_code=usgs_site_code,
-            start_time=data_ranges["observed_value_time_min"],
-            end_time=data_ranges["observed_value_time_max"],
-            cache=True
-        ):
-            # Append data
-            dataframes.append(df)
-            observations = pl.concat(dataframes)
-
-            # Replace data
-            hydrograph.update_trace(
-                xdata=observations["value_time"].to_numpy(),
-                ydata=observations["observed_cfs"].to_numpy(),
-                name=f"USGS-{usgs_site_code}"
-            )
-
-        # Stream predictions
-        for df in nwm_site_generator(
-            root=root,
-            configuration=filter_widgets.configuration,
-            nwm_feature_id=nwm_feature_id,
-            start_time=data_ranges["reference_time_min"],
-            end_time=data_ranges["reference_time_max"],
-            cache=True
-        ):
-            # Add each reference time
-            trace_data = []
-            for rt in df["reference_time"].unique():
-                # Extract predictions
-                predictions = df.filter(pl.col("reference_time") == rt)
-
-                # Add trace data
-                trace_data.append((
-                    predictions["value_time"].to_numpy(),
-                    predictions["predicted_cfs"].to_numpy(),
-                    str(rt)
-                ))
-
-            # Add to plot
-            hydrograph.append_traces(trace_data)
-    site_map.bind_click(handle_click)
 
     pn.serve(pn.Column(
         pn.Row(filter_widgets, site_map),
