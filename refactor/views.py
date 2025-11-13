@@ -8,7 +8,7 @@ import polars as pl
 import panel as pn
 from panel.viewable import Viewer
 import plotly.graph_objects as go
-from plotly.colors import hex_to_rgb, label_rgb
+from plotly.colors import hex_to_rgb
 from plotly.basedatatypes import BaseTraceType
 import colorcet as cc
 import pandas as pd
