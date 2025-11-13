@@ -8,6 +8,7 @@ import polars as pl
 import panel as pn
 from panel.viewable import Viewer
 import plotly.graph_objects as go
+from plotly.colors import hex_to_rgb, label_rgb
 from plotly.basedatatypes import BaseTraceType
 import colorcet as cc
 import pandas as pd
@@ -481,6 +482,27 @@ class MapView(Viewer):
         # Send updates to frontend
         self._pane.object = self._figure
 
+def rgb_to_hex(rgb_tuple):
+    """Converts an RGB tuple to a hexadecimal color string."""
+    r, g, b = rgb_tuple
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+def invert_color(value: str) -> str:
+    """Convert a hex color to an inverted hex color.
+    
+    Parameters
+    ----------
+    value: str, required,
+        Hex color string.
+    
+    Returns
+    -------
+    str:
+        Inverted hex color.
+    """
+    r, g, b = hex_to_rgb(value)
+    return rgb_to_hex((255-r, 255-g, 255-b))
+
 class TimeSeriesView(Viewer):
     """Display time series data."""
     def __init__(self, **params):
@@ -508,12 +530,62 @@ class TimeSeriesView(Viewer):
         # Color ramp
         self._color_ramp = cycle(cc.CET_C7)
 
+        # Track selection state
+        self.click_data: dict[str, Any] = {}
+        self.selected_traces: dict[int, bool] = {}
+        def catch_click(event) -> None:
+            if event is None:
+                return
+
+            # Get curve number
+            curve_number = event["points"][0].get("curveNumber")
+
+            # Highlight/unhighlight trace
+            self.toggle_highlight(curve_number)
+
+            # Update click data
+            if self.click_data.get("curveNumber") == curve_number:
+                self.click_data = {}
+            else:
+                self.click_data.update(event["points"][0])
+        pn.bind(catch_click, self._pane.param.click_data, watch=True)
+
     def __panel__(self):
         return pn.Card(
             self._pane,
             collapsible=False,
             hide_header=True
             )
+
+    def toggle_highlight(self, curve_number: int) -> None:
+        """Highlight or unhighlight selected trace."""
+        # Invert colors
+        color = self._figure["data"][curve_number]["line"]["color"]
+        self._figure["data"][curve_number]["line"].update(
+            color=invert_color(color)
+        )
+
+        # Update width
+        width = self._figure["data"][curve_number]["line"]["width"]
+        if curve_number in self.selected_traces:
+            # Remove trace
+            self.selected_traces.pop(curve_number)
+
+            # Reduce width
+            self._figure["data"][curve_number]["line"].update(
+                width=width-4
+            )
+        else:
+            # Add trace
+            self.selected_traces[curve_number] = True
+
+            # Increase width
+            self._figure["data"][curve_number]["line"].update(
+                width=width+4
+            )
+
+        # Refresh
+        self._pane.object = self._figure
 
     def erase_data(
             self,
@@ -530,8 +602,17 @@ class TimeSeriesView(Viewer):
         if xrange is not None:
             self._figure["layout"]["xaxis"].update(range=xrange)
 
+        # Update focus
+        self._figure["layout"].update(
+            uirevision=pd.Timestamp.now().strftime("%Y%m%dT%H%M%S")
+        )
+
         # Refresh
         self._pane.object = self._figure
+
+        # Clear click data
+        self.click_data = {}
+        self.selected_traces = {}
 
     def update_trace(
             self,
@@ -676,7 +757,7 @@ def main() -> None:
     hydrograph = TimeSeriesView()
     barplot = BarPlot()
 
-    def handle_click(event) -> None:
+    def handle_map_click(event) -> None:
         if event is None:
             return
         # Clear barplot
@@ -764,7 +845,7 @@ def main() -> None:
 
             # Add to plot
             hydrograph.append_traces(trace_data)
-    site_map.bind_click(handle_click)
+    site_map.bind_click(handle_map_click)
 
     def handle_filter_updates(event: str) -> None:
         # Ignore non-calls
@@ -835,7 +916,7 @@ def main() -> None:
             )
 
         # Update barplot and hydrograph
-        handle_click(0)
+        handle_map_click(0)
     handle_filter_updates(filter_widgets.label)
     filter_widgets.bind(handle_filter_updates)
 
