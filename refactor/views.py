@@ -357,6 +357,7 @@ class MapView(Viewer):
         super().__init__(**params)
 
         # Setup
+        self._domain = None
         self._figure = PlotlyFigure(
             data=[
                 go.Scattermap(
@@ -473,6 +474,11 @@ class MapView(Viewer):
             hover_template: str | None = None
             ) -> None:
         """Update map."""
+        # Update domain
+        if self._domain != domain:
+            self._domain = domain
+            self.viewport = {}
+
         # Handle selection
         show_marker = self.click_data.get("lat") in dataframe["latitude"]
         show_marker &= self.click_data.get("lon") in dataframe["longitude"]
@@ -1012,24 +1018,6 @@ def main() -> None:
         data_ranges["reference_time_min"] = data["reference_time_min"].min()
         data_ranges["reference_time_max"] = data["reference_time_max"].max()
 
-        # Update CDF
-        if site_map.viewport:
-            sorted_data = data.filter(
-                pl.col("latitude") <= site_map.viewport["lat_max"],
-                pl.col("latitude") >= site_map.viewport["lat_min"],
-                pl.col("longitude") <= site_map.viewport["lon_max"],
-                pl.col("longitude") >= site_map.viewport["lon_min"]
-            ).sort(filter_widgets.point_column, descending=False)
-        else:
-            sorted_data = data.sort(filter_widgets.point_column, descending=False)
-        ecdf.update(
-            xdata=sorted_data[filter_widgets.point_column].to_numpy(),
-            xdata_lower=sorted_data[filter_widgets.lower_column].to_numpy(),
-            xdata_upper=sorted_data[filter_widgets.upper_column].to_numpy(),
-            xlabel=filter_widgets.metric_label,
-            xrange=METRIC_PLOTTING_LIMITS[filter_widgets.metric]
-        )
-
         # Update map
         site_map.update(
             dataframe=data,
@@ -1056,6 +1044,24 @@ def main() -> None:
                     "Latitude: %{lat}"
                 )
             )
+
+        # Update CDF
+        if site_map.viewport:
+            sorted_data = data.filter(
+                pl.col("latitude") <= site_map.viewport["lat_max"],
+                pl.col("latitude") >= site_map.viewport["lat_min"],
+                pl.col("longitude") <= site_map.viewport["lon_max"],
+                pl.col("longitude") >= site_map.viewport["lon_min"]
+            ).sort(filter_widgets.point_column, descending=False)
+        else:
+            sorted_data = data.sort(filter_widgets.point_column, descending=False)
+        ecdf.update(
+            xdata=sorted_data[filter_widgets.point_column].to_numpy(),
+            xdata_lower=sorted_data[filter_widgets.lower_column].to_numpy(),
+            xdata_upper=sorted_data[filter_widgets.upper_column].to_numpy(),
+            xlabel=filter_widgets.metric_label,
+            xrange=METRIC_PLOTTING_LIMITS[filter_widgets.metric]
+        )
 
         # Update barplot and hydrograph
         handle_map_click(0)
