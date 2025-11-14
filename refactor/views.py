@@ -398,7 +398,7 @@ class MapView(Viewer):
         )
 
         # Create layout
-        self._pane = pn.pane.Plotly(self._figure)
+        self._pane = pn.pane.Plotly(self._figure, config={'displaylogo': False})
 
         # Track selection state
         self.click_data: dict[str, Any] = {}
@@ -514,7 +514,7 @@ class TimeSeriesView(Viewer):
             layout=go.Layout(
                 height=250,
                 width=1045,
-                margin=dict(l=0, r=0, t=0, b=0),
+                margin=dict(l=0, r=25, t=10, b=0),
                 yaxis=dict(title=dict(text="Streamflow (CFS)")),
                 clickmode="event",
                 modebar=dict(
@@ -525,7 +525,7 @@ class TimeSeriesView(Viewer):
         )
 
         # Create layout
-        self._pane = pn.pane.Plotly(self._figure)
+        self._pane = pn.pane.Plotly(self._figure, config={'displaylogo': False})
 
         # Color ramp
         self._color_ramp = cycle(cc.CET_C7)
@@ -667,14 +667,14 @@ class BarPlot(Viewer):
         self.layout = go.Layout(
             height=250,
             width=440,
-            margin=dict(l=0, r=0, t=0, b=0),
+            margin=dict(l=0, r=25, t=10, b=0),
             modebar=dict(
                 remove=["lasso", "select", "pan", "autoscale", "zoomin", "zoomout"],
                 orientation="v"
             )
         )
         self.figure = dict(data=self.data, layout=self.layout)
-        self.pane = pn.pane.Plotly(self.figure)
+        self.pane = pn.pane.Plotly(self.figure, config={'displaylogo': False})
 
     def update(
             self,
@@ -734,6 +734,104 @@ class BarPlot(Viewer):
             hide_header=True
         )
 
+class ECDFPlot(Viewer):
+    """Display empirical cumulative distribution curves."""
+    def __init__(self, **params) -> None:
+        super().__init__(**params)
+
+        # Setup
+        self.data = [go.Scatter(
+            name="",
+            mode="markers"
+        )]
+        self.layout = go.Layout(
+            height=250,
+            width=440,
+            margin=dict(l=0, r=25, t=10, b=0),
+            modebar=dict(
+                remove=["lasso", "select"],
+                orientation="v"
+            )
+        )
+        self.figure = dict(data=self.data, layout=self.layout)
+        self.pane = pn.pane.Plotly(self.figure, config={'displaylogo': False})
+
+    def update(
+            self,
+            xdata: npt.ArrayLike,
+            xdata_lower: npt.ArrayLike,
+            xdata_upper: npt.ArrayLike,
+            xlabel: str,
+            ylabel: str = "Cumulative Frequency",
+            xrange: tuple[float, float] | None = None
+        ) -> None:
+        """Update data. Assumes xdata are sorted."""
+        # Set xrange
+        if xrange is None:
+            xrange = (-2, 2)
+
+        # Construct custom data
+        custom_data = np.hstack((xdata_lower[:, np.newaxis], xdata_upper[:, np.newaxis]))
+
+        # Plotting position
+        ydata = np.arange(len(xdata)) / (len(xdata) + 1)
+
+        # Update trace
+        self.data[0].update(dict(
+            x=xdata,
+            y=ydata,
+            customdata=custom_data,
+            hovertemplate=(
+                f"{ylabel}: " + "%{y:.2f}<br>" +
+                f"{xlabel}: " + "%{x:.2f}<br>" +
+                "95% CI: %{customdata[0]:.2f} to %{customdata[1]:.2f}"
+            )
+        ))
+
+        # Update axes
+        self.layout.update(dict(
+            xaxis=dict(
+                title=dict(text=xlabel),
+                range=(xrange[0], xrange[1]),
+                tickmode="linear",
+                tick0=xrange[0],
+                dtick=(xrange[1]-xrange[0])/4,
+                tickformat=".1f"
+            ),
+            yaxis=dict(
+                title=dict(text=ylabel),
+                range=(0, 1),
+                tickmode="linear",
+                tick0=0.0,
+                dtick=0.2,
+                tickformat=".1f"
+            )
+        ))
+
+        # Update frontend
+        self.figure.update(dict(data=self.data, layout=self.layout))
+        self.pane.object = self.figure
+
+    def erase(
+            self
+        ) -> None:
+        """Erase data."""
+        self.data = [go.Scatter(
+            name="",
+            mode="markers"
+        )]
+
+        # Update frontend
+        self.figure.update(dict(data=self.data, layout=self.layout))
+        self.pane.object = self.figure
+
+    def __panel__(self) -> pn.Card:
+        return pn.Card(
+            self.pane,
+            collapsible=False,
+            hide_header=True
+        )
+
 def main() -> None:
     """Main."""
     root = Path("/ised/nwm_explorer_data")
@@ -756,6 +854,7 @@ def main() -> None:
     site_map = MapView()
     hydrograph = TimeSeriesView()
     barplot = BarPlot()
+    ecdf = ECDFPlot()
 
     def handle_map_click(event) -> None:
         if event is None:
@@ -880,13 +979,22 @@ def main() -> None:
                 old=routelink["nwm_feature_id"].implode(),
                 new=routelink["longitude"].implode()
             )
-        )
+        ).sort(filter_widgets.point_column, descending=False)
 
         # Update date range
         data_ranges["observed_value_time_min"] = data["observed_value_time_min"].min()
         data_ranges["observed_value_time_max"] = data["observed_value_time_max"].max()
         data_ranges["reference_time_min"] = data["reference_time_min"].min()
         data_ranges["reference_time_max"] = data["reference_time_max"].max()
+
+        # Update CDF
+        ecdf.update(
+            xdata=data[filter_widgets.point_column].to_numpy(),
+            xdata_lower=data[filter_widgets.lower_column].to_numpy(),
+            xdata_upper=data[filter_widgets.upper_column].to_numpy(),
+            xlabel=filter_widgets.metric_label,
+            xrange=METRIC_PLOTTING_LIMITS[filter_widgets.metric]
+        )
 
         # Update map
         site_map.update(
@@ -921,7 +1029,7 @@ def main() -> None:
     filter_widgets.bind(handle_filter_updates)
 
     pn.serve(pn.Column(
-        pn.Row(filter_widgets, site_map),
+        pn.Row(filter_widgets, site_map, ecdf),
         pn.Row(hydrograph, barplot))
         )
 
