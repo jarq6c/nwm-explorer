@@ -417,6 +417,27 @@ class MapView(Viewer):
             self.update_marker()
         pn.bind(catch_click, self._pane.param.click_data, watch=True)
 
+        # Viewport state
+        self.viewport: dict[str, float] = {}
+        def catch_relayout(event: dict[str, Any]) -> None:
+            if event is None:
+                return
+
+            # Check for viewport change
+            bbox = event.get("map._derived")
+            if bbox is None:
+                self.viewport = {}
+                return
+
+            # Extract points
+            self.viewport = {
+                "lat_max": bbox["coordinates"][0][1],
+                "lat_min": bbox["coordinates"][2][1],
+                "lon_max": bbox["coordinates"][1][0],
+                "lon_min": bbox["coordinates"][0][0]
+            }
+        pn.bind(catch_relayout, self._pane.param.relayout_data, watch=True)
+
     def __panel__(self):
         return pn.Card(
             self._pane,
