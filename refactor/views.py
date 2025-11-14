@@ -457,6 +457,10 @@ class MapView(Viewer):
         """Bind a function to click event."""
         pn.bind(function, self._pane.param.click_data, watch=True)
 
+    def bind_relayout(self, function) -> None:
+        """Bind a function to relayout event."""
+        pn.bind(function, self._pane.param.relayout_data, watch=True)
+
     def update(
             self,
             dataframe: pl.DataFrame,
@@ -1000,7 +1004,7 @@ def main() -> None:
                 old=routelink["nwm_feature_id"].implode(),
                 new=routelink["longitude"].implode()
             )
-        ).sort(filter_widgets.point_column, descending=False)
+        )
 
         # Update date range
         data_ranges["observed_value_time_min"] = data["observed_value_time_min"].min()
@@ -1009,10 +1013,19 @@ def main() -> None:
         data_ranges["reference_time_max"] = data["reference_time_max"].max()
 
         # Update CDF
+        if site_map.viewport:
+            sorted_data = data.filter(
+                pl.col("latitude") <= site_map.viewport["lat_max"],
+                pl.col("latitude") >= site_map.viewport["lat_min"],
+                pl.col("longitude") <= site_map.viewport["lon_max"],
+                pl.col("longitude") >= site_map.viewport["lon_min"]
+            ).sort(filter_widgets.point_column, descending=False)
+        else:
+            sorted_data = data.sort(filter_widgets.point_column, descending=False)
         ecdf.update(
-            xdata=data[filter_widgets.point_column].to_numpy(),
-            xdata_lower=data[filter_widgets.lower_column].to_numpy(),
-            xdata_upper=data[filter_widgets.upper_column].to_numpy(),
+            xdata=sorted_data[filter_widgets.point_column].to_numpy(),
+            xdata_lower=sorted_data[filter_widgets.lower_column].to_numpy(),
+            xdata_upper=sorted_data[filter_widgets.upper_column].to_numpy(),
             xlabel=filter_widgets.metric_label,
             xrange=METRIC_PLOTTING_LIMITS[filter_widgets.metric]
         )
@@ -1048,6 +1061,62 @@ def main() -> None:
         handle_map_click(0)
     handle_filter_updates(filter_widgets.label)
     filter_widgets.bind(handle_filter_updates)
+
+    def handle_relayout(event: dict[str, Any]) -> None:
+        # Ignore non-calls
+        if event is None:
+            return
+
+        # Ignore non-zooms
+        if not site_map.viewport:
+            return
+
+        # Retrieve data
+        data = load_metrics(
+            root=root,
+            label=filter_widgets.label,
+            configuration=filter_widgets.configuration,
+            metric=filter_widgets.metric,
+            lead_time_hours_min=filter_widgets.lead_time,
+            rank=filter_widgets.rank,
+            additional_columns=(
+                "nwm_feature_id",
+                "usgs_site_code",
+                "sample_size",
+                "observed_value_time_min",
+                "observed_value_time_max",
+                "reference_time_min",
+                "reference_time_max"
+                ),
+            significant=filter_widgets.significant,
+            cache=True
+        ).with_columns(
+            latitude=pl.col("nwm_feature_id").replace_strict(
+                old=routelink["nwm_feature_id"].implode(),
+                new=routelink["latitude"].implode()
+            ),
+            longitude=pl.col("nwm_feature_id").replace_strict(
+                old=routelink["nwm_feature_id"].implode(),
+                new=routelink["longitude"].implode()
+            )
+        ).filter(
+            pl.col("latitude") <= site_map.viewport["lat_max"],
+            pl.col("latitude") >= site_map.viewport["lat_min"],
+            pl.col("longitude") <= site_map.viewport["lon_max"],
+            pl.col("longitude") >= site_map.viewport["lon_min"]
+        ).sort(
+            filter_widgets.point_column, descending=False
+        )
+
+        # Update ECDF
+        ecdf.update(
+            xdata=data[filter_widgets.point_column].to_numpy(),
+            xdata_lower=data[filter_widgets.lower_column].to_numpy(),
+            xdata_upper=data[filter_widgets.upper_column].to_numpy(),
+            xlabel=filter_widgets.metric_label,
+            xrange=METRIC_PLOTTING_LIMITS[filter_widgets.metric]
+        )
+    site_map.bind_relayout(handle_relayout)
 
     pn.serve(pn.Column(
         pn.Row(filter_widgets, site_map, ecdf),
