@@ -185,7 +185,7 @@ class FilterWidgets(Viewer):
         self._callbacks: list[Callable] = []
 
         # Update lead time
-        def update_lead_times(event) -> None:
+        def update_lead_times(event, callback_type: str) -> None:
             # Ignore non-events
             if event is None:
                 return
@@ -207,8 +207,10 @@ class FilterWidgets(Viewer):
 
             # Bind callbacks
             for c in self._callbacks:
-                pn.bind(c, self._widgets["lead_time"].object.param.value, watch=True)
-        pn.bind(update_lead_times, self._widgets["configuration"].param.value, watch=True)
+                pn.bind(c, self._widgets["lead_time"].object.param.value, watch=True,
+                    callback_type="lead_time")
+        pn.bind(update_lead_times, self._widgets["configuration"].param.value, watch=True,
+            callback_type="configuration")
 
         # Create layout
         self._layout = pn.Card(
@@ -223,11 +225,11 @@ class FilterWidgets(Viewer):
     def bind(self, function) -> None:
         """Bind a function to all filtering widgets."""
         self._callbacks.append(function)
-        for v in self._widgets.values():
+        for k, v in self._widgets.items():
             if isinstance(v, pn.pane.Placeholder):
-                pn.bind(function, v.object.param.value, watch=True)
+                pn.bind(function, v.object.param.value, watch=True, callback_type=k)
             else:
-                pn.bind(function, v.param.value, watch=True)
+                pn.bind(function, v.param.value, watch=True, callback_type=k)
 
     @property
     def label(self) -> str:
@@ -403,7 +405,7 @@ class MapView(Viewer):
 
         # Track selection state
         self.click_data: dict[str, Any] = {}
-        def catch_click(event) -> None:
+        def catch_click(event, callback_type: str) -> None:
             if event is None:
                 return
 
@@ -416,18 +418,17 @@ class MapView(Viewer):
 
             # Update marker
             self.update_marker()
-        pn.bind(catch_click, self._pane.param.click_data, watch=True)
+        pn.bind(catch_click, self._pane.param.click_data, watch=True, callback_type="click")
 
         # Viewport state
         self.viewport: dict[str, float] = {}
-        def catch_relayout(event: dict[str, Any]) -> None:
+        def catch_relayout(event: dict[str, Any], callback_type: str) -> None:
             if event is None:
                 return
 
             # Check for viewport change
             bbox = event.get("map._derived")
             if bbox is None:
-                self.viewport = {}
                 return
 
             # Extract points
@@ -437,7 +438,8 @@ class MapView(Viewer):
                 "lon_max": bbox["coordinates"][1][0],
                 "lon_min": bbox["coordinates"][0][0]
             }
-        pn.bind(catch_relayout, self._pane.param.relayout_data, watch=True)
+        pn.bind(catch_relayout, self._pane.param.relayout_data, watch=True,
+            callback_type="relayout")
 
     def __panel__(self):
         return pn.Card(
@@ -456,11 +458,11 @@ class MapView(Viewer):
 
     def bind_click(self, function) -> None:
         """Bind a function to click event."""
-        pn.bind(function, self._pane.param.click_data, watch=True)
+        pn.bind(function, self._pane.param.click_data, watch=True, callback_type="click")
 
     def bind_relayout(self, function) -> None:
         """Bind a function to relayout event."""
-        pn.bind(function, self._pane.param.relayout_data, watch=True)
+        pn.bind(function, self._pane.param.relayout_data, watch=True, callback_type="relayout")
 
     def update(
             self,
@@ -564,7 +566,7 @@ class TimeSeriesView(Viewer):
         # Track selection state
         self.click_data: dict[str, Any] = {}
         self.selected_traces: dict[int, bool] = {}
-        def catch_click(event) -> None:
+        def catch_click(event, callback_type: str) -> None:
             if event is None:
                 return
 
@@ -579,7 +581,7 @@ class TimeSeriesView(Viewer):
                 self.click_data = {}
             else:
                 self.click_data.update(event["points"][0])
-        pn.bind(catch_click, self._pane.param.click_data, watch=True)
+        pn.bind(catch_click, self._pane.param.click_data, watch=True, callback_type="click")
 
     def __panel__(self):
         return pn.Card(
@@ -887,22 +889,22 @@ def main() -> None:
     barplot = BarPlot()
     ecdf = ECDFPlot()
 
-    def handle_map_click(event) -> None:
+    def handle_map_click(event, callback_type: str) -> None:
         if event is None:
             return
-        # Clear barplot
-        barplot.erase()
-
-        # Clear hydrograph
-        hydrograph.erase_data(
-            xrange=(
-                data_ranges["observed_value_time_min"],
-                data_ranges["observed_value_time_max"]
-                )
-        )
 
         # Check for state
         if not site_map.click_data:
+            # Clear barplot
+            barplot.erase()
+
+            # Clear hydrograph
+            hydrograph.erase_data(
+                xrange=(
+                    data_ranges["observed_value_time_min"],
+                    data_ranges["observed_value_time_max"]
+                    )
+            )
             return
 
         # Parse custom data
@@ -921,6 +923,13 @@ def main() -> None:
             cache=True
         )
 
+        # These filters do not update hydrograph or barplot
+        if callback_type in ["lead_time", "significant"]:
+            return
+
+        # Clear barplot
+        barplot.erase()
+
         # Update barplot
         barplot.update(
             xdata=metric_data["lead_time_hours_min"],
@@ -929,6 +938,18 @@ def main() -> None:
             ydata_upper=metric_data[filter_widgets.upper_column].to_numpy(),
             xlabel="Minimum Lead Time (h)",
             ylabel=filter_widgets.metric_label
+        )
+
+        # These filters do not update hydrograph
+        if callback_type in ["rank", "metric"]:
+            return
+
+        # Clear hydrograph
+        hydrograph.erase_data(
+            xrange=(
+                data_ranges["observed_value_time_min"],
+                data_ranges["observed_value_time_max"]
+                )
         )
 
         # Stream observations
@@ -977,7 +998,7 @@ def main() -> None:
             hydrograph.append_traces(trace_data)
     site_map.bind_click(handle_map_click)
 
-    def handle_filter_updates(event: str) -> None:
+    def handle_filter_updates(event: str, callback_type: str) -> None:
         # Ignore non-calls
         if event is None:
             return
@@ -1064,11 +1085,11 @@ def main() -> None:
         )
 
         # Update barplot and hydrograph
-        handle_map_click(0)
-    handle_filter_updates(filter_widgets.label)
+        handle_map_click(0, callback_type)
+    handle_filter_updates(filter_widgets.label, "intialize")
     filter_widgets.bind(handle_filter_updates)
 
-    def handle_relayout(event: dict[str, Any]) -> None:
+    def handle_relayout(event: dict[str, Any], callback_type: str) -> None:
         # Ignore non-calls
         if event is None:
             return
