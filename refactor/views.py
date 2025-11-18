@@ -300,7 +300,11 @@ class TableView(Viewer):
         self._layout = self._table
 
     def __panel__(self):
-        return self._layout
+        return pn.Card(
+            self._layout,
+            collapsible=False,
+            hide_header=True
+            )
 
     def update(self, dataframe: pl.DataFrame) -> None:
         """Update data underlying tabular representation."""
@@ -406,7 +410,7 @@ class MapView(Viewer):
         # Track selection state
         self.click_data: dict[str, Any] = {}
         def catch_click(event, callback_type: str) -> None:
-            if event is None:
+            if event is None or callback_type is None:
                 return
 
             # Handle selection/deselection
@@ -423,7 +427,7 @@ class MapView(Viewer):
         # Viewport state
         self.viewport: dict[str, float] = {}
         def catch_relayout(event: dict[str, Any], callback_type: str) -> None:
-            if event is None:
+            if event is None or callback_type is None:
                 return
 
             # Check for viewport change
@@ -567,7 +571,7 @@ class TimeSeriesView(Viewer):
         self.click_data: dict[str, Any] = {}
         self.selected_traces: dict[int, bool] = {}
         def catch_click(event, callback_type: str) -> None:
-            if event is None:
+            if event is None or callback_type is None:
                 return
 
             # Get curve number
@@ -888,6 +892,7 @@ def main() -> None:
     hydrograph = TimeSeriesView()
     barplot = BarPlot()
     ecdf = ECDFPlot()
+    site_information = TableView()
 
     def handle_map_click(event, callback_type: str) -> None:
         if event is None:
@@ -1091,7 +1096,7 @@ def main() -> None:
 
     def handle_relayout(event: dict[str, Any], callback_type: str) -> None:
         # Ignore non-calls
-        if event is None:
+        if event is None or callback_type is None:
             return
 
         # Ignore non-zooms
@@ -1146,7 +1151,7 @@ def main() -> None:
     site_map.bind_relayout(handle_relayout)
 
     pn.serve(pn.Column(
-        pn.Row(filter_widgets, site_map, ecdf),
+        pn.Row(filter_widgets, site_map, ecdf, site_information),
         pn.Row(hydrograph, barplot))
         )
 

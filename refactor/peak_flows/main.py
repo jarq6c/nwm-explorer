@@ -49,7 +49,8 @@ def main():
 
     # Concat
     data = pd.concat(dataframes, ignore_index=True)
-    print(data["site_no"].unique().size)
+    idx = pd.to_datetime(data["peak_dt"], errors="coerce").idxmin()
+    print(data.iloc[idx, :])
 
 if __name__ == "__main__":
     main()
