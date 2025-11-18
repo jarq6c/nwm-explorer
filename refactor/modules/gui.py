@@ -21,7 +21,7 @@ def generate_dashboard_closure(
         return generate_dashboard(root, title)
     return closure
 
-def serve_dashboard(
+def serve_dashboards(
         root: Path,
         title: str
         ) -> None:
