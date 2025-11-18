@@ -882,6 +882,10 @@ class MarkdownView(Viewer):
         """Update Markdown content."""
         self._pane.object = content
 
+    def erase(self) -> None:
+        """Clear Markdown content."""
+        self._pane.object = "| Site Information |  |  \n| :-- | :-- |  \n|  |  |"
+
     def __panel__(self) -> None:
         return pn.Card(
             self._pane,
@@ -938,6 +942,9 @@ def main() -> None:
                     data_ranges["observed_value_time_max"]
                     )
             )
+
+            # Clear site info
+            site_information.erase()
             return
 
         # Parse custom data
@@ -945,14 +952,16 @@ def main() -> None:
         nwm_feature_id = metadata[0]
         usgs_site_code = metadata[1]
 
-        # Update site information
-        info = "| Site Information |  |  \n| :-- | :-- |  \n"
-        for series in load_site_information(root, usgs_site_code,
-            rename=site_column_mapping).iter_columns():
-            info += f"| **{series.name}** | {series.item(0)} |  \n"
-        url = f"https://waterdata.usgs.gov/monitoring-location/USGS-{usgs_site_code}/"
-        info += f'| **Monitoring page** | <a href="{url}" target="_blank">Open new tab</a> |'
-        site_information.update(info)
+        # Update site info
+        if callback_type == "click":
+            # Build site table
+            info = "| Site Information |  |  \n| :-- | :-- |  \n"
+            for series in load_site_information(root, usgs_site_code,
+                rename=site_column_mapping).iter_columns():
+                info += f"| **{series.name}** | {series.item(0)} |  \n"
+            url = f"https://waterdata.usgs.gov/monitoring-location/USGS-{usgs_site_code}/"
+            info += f'| **Monitoring page** | <a href="{url}" target="_blank">Open new tab</a> |'
+            site_information.update(info)
 
         # Retrieve metrics
         metric_data = load_site_metrics(
