@@ -5,7 +5,7 @@ from typing import Any
 import polars as pl
 import panel as pn
 import pandas as pd
-from panel.template import BootstrapTemplate
+from panel.template import MaterialTemplate
 from panel.viewable import Viewer
 
 from .nwm import nwm_site_generator
@@ -13,7 +13,8 @@ from .evaluate import load_metrics, scan_evaluations, load_site_metrics
 from .routelink import download_routelink
 from .usgs import usgs_site_generator, load_site_information
 from .views import (FilterWidgets, MapView, TimeSeriesView, BarPlot, ECDFPlot,
-    MarkdownView, METRIC_PLOTTING_LIMITS)
+    MarkdownView)
+from .constants import METRIC_PLOTTING_LIMITS, CONFIGURATION_LINE_TYPE
 
 class Dashboard(Viewer):
     """Build a dashboard for exploring National Water Model output."""
@@ -171,7 +172,10 @@ class Dashboard(Viewer):
                     ))
 
                 # Add to plot
-                hydrograph.append_traces(trace_data)
+                mode = CONFIGURATION_LINE_TYPE.get(
+                    filter_widgets.configuration, "lines"
+                )
+                hydrograph.append_traces(trace_data, mode=mode)
         site_map.bind_click(handle_map_click)
 
         def handle_filter_updates(event: str, callback_type: str) -> None:
@@ -322,7 +326,7 @@ class Dashboard(Viewer):
         site_map.bind_relayout(handle_relayout)
 
         # Setup template
-        self.template = BootstrapTemplate(
+        self.template = MaterialTemplate(
             title=title,
             collapsed_sidebar=True
         )
@@ -334,5 +338,5 @@ class Dashboard(Viewer):
             pn.Column(ecdf, barplot)
         ))
 
-    def __panel__(self) -> BootstrapTemplate:
+    def __panel__(self) -> MaterialTemplate:
         return self.template

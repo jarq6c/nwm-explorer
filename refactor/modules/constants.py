@@ -2,9 +2,12 @@
 from pathlib import Path
 from enum import StrEnum
 from dataclasses import dataclass
+from typing import TypedDict
 
 import polars as pl
 import us
+from plotly.basedatatypes import BaseTraceType
+import plotly.graph_objects as go
 
 class ModelDomain(StrEnum):
     """Symbols for model domains."""
@@ -403,3 +406,51 @@ SITE_SCHEMA: pl.Schema = pl.Schema({
     "latitude": pl.Float64
 })
 """Schema for USGS site data."""
+
+class PlotlyFigure(TypedDict):
+    """
+    Specifies plotly figure dict for use with panel.
+
+    Attributes
+    ----
+    data: list[plotly.basedatatypes.BaseTraceType]
+        List of plotly traces.
+    layout: plotly.graph_objects.Layout
+        Plotly layout.
+    """
+    data: list[BaseTraceType]
+    layout: go.Layout
+
+DEFAULT_ZOOM: dict[ModelDomain, int] = {
+    ModelDomain.ALASKA: 5,
+    ModelDomain.CONUS: 3,
+    ModelDomain.HAWAII: 6,
+    ModelDomain.PUERTO_RICO: 8
+}
+"""Default map zoom for each domain."""
+
+DEFAULT_CENTER: dict[ModelDomain, dict[str, float]] = {
+    ModelDomain.ALASKA: {"lat": 60.84683, "lon": -149.05659},
+    ModelDomain.CONUS: {"lat": 38.83348, "lon": -93.97612},
+    ModelDomain.HAWAII: {"lat": 21.24988, "lon": -157.59606},
+    ModelDomain.PUERTO_RICO: {"lat": 18.21807, "lon": -66.32802}
+}
+"""Default map center for each domain."""
+
+METRIC_PLOTTING_LIMITS: dict[Metric, tuple[float, float]] = {
+    Metric.RELATIVE_MEAN_BIAS: (-1.0, 1.0),
+    Metric.PEARSON_CORRELATION_COEFFICIENT: (-1.0, 1.0),
+    Metric.NASH_SUTCLIFFE_EFFICIENCY: (-1.0, 1.0),
+    Metric.RELATIVE_MEAN: (0.0, 2.0),
+    Metric.RELATIVE_STANDARD_DEVIATION: (0.0, 2.0),
+    Metric.RELATIVE_MEDIAN: (0.0, 2.0),
+    Metric.RELATIVE_MINIMUM: (0.0, 2.0),
+    Metric.RELATIVE_MAXIMUM: (0.0, 2.0),
+    Metric.KLING_GUPTA_EFFICIENCY: (-1.0, 1.0)
+}
+"""Mapping from Metrics to plotting limits (cmin, cmax)."""
+
+CONFIGURATION_LINE_TYPE: dict[ModelConfiguration, str] = {
+    ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA: "markers"
+}
+"""Mapping from Model configuration to line type for plotting."""

@@ -1,5 +1,5 @@
 """Methods to generate views of data."""
-from typing import TypedDict, Callable, Any
+from typing import Callable, Any
 from itertools import cycle
 
 import polars as pl
@@ -7,7 +7,6 @@ import panel as pn
 from panel.viewable import Viewer
 import plotly.graph_objects as go
 from plotly.colors import hex_to_rgb
-from plotly.basedatatypes import BaseTraceType
 import colorcet as cc
 import pandas as pd
 import numpy.typing as npt
@@ -16,7 +15,8 @@ import numpy as np
 from .nwm import ModelConfiguration
 from .evaluate import Metric
 from .constants import (ModelDomain, GROUP_SPECIFICATIONS, DOMAIN_LOOKUP,
-    CONFIGURATION_LOOKUP, NWMGroupSpecification, METRIC_LOOKUP, RANK_LOOKUP)
+    CONFIGURATION_LOOKUP, NWMGroupSpecification, METRIC_LOOKUP, RANK_LOOKUP,
+    PlotlyFigure, DEFAULT_CENTER, DEFAULT_ZOOM)
 
 pn.extension('tabulator')
 
@@ -140,7 +140,7 @@ class FilterWidgets(Viewer):
 
         # Create layout
         self._layout = pn.Card(
-            pn.WidgetBox(*list(self._widgets.values())),
+            pn.Column(*list(self._widgets.values())),
             title="Filters",
             collapsible=False
             )
@@ -239,49 +239,6 @@ class TableView(Viewer):
             height=500,
             show_index=False
         )
-
-class PlotlyFigure(TypedDict):
-    """
-    Specifies plotly figure dict for use with panel.
-
-    Attributes
-    ----
-    data: list[plotly.basedatatypes.BaseTraceType]
-        List of plotly traces.
-    layout: plotly.graph_objects.Layout
-        Plotly layout.
-    """
-    data: list[BaseTraceType]
-    layout: go.Layout
-
-DEFAULT_ZOOM: dict[ModelDomain, int] = {
-    ModelDomain.ALASKA: 5,
-    ModelDomain.CONUS: 3,
-    ModelDomain.HAWAII: 6,
-    ModelDomain.PUERTO_RICO: 8
-}
-"""Default map zoom for each domain."""
-
-DEFAULT_CENTER: dict[ModelDomain, dict[str, float]] = {
-    ModelDomain.ALASKA: {"lat": 60.84683, "lon": -149.05659},
-    ModelDomain.CONUS: {"lat": 38.83348, "lon": -93.97612},
-    ModelDomain.HAWAII: {"lat": 21.24988, "lon": -157.59606},
-    ModelDomain.PUERTO_RICO: {"lat": 18.21807, "lon": -66.32802}
-}
-"""Default map center for each domain."""
-
-METRIC_PLOTTING_LIMITS: dict[Metric, tuple[float, float]] = {
-    Metric.RELATIVE_MEAN_BIAS: (-1.0, 1.0),
-    Metric.PEARSON_CORRELATION_COEFFICIENT: (-1.0, 1.0),
-    Metric.NASH_SUTCLIFFE_EFFICIENCY: (-1.0, 1.0),
-    Metric.RELATIVE_MEAN: (0.0, 2.0),
-    Metric.RELATIVE_STANDARD_DEVIATION: (0.0, 2.0),
-    Metric.RELATIVE_MEDIAN: (0.0, 2.0),
-    Metric.RELATIVE_MINIMUM: (0.0, 2.0),
-    Metric.RELATIVE_MAXIMUM: (0.0, 2.0),
-    Metric.KLING_GUPTA_EFFICIENCY: (-1.0, 1.0)
-}
-"""Mapping from Metrics to plotting limits (cmin, cmax)."""
 
 class MapView(Viewer):
     """Display data on a map."""
@@ -602,7 +559,8 @@ class TimeSeriesView(Viewer):
 
     def append_traces(
             self,
-            traces: list[tuple[npt.ArrayLike, npt.ArrayLike, str]]
+            traces: list[tuple[npt.ArrayLike, npt.ArrayLike, str]],
+            mode: str = "lines"
         ) -> None:
         """Add time series."""
         # Add new traces
@@ -610,7 +568,7 @@ class TimeSeriesView(Viewer):
             self._figure["data"].append(go.Scatter(
                 x=trace[0],
                 y=trace[1],
-                mode="lines",
+                mode=mode,
                 line={"color": next(self._color_ramp), "width": 2.0},
                 name=trace[2]
             ))
