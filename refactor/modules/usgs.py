@@ -261,6 +261,7 @@ def expand_site_table(
     logger.info("Saving %s", ofile)
     data.write_parquet(ofile)
 
+@functools.lru_cache(LRU_CACHE_SIZE)
 def scan_site_table(root: Path) -> pl.LazyFrame:
     """
     Return polars.LazyFrame of USGS sites.
@@ -274,6 +275,52 @@ def scan_site_table(root: Path) -> pl.LazyFrame:
         root / SITE_TABLE_DIRECTORY,
         hive_schema={"site_type_slug": pl.Enum(SiteTypeSlug)}
         )
+
+def load_site_information(
+        root: Path,
+        usgs_site_code: str,
+        columns: list[str] | None = None,
+        rename: dict[str, str] | None = None
+        ) -> pl.DataFrame:
+    """
+    Return site specific information.
+
+    Parameters
+    ----------
+    root: pathlib.Path
+        Root directory containing site information tables.
+    usgs_site_code: str
+        USGS site code.
+    columns: list[str], optional
+        List of columns to return. Default: ["id", "site_type", "drainage_area",
+        "hydrologic_unit_code", "contributing_drainage_area", "monitoring_location_name"]
+    rename: dict[str, str], optional
+        Optional mapping to rename columns.
+    
+    Returns
+    -------
+    pl.DataFrame
+    """
+    # Set columns
+    if columns is None:
+        columns = [
+            "monitoring_location_name",
+            "monitoring_location_number",
+            "hydrologic_unit_code",
+            "site_type",
+            "drainage_area",
+            "contributing_drainage_area"
+        ]
+
+    # Get data
+    df = scan_site_table(root).select(columns).filter(
+        pl.col("monitoring_location_number") == usgs_site_code
+    ).collect()
+
+    # Rename columns
+    if rename is not None:
+        df = df.rename(rename)
+    return df
 
 @functools.lru_cache(LRU_CACHE_SIZE)
 def lookup_site_state_code_cache(root: Path, usgs_site_code: str) -> str:

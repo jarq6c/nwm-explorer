@@ -19,7 +19,7 @@ from modules.nwm import ModelConfiguration, nwm_site_generator
 from modules.evaluate import load_metrics, Metric, scan_evaluations, load_site_metrics
 from modules.routelink import download_routelink
 from modules.pairs import GROUP_SPECIFICATIONS, NWMGroupSpecification
-from modules.usgs import usgs_site_generator
+from modules.usgs import usgs_site_generator, load_site_information
 
 pn.extension('tabulator')
 
@@ -187,7 +187,7 @@ class FilterWidgets(Viewer):
         # Update lead time
         def update_lead_times(event, callback_type: str) -> None:
             # Ignore non-events
-            if event is None:
+            if event is None or callback_type is None:
                 return
 
             # Maintain value
@@ -869,6 +869,26 @@ class ECDFPlot(Viewer):
             hide_header=True
         )
 
+class MarkdownView(Viewer):
+    """Display Markdown content."""
+    def __init__(self, **params) -> None:
+        super().__init__(**params)
+
+        self._pane = pn.pane.Markdown(
+            "| Site Information |  |  \n| :-- | :-- |  \n|  |  |"
+        )
+
+    def update(self, content: str) -> None:
+        """Update Markdown content."""
+        self._pane.object = content
+
+    def __panel__(self) -> None:
+        return pn.Card(
+            self._pane,
+            collapsible=False,
+            hide_header=True
+        )
+
 def main() -> None:
     """Main."""
     root = Path("/ised/nwm_explorer_data")
@@ -892,7 +912,15 @@ def main() -> None:
     hydrograph = TimeSeriesView()
     barplot = BarPlot()
     ecdf = ECDFPlot()
-    site_information = TableView()
+    site_information = MarkdownView()
+    site_column_mapping = {
+        "monitoring_location_name": "Name",
+        "monitoring_location_number": "Site code",
+        "hydrologic_unit_code": "HUC",
+        "site_type": "Site type",
+        "drainage_area": "Drainage area (sq.mi.)",
+        "contributing_drainage_area": "Contrib. drain. area (sq.mi.)"
+    }
 
     def handle_map_click(event, callback_type: str) -> None:
         if event is None:
@@ -916,6 +944,15 @@ def main() -> None:
         metadata = site_map.click_data["customdata"]
         nwm_feature_id = metadata[0]
         usgs_site_code = metadata[1]
+
+        # Update site information
+        info = "| Site Information |  |  \n| :-- | :-- |  \n"
+        for series in load_site_information(root, usgs_site_code,
+            rename=site_column_mapping).iter_columns():
+            info += f"| **{series.name}** | {series.item(0)} |  \n"
+        url = f"https://waterdata.usgs.gov/monitoring-location/USGS-{usgs_site_code}/"
+        info += f'| **Monitoring page** | <a href="{url}" target="_blank">Open new tab</a> |'
+        site_information.update(info)
 
         # Retrieve metrics
         metric_data = load_site_metrics(
