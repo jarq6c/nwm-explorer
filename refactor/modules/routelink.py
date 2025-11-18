@@ -3,7 +3,6 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import inspect
 import tarfile
-from enum import StrEnum
 
 import pandas as pd
 import polars as pl
@@ -11,30 +10,8 @@ from yarl import URL
 
 from .logger import get_logger
 from .downloads import download_files
-
-class ModelDomain(StrEnum):
-    """Model domains."""
-    ALASKA = "alaska"
-    HAWAII = "hawaii"
-    CONUS = "conus"
-    PUERTO_RICO = "puertorico"
-
-ROUTELINK_URL: str = (
-    "https://www.hydroshare.org/resource"
-    "/1fe9975004ce4b5097d41939afa14f84/data/contents/RouteLinks.tar.gz"
-)
-"""URL to RouteLink CSV tarball."""
-
-ROUTELINK_PARQUET: Path = Path("routelink.parquet")
-"""Default path to polars-compatible RouteLink parquet file used by application."""
-
-ROUTELINK_FILENAMES: dict[ModelDomain, str] = {
-    ModelDomain.ALASKA: "RouteLink_AK.csv",
-    ModelDomain.CONUS: "RouteLink_CONUS.csv",
-    ModelDomain.HAWAII: "RouteLink_HI.csv",
-    ModelDomain.PUERTO_RICO: "RouteLink_PRVI.csv"
-}
-"""Mapping from domains to routelink files names."""
+from .constants import (ModelDomainDirectory, ROUTELINK_URL, ROUTELINK_PARQUET,
+    ROUTELINK_FILENAMES)
 
 def download_routelink(
         root: Path,
@@ -104,7 +81,7 @@ def download_routelink(
             data,
             schema_overrides={
                 "usgs_site_code": pl.String,
-                "domain": ModelDomain,
+                "domain": ModelDomainDirectory,
                 "nwm_feature_id": pl.Int64,
                 "latitude": pl.Float64,
                 "longitude": pl.Float64

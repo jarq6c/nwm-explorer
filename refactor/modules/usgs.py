@@ -12,7 +12,6 @@ import inspect
 import json
 from dataclasses import dataclass
 from tempfile import TemporaryDirectory
-from enum import StrEnum
 from time import sleep
 import functools
 from typing import Generator
@@ -25,131 +24,9 @@ import geopandas as gpd
 from .logger import get_logger
 from .downloads import download_files
 from .configuration import Configuration
-
-LRU_CACHE_SIZE: int = 25
-"""Maximum size of functools.lru_cache."""
-
-NWIS_BASE_URL: str = (
-    "https://waterservices.usgs.gov/nwis/iv/"
-    "?format=json&siteStatus=all&parameterCd=00060"
-)
-"""NWIS IV API returning json and all site statuses."""
-
-MONITORING_LOCATION_BASE_URL: str = (
-    "https://api.waterdata.usgs.gov/ogcapi/v0/collections/monitoring-locations"
-    "/items?f=json&lang=en-US&limit=10000&skipGeometry=false&offset=0"
-    "&agency_code=USGS&site_type_code="
-)
-"""USGS monitoring location API returning geojson."""
-
-class SiteTypeSlug(StrEnum):
-    """Machine-friendly site types."""
-    STREAM = "stream"
-    CANAL = "canal"
-    DITCH = "ditch"
-    LAKE = "lake"
-    TIDAL = "tidal"
-    SPRING = "spring"
-    DIVERSION = "diversion"
-    ESTUARY = "estuary"
-    TUNNEL = "tunnel"
-    FIELD = "field"
-    STORM_SEWER = "storm_sewer"
-    COMBINED_SEWER = "combined_sewer"
-    OUTFALL = "outfall"
-
-@dataclass
-class SiteType:
-    """
-    Dataclass for storing USGS site type details.
-
-    Attributes
-    ----------
-    code: str
-        Site type code.
-    name: str
-        Short name.
-    long_name: str
-        Long name.
-    slug: SiteTypeSlug
-        Machine-friendly representation.
-    """
-    code: str
-    name: str
-    long_name: str
-    slug: SiteTypeSlug
-
-SITE_TYPES: list[SiteType] = [
-    SiteType("ST", "Stream", "Stream", SiteTypeSlug.STREAM),
-    SiteType("ST-CA", "Canal", "Canal", SiteTypeSlug.CANAL),
-    SiteType("ST-DCH", "Ditch", "Ditch", SiteTypeSlug.DITCH),
-    SiteType("ST-TS", "Tidal SW", "Tidal stream", SiteTypeSlug.TIDAL),
-    SiteType("LK", "Lake", "Lake, Reservoir, Impoundment", SiteTypeSlug.LAKE),
-    SiteType("SP", "Spring", "Spring", SiteTypeSlug.SPRING),
-    SiteType("FA-DV", "Diversion", "Diversion", SiteTypeSlug.DIVERSION),
-    SiteType("ES", "Estuary", "Estuary", SiteTypeSlug.ESTUARY),
-    SiteType("SB-TSM", "Tunl/mine", "Tunnel, shaft, or mine", SiteTypeSlug.TUNNEL),
-    SiteType("FA-FON", "Agric area", "Field, Pasture, Orchard, or Nursery", SiteTypeSlug.FIELD),
-    SiteType("FA-STS", "Sewer-strm", "Storm sewer", SiteTypeSlug.STORM_SEWER),
-    SiteType("FA-CS", "Sewer-comb", "Combined sewer", SiteTypeSlug.COMBINED_SEWER),
-    SiteType("FA-OF", "Outfall", "Outfall", SiteTypeSlug.OUTFALL)
-]
-"""List of USGS site types to retrieve for master site table."""
-
-STATE_LIST: list[us.states.State] = us.states.STATES + [us.states.PR, us.states.DC]
-"""List of US states."""
-
-SUBDIRECTORY: str = "usgs"
-"""Subdirectory that indicates root of USGS output parquet store."""
-
-SITE_TABLE_DIRECTORY: str = "site_table"
-"""Subdirectory that indicates root of USGS site parquet store."""
-
-SITE_SCHEMA: pl.Schema = pl.Schema({
-    "id": pl.String,
-    "vertical_datum": pl.String,
-    "original_horizontal_datum_name": pl.String,
-    "well_constructed_depth": pl.String,
-    "country_name": pl.String,
-    "vertical_datum_name": pl.String,
-    "drainage_area": pl.Float64,
-    "hole_constructed_depth": pl.String,
-    "minor_civil_division_code": pl.String,
-    "hydrologic_unit_code": pl.String,
-    "horizontal_positional_accuracy_code": pl.String,
-    "contributing_drainage_area": pl.Float64,
-    "depth_source_code": pl.String,
-    "agency_name": pl.String,
-    "basin_code": pl.String,
-    "horizontal_positional_accuracy": pl.String,
-    "time_zone_abbreviation": pl.String,
-    "altitude": pl.Float64,
-    "monitoring_location_name": pl.String,
-    "district_code": pl.String,
-    "state_code": pl.String,
-    "site_type": pl.String,
-    "horizontal_position_method_code": pl.String,
-    "uses_daylight_savings": pl.String,
-    "agency_code": pl.String,
-    "country_code": pl.String,
-    "county_code": pl.String,
-    "altitude_accuracy": pl.Float64,
-    "construction_date": pl.String,
-    "aquifer_code": pl.String,
-    "monitoring_location_number": pl.String,
-    "state_name": pl.String,
-    "site_type_code": pl.String,
-    "altitude_method_code": pl.String,
-    "horizontal_position_method_name": pl.String,
-    "national_aquifer_code": pl.String,
-    "county_name": pl.String,
-    "altitude_method_name": pl.String,
-    "original_horizontal_datum": pl.String,
-    "aquifer_type_code": pl.String,
-    "longitude": pl.Float64,
-    "latitude": pl.Float64
-})
-"""Schema for USGS site data."""
+from .constants import (LRU_CACHE_SIZES, SUBDIRECTORIES, SiteTypeSlug,
+    NWIS_BASE_URL, MONITORING_LOCATION_BASE_URL, STATE_LIST, SITE_TYPES,
+    SITE_SCHEMA)
 
 def download_site_table(
         root: Path,
@@ -170,7 +47,7 @@ def download_site_table(
     logger = get_logger(name)
 
     # Output directory
-    odir = root / SITE_TABLE_DIRECTORY
+    odir = root / SUBDIRECTORIES["site_table"]
     odir.mkdir(exist_ok=True, parents=True)
 
     # Build site table
@@ -261,7 +138,7 @@ def expand_site_table(
     logger.info("Saving %s", ofile)
     data.write_parquet(ofile)
 
-@functools.lru_cache(LRU_CACHE_SIZE)
+@functools.lru_cache(LRU_CACHE_SIZES["usgs"])
 def scan_site_table(root: Path) -> pl.LazyFrame:
     """
     Return polars.LazyFrame of USGS sites.
@@ -272,7 +149,7 @@ def scan_site_table(root: Path) -> pl.LazyFrame:
         Root data directory.
     """
     return pl.scan_parquet(
-        root / SITE_TABLE_DIRECTORY,
+        root / SUBDIRECTORIES["site_table"],
         hive_schema={"site_type_slug": pl.Enum(SiteTypeSlug)}
         )
 
@@ -322,7 +199,7 @@ def load_site_information(
         df = df.rename(rename)
     return df
 
-@functools.lru_cache(LRU_CACHE_SIZE)
+@functools.lru_cache(LRU_CACHE_SIZES["usgs"])
 def lookup_site_state_code_cache(root: Path, usgs_site_code: str) -> str:
     """
     Given a USGS site code, return the US state as a lower case two-character
@@ -380,7 +257,8 @@ def build_usgs_filepath(
     year = f"year={date.year}"
     month = f"month={date.month}"
     day = f"D{date.day}.parquet"
-    return root / SUBDIRECTORY / state / year / month / day
+    subdirectory = SUBDIRECTORIES["usgs"]
+    return root / subdirectory / state / year / month / day
 
 def generate_usgs_url(
         date: pd.Timestamp,
@@ -530,8 +408,9 @@ def scan_usgs_no_cache(root: Path) -> pl.LazyFrame:
     -------
     polars.LazyFrame
     """
+    subdirectory = SUBDIRECTORIES["usgs"]
     return pl.scan_parquet(
-        root / f"{SUBDIRECTORY}/",
+        root / f"{subdirectory}/",
         hive_schema={
             "state_code": pl.Enum([s.abbr.lower() for s in STATE_LIST]),
             "year": pl.Int32,
@@ -539,7 +418,7 @@ def scan_usgs_no_cache(root: Path) -> pl.LazyFrame:
         }
     )
 
-@functools.lru_cache(LRU_CACHE_SIZE)
+@functools.lru_cache(LRU_CACHE_SIZES["usgs"])
 def scan_usgs_cache(root: Path) -> pl.LazyFrame:
     """
     Return polars.LazyFrame of USGS observations. Cache result.
@@ -615,7 +494,7 @@ def load_usgs_no_cache(
         ["usgs_site_code", "value_time"]
     )
 
-@functools.lru_cache(LRU_CACHE_SIZE)
+@functools.lru_cache(LRU_CACHE_SIZES["usgs"])
 def load_usgs_cache(
     root: Path,
     state_code: str,

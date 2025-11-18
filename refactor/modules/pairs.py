@@ -1,6 +1,5 @@
 """Methods to pair predictions with observations."""
 from pathlib import Path
-from dataclasses import dataclass
 import functools
 import inspect
 
@@ -8,120 +7,25 @@ import pandas as pd
 import polars as pl
 
 from .routelink import download_routelink
-from .nwm import scan_nwm, ModelConfiguration
+from .nwm import scan_nwm
 from .usgs import scan_usgs, STATE_LIST
 from .logger import get_logger
+from .constants import (ModelConfiguration, LRU_CACHE_SIZES, SUBDIRECTORIES,
+    GROUP_SPECIFICATIONS)
 
-LRU_CACHE_SIZE: int = 60
-"""Maximum size of functools.lru_cache."""
-
-SUBDIRECTORY: str = "pairs"
-"""Subdirectory that indicates root of pairs parquet store."""
-
-@dataclass
-class NWMGroupSpecification:
-    """
-    A dataclass that holds specifications for time-based polars groupby
-    operations.
-    """
-    index_column: str = "value_time"
-    group_by_columns: list[str] | None = None
-    select_columns: list[str] | None = None
-    sort_columns: list[str] | None = None
-    window_interval: int = 24
-    state_code: str | None = None
-    lead_time_hours_max: int = 0
-
-    def __post_init__(self) -> None:
-        if self.group_by_columns is None:
-            self.group_by_columns = ["nwm_feature_id", "reference_time"]
-
-        if self.select_columns is None:
-            self.select_columns = self.group_by_columns + [self.index_column, "predicted_cfs"]
-
-        if self.sort_columns is None:
-            self.sort_columns = self.group_by_columns + [self.index_column]
-
-GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
-    ModelConfiguration.ANALYSIS_ASSIM_EXTEND_ALASKA_NO_DA: NWMGroupSpecification(
-        group_by_columns=["nwm_feature_id"],
-        state_code="ak",
-        select_columns=["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
-    ),
-    ModelConfiguration.MEDIUM_RANGE_ALASKA_MEM_1: NWMGroupSpecification(
-        state_code="ak",
-        lead_time_hours_max=240
-    ),
-    ModelConfiguration.MEDIUM_RANGE_BLEND_ALASKA: NWMGroupSpecification(
-        state_code="ak",
-        lead_time_hours_max=240
-    ),
-    ModelConfiguration.MEDIUM_RANGE_ALASKA_NO_DA: NWMGroupSpecification(
-        state_code="ak",
-        lead_time_hours_max=240
-    ),
-    ModelConfiguration.SHORT_RANGE_ALASKA: NWMGroupSpecification(
-        window_interval=5,
-        state_code="ak",
-        lead_time_hours_max=45
-    ),
-    ModelConfiguration.ANALYSIS_ASSIM_HAWAII_NO_DA: NWMGroupSpecification(
-        group_by_columns=["nwm_feature_id"],
-        state_code="hi",
-        select_columns=["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
-    ),
-    ModelConfiguration.SHORT_RANGE_HAWAII: NWMGroupSpecification(
-        window_interval=6,
-        state_code="hi",
-        lead_time_hours_max=48
-    ),
-    ModelConfiguration.SHORT_RANGE_HAWAII_NO_DA: NWMGroupSpecification(
-        window_interval=6,
-        state_code="hi",
-        lead_time_hours_max=48
-    ),
-    ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA: NWMGroupSpecification(
-        group_by_columns=["nwm_feature_id"],
-        state_code="pr",
-        select_columns=["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
-    ),
-    ModelConfiguration.SHORT_RANGE_PUERTO_RICO: NWMGroupSpecification(
-        window_interval=6,
-        state_code="pr",
-        lead_time_hours_max=48
-    ),
-    ModelConfiguration.SHORT_RANGE_PUERTO_RICO_NO_DA: NWMGroupSpecification(
-        window_interval=6,
-        state_code="pr",
-        lead_time_hours_max=48
-    ),
-    ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA: NWMGroupSpecification(
-        group_by_columns=["nwm_feature_id"],
-        select_columns=["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
-    ),
-    ModelConfiguration.MEDIUM_RANGE_MEM_1: NWMGroupSpecification(lead_time_hours_max=240),
-    ModelConfiguration.MEDIUM_RANGE_BLEND: NWMGroupSpecification(lead_time_hours_max=240),
-    ModelConfiguration.MEDIUM_RANGE_NO_DA: NWMGroupSpecification(lead_time_hours_max=240),
-    ModelConfiguration.SHORT_RANGE: NWMGroupSpecification(
-        window_interval=6,
-        lead_time_hours_max=18
-    )
-}
-"""Mapping from ModelConfiguration to group-by specifications."""
-
-@functools.lru_cache(LRU_CACHE_SIZE)
+@functools.lru_cache(LRU_CACHE_SIZES["pairs"])
 def routelink_cache(root: Path) -> pl.DataFrame:
     """Scan and collect routelink."""
     return download_routelink(root).select(
         ["nwm_feature_id", "usgs_site_code"]
     ).collect()
 
-@functools.lru_cache(LRU_CACHE_SIZE)
+@functools.lru_cache(LRU_CACHE_SIZES["pairs"])
 def observations_cache(root: Path) -> pl.LazyFrame:
     """Scan observations."""
     return scan_usgs(root)
 
-@functools.lru_cache(LRU_CACHE_SIZE)
+@functools.lru_cache(LRU_CACHE_SIZES["pairs"])
 def load_and_map_observations_chunk(
         root: Path,
         state_code: str,
@@ -161,7 +65,7 @@ def load_and_map_observations_chunk(
         ["usgs_site_code", "value_time", "observed_cfs"]
     ).collect()
 
-@functools.lru_cache(LRU_CACHE_SIZE)
+@functools.lru_cache(LRU_CACHE_SIZES["pairs"])
 def load_and_map_observations(
         root: Path,
         start_time: str,
@@ -243,7 +147,8 @@ def build_pairs_filepath(
     year = f"year={reference_date.year}"
     month = f"month={reference_date.month}"
     partition = f"P{reference_date.day}.parquet"
-    return root / SUBDIRECTORY / config / year / month / partition
+    subdirectory = SUBDIRECTORIES["pairs"]
+    return root / subdirectory / config / year / month / partition
 
 def pair_nwm_usgs(
         root: Path,
@@ -355,8 +260,9 @@ def scan_pairs_no_cache(root: Path) -> pl.LazyFrame:
     logger = get_logger(name)
 
     logger.info("Scanning pairs")
+    subdirectory = SUBDIRECTORIES["pairs"]
     return pl.scan_parquet(
-        root / f"{SUBDIRECTORY}/",
+        root / f"{subdirectory}/",
         hive_schema={
             "configuration": pl.Enum(ModelConfiguration),
             "year": pl.Int32,
@@ -364,7 +270,7 @@ def scan_pairs_no_cache(root: Path) -> pl.LazyFrame:
         }
     )
 
-@functools.lru_cache(LRU_CACHE_SIZE)
+@functools.lru_cache(LRU_CACHE_SIZES["pairs"])
 def scan_pairs_cache(root: Path) -> pl.LazyFrame:
     """
     Return polars.LazyFrame of paired NWM predictions and USGS observations.

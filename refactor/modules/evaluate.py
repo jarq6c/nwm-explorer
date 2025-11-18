@@ -3,7 +3,6 @@ from pathlib import Path
 import inspect
 from typing import Generator, Any, Callable, Literal
 from concurrent.futures import ProcessPoolExecutor
-from enum import StrEnum
 import itertools
 import functools
 
@@ -18,34 +17,7 @@ from .nwm import ModelConfiguration
 from .pairs import scan_pairs, GROUP_SPECIFICATIONS
 from .logger import get_logger
 from .routelink import download_routelink
-
-class Metric(StrEnum):
-    """Symbols for common metrics."""
-    NASH_SUTCLIFFE_EFFICIENCY = "nash_sutcliffe_efficiency"
-    RELATIVE_MEAN_BIAS = "relative_mean_bias"
-    PEARSON_CORRELATION_COEFFICIENT = "pearson_correlation_coefficient"
-    RELATIVE_MEAN = "relative_mean"
-    RELATIVE_MEDIAN = "relative_median"
-    RELATIVE_MINIMUM = "relative_minimum"
-    RELATIVE_MAXIMUM = "relative_maximum"
-    RELATIVE_STANDARD_DEVIATION = "relative_standard_deviation"
-    KLING_GUPTA_EFFICIENCY = "kling_gupta_efficiency"
-
-METRIC_SIGNIFICANCE_THRESHOLD: dict[Metric, float] = {
-    Metric.RELATIVE_MEAN_BIAS: 0.0,
-    Metric.PEARSON_CORRELATION_COEFFICIENT: 0.0,
-    Metric.NASH_SUTCLIFFE_EFFICIENCY: 0.0,
-    Metric.RELATIVE_MEAN: 1.0,
-    Metric.RELATIVE_STANDARD_DEVIATION: 1.0,
-    Metric.RELATIVE_MEDIAN: 1.0,
-    Metric.RELATIVE_MINIMUM: 1.0,
-    Metric.RELATIVE_MAXIMUM: 1.0,
-    Metric.KLING_GUPTA_EFFICIENCY: 0.0
-}
-"""
-Mapping from Metrics to a value that if it falls outside the 95% confidence interval,
-indicates 'statistical significance.'
-"""
+from .constants import Metric, SUBDIRECTORIES, LRU_CACHE_SIZES, METRIC_SIGNIFICANCE_THRESHOLD
 
 MetricFunction = Callable[[
     npt.NDArray[np.float64],
@@ -53,12 +25,6 @@ MetricFunction = Callable[[
     npt.NDArray[np.float64]
     ], None]
 """Type hint for Numba functions that generate metrics."""
-
-LRU_CACHE_SIZE: int = 10
-"""Maximum size of functools.lru_cache."""
-
-SUBDIRECTORY: str = "evaluations"
-"""Subdirectory that indicates root of evaluation parquet store."""
 
 @guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
 def nash_sutcliffe_efficiency(
@@ -655,11 +621,12 @@ def evaluate(
 
     # Start process pool
     logger.info("Starting %d processes", processes)
+    subdirectory = SUBDIRECTORIES["evaluations"]
     with ProcessPoolExecutor(max_workers=processes) as parallel_computer:
         # Process each configuration
         for config, specs in GROUP_SPECIFICATIONS.items():
             # Prepare output file
-            ofile = root / f"{SUBDIRECTORY}/label={label}/configuration={config}/E0.parquet"
+            ofile = root / f"{subdirectory}/label={label}/configuration={config}/E0.parquet"
             if ofile.exists():
                 logger.info("Found %s", ofile)
                 continue
@@ -715,15 +682,16 @@ def scan_evaluations_no_cache(root: Path) -> pl.LazyFrame:
     -------
     polars.LazyFrame
     """
+    subdirectory = SUBDIRECTORIES["evaluations"]
     return pl.scan_parquet(
-        root / f"{SUBDIRECTORY}/",
+        root / f"{subdirectory}/",
         hive_schema={
             "label": pl.String,
             "configuration": pl.Enum(ModelConfiguration)
         }
     )
 
-@functools.lru_cache(LRU_CACHE_SIZE)
+@functools.lru_cache(LRU_CACHE_SIZES["evaluations"])
 def scan_evaluations_cache(root: Path) -> pl.LazyFrame:
     """
     Return polars.LazyFrame of Evaluation results. Cache LazyFrame.
@@ -830,7 +798,7 @@ def load_metrics_no_cache(
         ).filter(pl.col("significant"))
     return data
 
-@functools.lru_cache(LRU_CACHE_SIZE)
+@functools.lru_cache(LRU_CACHE_SIZES["evaluations"])
 def load_metrics_cache(
         root: Path,
         label: str,

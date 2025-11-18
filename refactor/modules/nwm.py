@@ -13,7 +13,6 @@ from pathlib import Path
 import inspect
 from concurrent.futures import ProcessPoolExecutor
 import os
-from enum import StrEnum
 import functools
 import warnings
 
@@ -24,35 +23,9 @@ import xarray as xr
 
 from .logger import get_logger
 from .downloads import download_files, FileValidationError
-from .routelink import download_routelink, ModelDomain
-
-LRU_CACHE_SIZE: int = 9
-"""Maximum size of functools.lru_cache."""
-
-class ModelConfiguration(StrEnum):
-    """Model configurations."""
-    ANALYSIS_ASSIM_EXTEND_ALASKA_NO_DA = "analysis_assim_extend_alaska_no_da"
-    ANALYSIS_ASSIM_EXTEND_NO_DA = "analysis_assim_extend_no_da"
-    ANALYSIS_ASSIM_HAWAII_NO_DA = "analysis_assim_hawaii_no_da"
-    ANALYSIS_ASSIM_PUERTO_RICO_NO_DA = "analysis_assim_puertorico_no_da"
-    MEDIUM_RANGE_MEM_1 = "medium_range_mem1"
-    MEDIUM_RANGE_BLEND = "medium_range_blend"
-    MEDIUM_RANGE_NO_DA = "medium_range_no_da"
-    MEDIUM_RANGE_ALASKA_MEM_1 = "medium_range_alaska_mem1"
-    MEDIUM_RANGE_BLEND_ALASKA = "medium_range_blend_alaska"
-    MEDIUM_RANGE_ALASKA_NO_DA = "medium_range_alaska_no_da"
-    SHORT_RANGE = "short_range"
-    SHORT_RANGE_ALASKA = "short_range_alaska"
-    SHORT_RANGE_HAWAII = "short_range_hawaii"
-    SHORT_RANGE_HAWAII_NO_DA = "short_range_hawaii_no_da"
-    SHORT_RANGE_PUERTO_RICO = "short_range_puertorico"
-    SHORT_RANGE_PUERTO_RICO_NO_DA = "short_range_puertorico_no_da"
-
-GOOGLE_CLOUD_BUCKET_URL: str = "https://storage.googleapis.com/national-water-model/"
-"""National Water Model Google Cloud Storage bucket."""
-
-SUBDIRECTORY: str = "nwm"
-"""Subdirectory that indicates root of NWM output parquet store."""
+from .routelink import download_routelink
+from .constants import (LRU_CACHE_SIZES, SUBDIRECTORIES, GOOGLE_CLOUD_BUCKET_URL,
+    ModelConfiguration, ModelDomain)
 
 def netcdf_validator(filepath: Path) -> None:
     """
@@ -598,7 +571,8 @@ def build_nwm_filepath(
     year = f"year={reference_date.year}"
     month = f"month={reference_date.month}"
     day = f"D{reference_date.day}.parquet"
-    return root / SUBDIRECTORY / config / year / month / day
+    subdirectory = SUBDIRECTORIES["nwm"]
+    return root / subdirectory / config / year / month / day
 
 def download_nwm(
         start: pd.Timestamp,
@@ -715,8 +689,9 @@ def scan_nwm_no_cache(root: Path) -> pl.LazyFrame:
 
     # Generate reference dates
     logger.info("Scanning predictions")
+    subdirectory = SUBDIRECTORIES["nwm"]
     return pl.scan_parquet(
-        root / f"{SUBDIRECTORY}/",
+        root / f"{subdirectory}/",
         hive_schema={
             "configuration": pl.Enum(ModelConfiguration),
             "year": pl.Int32,
@@ -724,7 +699,7 @@ def scan_nwm_no_cache(root: Path) -> pl.LazyFrame:
         }
     )
 
-@functools.lru_cache(LRU_CACHE_SIZE)
+@functools.lru_cache(LRU_CACHE_SIZES["nwm"])
 def scan_nwm_cache(root: Path) -> pl.LazyFrame:
     """
     Return polars.LazyFrame of NWM output. Cache LazyFrame.
@@ -799,7 +774,7 @@ def load_nwm_no_cache(
         ["nwm_feature_id", "reference_time", "value_time"]
     )
 
-@functools.lru_cache(LRU_CACHE_SIZE)
+@functools.lru_cache(LRU_CACHE_SIZES["nwm"])
 def load_nwm_cache(
     root: Path,
     configuration: ModelConfiguration,
