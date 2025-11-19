@@ -142,7 +142,8 @@ class FilterWidgets(Viewer):
         self._layout = pn.Card(
             pn.Column(*list(self._widgets.values())),
             title="Filters",
-            collapsible=False
+            collapsible=False,
+            width=350
             )
 
     def __panel__(self):
@@ -667,7 +668,7 @@ class ECDFPlot(Viewer):
         )]
         self.layout = go.Layout(
             height=250,
-            width=440,
+            width=300,
             margin=dict(l=0, r=25, t=10, b=0),
             modebar=dict(
                 remove=["lasso", "select"],
@@ -683,7 +684,7 @@ class ECDFPlot(Viewer):
             xdata_lower: npt.ArrayLike,
             xdata_upper: npt.ArrayLike,
             xlabel: str,
-            ylabel: str = "Cumulative Frequency",
+            ylabel: str = "Empirical CDF",
             xrange: tuple[float, float] | None = None
         ) -> None:
         """Update data. Assumes xdata are sorted."""
@@ -753,6 +754,31 @@ class ECDFPlot(Viewer):
             hide_header=True
         )
 
+class ECDFMatrix(Viewer):
+    """Show a set of linked empirical CDF plots."""
+    def __init__(self, nplots: int, ncols: int, **params):
+        super().__init__(**params)
+
+        # Setup
+        self.ncols = ncols
+        self.plots = [ECDFPlot() for _ in range(nplots)]
+
+    def update(self, index: int, **kwargs) -> None:
+        """Update a plot."""
+        self.plots[index].update(**kwargs)
+
+    def erase(self, index: int) -> None:
+        """Erase a single plot."""
+        self.plots[index].erase()
+
+    def erase_all(self) -> None:
+        """Erase all plots."""
+        for p in self.plots:
+            p.erase()
+
+    def __panel__(self) -> pn.GridBox:
+        return pn.GridBox(*self.plots, ncols=self.ncols)
+
 class MarkdownView(Viewer):
     """Display Markdown content."""
     def __init__(self, **params) -> None:
@@ -774,5 +800,6 @@ class MarkdownView(Viewer):
         return pn.Card(
             self._pane,
             collapsible=False,
-            hide_header=True
+            hide_header=True,
+            width=350
         )

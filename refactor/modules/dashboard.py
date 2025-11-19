@@ -12,7 +12,7 @@ from .nwm import nwm_site_generator
 from .evaluate import load_metrics, scan_evaluations, load_site_metrics
 from .routelink import download_routelink
 from .usgs import usgs_site_generator, load_site_information
-from .views import (FilterWidgets, MapView, TimeSeriesView, BarPlot, ECDFPlot,
+from .views import (FilterWidgets, MapView, TimeSeriesView, BarPlot, ECDFMatrix,
     MarkdownView)
 from .constants import METRIC_PLOTTING_LIMITS, CONFIGURATION_LINE_TYPE
 
@@ -40,7 +40,7 @@ class Dashboard(Viewer):
         site_map = MapView()
         hydrograph = TimeSeriesView()
         barplot = BarPlot()
-        ecdf = ECDFPlot()
+        ecdf = ECDFMatrix(nplots=4, ncols=2)
         site_information = MarkdownView()
         site_column_mapping = {
             "monitoring_location_name": "Name",
@@ -257,6 +257,7 @@ class Dashboard(Viewer):
             else:
                 sorted_data = data.sort(filter_widgets.point_column, descending=False)
             ecdf.update(
+                index=0,
                 xdata=sorted_data[filter_widgets.point_column].to_numpy(),
                 xdata_lower=sorted_data[filter_widgets.lower_column].to_numpy(),
                 xdata_upper=sorted_data[filter_widgets.upper_column].to_numpy(),
@@ -317,6 +318,7 @@ class Dashboard(Viewer):
 
             # Update ECDF
             ecdf.update(
+                index=0,
                 xdata=data[filter_widgets.point_column].to_numpy(),
                 xdata_lower=data[filter_widgets.lower_column].to_numpy(),
                 xdata_upper=data[filter_widgets.upper_column].to_numpy(),
@@ -332,10 +334,14 @@ class Dashboard(Viewer):
         )
 
         # Layout
+        controls = pn.Column(filter_widgets, site_information)
+        content = pn.Column(
+            pn.Row(site_map, ecdf),
+            pn.Row(hydrograph, barplot)
+        )
         self.template.main.append(pn.Row(
-            pn.Column(filter_widgets, site_information),
-            pn.Column(site_map, hydrograph),
-            pn.Column(ecdf, barplot)
+            controls,
+            content
         ))
 
     def __panel__(self) -> MaterialTemplate:
