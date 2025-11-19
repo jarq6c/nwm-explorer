@@ -779,6 +779,28 @@ class ECDFMatrix(Viewer):
     def __panel__(self) -> pn.GridBox:
         return pn.GridBox(*self.plots, ncols=self.ncols)
 
+class ECDFSelector(Viewer):
+    """WidetBox with metric selectors corresponding to ECDF plots."""
+    def __init__(self, nplots: int, **params):
+        super().__init__(**params)
+
+        # Setup
+        metric_names = list(METRIC_LOOKUP.keys())
+        self._widgets = [
+            pn.widgets.Select(
+                    name=f"Metric {idx+1}",
+                    options=metric_names,
+                    value=metric_names[idx]
+                )
+        for idx in range(nplots)]
+
+    def __panel__(self):
+        return pn.WidgetBox("# Empirical CDF", *self._widgets)
+
+    def get_metric(self, index: int) -> Metric:
+        """Returns selected metric at given index."""
+        return METRIC_LOOKUP[self._widgets[index].value]
+
 class MarkdownView(Viewer):
     """Display Markdown content."""
     def __init__(self, **params) -> None:

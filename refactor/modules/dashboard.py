@@ -13,7 +13,7 @@ from .evaluate import load_metrics, scan_evaluations, load_site_metrics
 from .routelink import download_routelink
 from .usgs import usgs_site_generator, load_site_information
 from .views import (FilterWidgets, MapView, TimeSeriesView, BarPlot, ECDFMatrix,
-    MarkdownView)
+    MarkdownView, ECDFSelector)
 from .constants import METRIC_PLOTTING_LIMITS, CONFIGURATION_LINE_TYPE
 
 class Dashboard(Viewer):
@@ -41,6 +41,7 @@ class Dashboard(Viewer):
         hydrograph = TimeSeriesView()
         barplot = BarPlot()
         ecdf = ECDFMatrix(nplots=4, ncols=2)
+        ecdf_filters = ECDFSelector(nplots=4)
         site_information = MarkdownView()
         site_column_mapping = {
             "monitoring_location_name": "Name",
@@ -333,7 +334,7 @@ class Dashboard(Viewer):
             collapsed_sidebar=True
         )
 
-        # Layout
+        # Main area
         controls = pn.Column(filter_widgets, site_information)
         content = pn.Column(
             pn.Row(site_map, ecdf),
@@ -343,6 +344,9 @@ class Dashboard(Viewer):
             controls,
             content
         ))
+
+        # Sidebar
+        self.template.sidebar.append(ecdf_filters)
 
     def __panel__(self) -> MaterialTemplate:
         return self.template
