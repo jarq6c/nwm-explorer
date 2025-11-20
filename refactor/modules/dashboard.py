@@ -2,6 +2,7 @@
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import polars as pl
 import panel as pn
 import pandas as pd
@@ -146,7 +147,7 @@ class Dashboard(Viewer):
                 # Replace data
                 hydrograph.update_trace(
                     xdata=observations["value_time"].to_numpy(),
-                    ydata=observations["observed_cfs"].to_numpy(),
+                    ydata=observations["observed_cfs"].to_numpy().astype(np.float16),
                     name=f"USGS-{usgs_site_code}"
                 )
 
@@ -168,7 +169,7 @@ class Dashboard(Viewer):
                     # Add trace data
                     trace_data.append((
                         predictions["value_time"].to_numpy(),
-                        predictions["predicted_cfs"].to_numpy(),
+                        predictions["predicted_cfs"].to_numpy().astype(np.float16),
                         str(rt)
                     ))
 
