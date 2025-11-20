@@ -93,6 +93,10 @@ class Dashboard(Viewer):
                 info += f'<a href="{url}" target="_blank">Open new tab</a> |'
                 site_information.update(info)
 
+            # These filters do not update hydrograph or barplot
+            if callback_type in ["lead_time", "significant"]:
+                return
+
             # Retrieve metrics
             metric_data = load_site_metrics(
                 root=root,
@@ -103,10 +107,6 @@ class Dashboard(Viewer):
                 rank=filter_widgets.rank,
                 cache=True
             )
-
-            # These filters do not update hydrograph or barplot
-            if callback_type in ["lead_time", "significant"]:
-                return
 
             # Clear barplot
             barplot.erase()

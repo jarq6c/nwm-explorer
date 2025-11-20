@@ -4,7 +4,7 @@ from typing import Callable
 import panel as pn
 from panel.viewable import Viewer
 
-from .constants import AxisType
+from .constants import AxisType, UNIT_CONVERSION_FUNCTIONS
 
 class StreamflowOptions(Viewer):
     """WidetBox for selecting streamflow plot parameters."""
@@ -20,8 +20,8 @@ class StreamflowOptions(Viewer):
             ),
             "measurement_units": pn.widgets.Select(
                 name="Measurement units",
-                options=["CFS", "CMS", "CFS/sq.mi.", "inch/h"],
-                value="CFS"
+                options=list(UNIT_CONVERSION_FUNCTIONS.keys()),
+                value=list(UNIT_CONVERSION_FUNCTIONS.keys())[0]
             )
         }
 
@@ -37,3 +37,8 @@ class StreamflowOptions(Viewer):
     def axis_scale(self) -> AxisType:
         """Currently select axis type."""
         return AxisType(self._widgets["axis_scale"].value.lower())
+
+    @property
+    def units(self) -> str:
+        """Currently select measurment units."""
+        return self._widgets["measurement_units"].value

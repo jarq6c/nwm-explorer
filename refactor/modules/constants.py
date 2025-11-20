@@ -2,7 +2,7 @@
 from pathlib import Path
 from enum import StrEnum
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import TypedDict, Callable
 
 import polars as pl
 import us
@@ -463,3 +463,11 @@ class AxisType(StrEnum):
     DATE = "date"
     CATEGORY = "category"
     MULTICATEGORY = "multicategory"
+
+UNIT_CONVERSION_FUNCTIONS: dict[str, Callable] = {
+    "CFS": lambda: None,
+    "CMS": lambda x: x * 0.3048 ** 3.0,
+    "CFS/sq.mi.": lambda x, area: x / area,
+    "inch/h": lambda: None
+}
+"""Measurement unit conversion functions. Assumes base units of CFS"""
