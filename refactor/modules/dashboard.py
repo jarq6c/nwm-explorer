@@ -16,6 +16,7 @@ from .usgs import usgs_site_generator, load_site_information
 from .views import (FilterWidgets, MapView, TimeSeriesView, BarPlot, ECDFMatrix,
     MarkdownView, ECDFSelector)
 from .constants import METRIC_PLOTTING_LIMITS, CONFIGURATION_LINE_TYPE
+from .options import StreamflowOptions
 
 class Dashboard(Viewer):
     """Build a dashboard for exploring National Water Model output."""
@@ -52,6 +53,7 @@ class Dashboard(Viewer):
             "drainage_area": "Drainage area (sq.mi.)",
             "contributing_drainage_area": "Contrib. drain. area (sq.mi.)"
         }
+        streamflow_options = StreamflowOptions()
 
         def handle_map_click(event, callback_type: str) -> None:
             if event is None:
@@ -334,6 +336,7 @@ class Dashboard(Viewer):
 
         # Sidebar
         self.template.sidebar.append(ecdf_filters)
+        self.template.sidebar.append(streamflow_options)
 
     def __panel__(self) -> MaterialTemplate:
         return self.template
