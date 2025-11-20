@@ -821,6 +821,11 @@ class ECDFSelector(Viewer):
                 lower_column=metric + "_" + self._filter_widgets.rank + "_lower"
             )
 
+    def bind(self, function: Callable) -> None:
+        """Bind function to widgets."""
+        for w in self._widgets:
+            pn.bind(function, w.param.value, watch=True, callback_type="ecdf")
+
 class MarkdownView(Viewer):
     """Display Markdown content."""
     def __init__(self, **params) -> None:

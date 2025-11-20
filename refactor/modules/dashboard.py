@@ -184,10 +184,6 @@ class Dashboard(Viewer):
             if event is None or callback_type is None:
                 return
 
-            # Ignore non-zooms
-            if not site_map.viewport:
-                return
-
             # Update each plot
             for p in ecdf_filters:
                 # Retrieve data
@@ -237,6 +233,7 @@ class Dashboard(Viewer):
                     xrange=METRIC_PLOTTING_LIMITS[p.metric]
                 )
         site_map.bind_relayout(handle_relayout)
+        ecdf_filters.bind(handle_relayout)
 
         def handle_filter_updates(event: str, callback_type: str) -> None:
             # Ignore non-calls
@@ -308,28 +305,14 @@ class Dashboard(Viewer):
 
             # Update ECDF
             handle_relayout(0, callback_type)
-            # if site_map.viewport:
-            #     sorted_data = data.filter(
-            #         pl.col("latitude") <= site_map.viewport["lat_max"],
-            #         pl.col("latitude") >= site_map.viewport["lat_min"],
-            #         pl.col("longitude") <= site_map.viewport["lon_max"],
-            #         pl.col("longitude") >= site_map.viewport["lon_min"]
-            #     ).sort(filter_widgets.point_column, descending=False)
-            # else:
-            #     sorted_data = data.sort(filter_widgets.point_column, descending=False)
-            # ecdf.update(
-            #     index=0,
-            #     xdata=sorted_data[filter_widgets.point_column].to_numpy(),
-            #     xdata_lower=sorted_data[filter_widgets.lower_column].to_numpy(),
-            #     xdata_upper=sorted_data[filter_widgets.upper_column].to_numpy(),
-            #     xlabel=filter_widgets.metric_label,
-            #     xrange=METRIC_PLOTTING_LIMITS[filter_widgets.metric]
-            # )
 
             # Update barplot and hydrograph
             handle_map_click(0, callback_type)
-        handle_filter_updates(filter_widgets.label, "intialize")
         filter_widgets.bind(handle_filter_updates)
+
+        # Initialize states
+        handle_filter_updates(filter_widgets.label, "intialize")
+        handle_relayout(0, "intialize")
 
         # Setup template
         self.template = MaterialTemplate(
