@@ -17,7 +17,7 @@ class Configuration(BaseModel):
     key: str
         USGS API key.
     """
-    key: str
+    usgs_api_key: str
 
 def load_configuration(configuration_file: Path) -> Configuration:
     """

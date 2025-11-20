@@ -64,7 +64,7 @@ def download_site_table(
 
             # Build URL
             url = (MONITORING_LOCATION_BASE_URL + site_type.code +
-                f"&state_code={state.fips}" + f"&api_key={config.key}")
+                f"&state_code={state.fips}" + f"&api_key={config.usgs_api_key}")
             logger.info("Downloading %s", url)
 
             # Fetch
