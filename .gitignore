@@ -140,3 +140,4 @@ dmypy.json
 *.tar.gz
 data/*
 *.tsv
+config.json
