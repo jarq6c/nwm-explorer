@@ -41,7 +41,7 @@ class Dashboard(Viewer):
         hydrograph = TimeSeriesView()
         barplot = BarPlot()
         ecdf = ECDFMatrix(nplots=4, ncols=2)
-        ecdf_filters = ECDFSelector(nplots=4)
+        ecdf_filters = ECDFSelector(nplots=4, filter_widgets=filter_widgets)
         site_information = MarkdownView()
         site_column_mapping = {
             "monitoring_location_name": "Name",
@@ -179,6 +179,65 @@ class Dashboard(Viewer):
                 hydrograph.append_traces(trace_data, mode=mode)
         site_map.bind_click(handle_map_click)
 
+        def handle_relayout(event: dict[str, Any], callback_type: str) -> None:
+            # Ignore non-calls
+            if event is None or callback_type is None:
+                return
+
+            # Ignore non-zooms
+            if not site_map.viewport:
+                return
+
+            # Update each plot
+            for p in ecdf_filters:
+                # Retrieve data
+                data = load_metrics(
+                    root=root,
+                    label=filter_widgets.label,
+                    configuration=filter_widgets.configuration,
+                    metric=p.metric,
+                    lead_time_hours_min=filter_widgets.lead_time,
+                    rank=filter_widgets.rank,
+                    additional_columns=(
+                        "nwm_feature_id",
+                        "usgs_site_code",
+                        "sample_size"
+                        ),
+                    significant=filter_widgets.significant,
+                    cache=True
+                ).with_columns(
+                    latitude=pl.col("nwm_feature_id").replace_strict(
+                        old=routelink["nwm_feature_id"].implode(),
+                        new=routelink["latitude"].implode()
+                    ),
+                    longitude=pl.col("nwm_feature_id").replace_strict(
+                        old=routelink["nwm_feature_id"].implode(),
+                        new=routelink["longitude"].implode()
+                    )
+                )
+
+                # Sort data
+                if site_map.viewport:
+                    sorted_data = data.filter(
+                        pl.col("latitude") <= site_map.viewport["lat_max"],
+                        pl.col("latitude") >= site_map.viewport["lat_min"],
+                        pl.col("longitude") <= site_map.viewport["lon_max"],
+                        pl.col("longitude") >= site_map.viewport["lon_min"]
+                    ).sort(p.point_column, descending=False)
+                else:
+                    sorted_data = data.sort(p.point_column, descending=False)
+
+                # Update ECDF
+                ecdf.update(
+                    index=p.index,
+                    xdata=sorted_data[p.point_column].to_numpy(),
+                    xdata_lower=sorted_data[p.lower_column].to_numpy(),
+                    xdata_upper=sorted_data[p.upper_column].to_numpy(),
+                    xlabel=p.metric_label,
+                    xrange=METRIC_PLOTTING_LIMITS[p.metric]
+                )
+        site_map.bind_relayout(handle_relayout)
+
         def handle_filter_updates(event: str, callback_type: str) -> None:
             # Ignore non-calls
             if event is None:
@@ -247,86 +306,30 @@ class Dashboard(Viewer):
                     )
                 )
 
-            # Update CDF
-            if site_map.viewport:
-                sorted_data = data.filter(
-                    pl.col("latitude") <= site_map.viewport["lat_max"],
-                    pl.col("latitude") >= site_map.viewport["lat_min"],
-                    pl.col("longitude") <= site_map.viewport["lon_max"],
-                    pl.col("longitude") >= site_map.viewport["lon_min"]
-                ).sort(filter_widgets.point_column, descending=False)
-            else:
-                sorted_data = data.sort(filter_widgets.point_column, descending=False)
-            ecdf.update(
-                index=0,
-                xdata=sorted_data[filter_widgets.point_column].to_numpy(),
-                xdata_lower=sorted_data[filter_widgets.lower_column].to_numpy(),
-                xdata_upper=sorted_data[filter_widgets.upper_column].to_numpy(),
-                xlabel=filter_widgets.metric_label,
-                xrange=METRIC_PLOTTING_LIMITS[filter_widgets.metric]
-            )
+            # Update ECDF
+            handle_relayout(0, callback_type)
+            # if site_map.viewport:
+            #     sorted_data = data.filter(
+            #         pl.col("latitude") <= site_map.viewport["lat_max"],
+            #         pl.col("latitude") >= site_map.viewport["lat_min"],
+            #         pl.col("longitude") <= site_map.viewport["lon_max"],
+            #         pl.col("longitude") >= site_map.viewport["lon_min"]
+            #     ).sort(filter_widgets.point_column, descending=False)
+            # else:
+            #     sorted_data = data.sort(filter_widgets.point_column, descending=False)
+            # ecdf.update(
+            #     index=0,
+            #     xdata=sorted_data[filter_widgets.point_column].to_numpy(),
+            #     xdata_lower=sorted_data[filter_widgets.lower_column].to_numpy(),
+            #     xdata_upper=sorted_data[filter_widgets.upper_column].to_numpy(),
+            #     xlabel=filter_widgets.metric_label,
+            #     xrange=METRIC_PLOTTING_LIMITS[filter_widgets.metric]
+            # )
 
             # Update barplot and hydrograph
             handle_map_click(0, callback_type)
         handle_filter_updates(filter_widgets.label, "intialize")
         filter_widgets.bind(handle_filter_updates)
-
-        def handle_relayout(event: dict[str, Any], callback_type: str) -> None:
-            # Ignore non-calls
-            if event is None or callback_type is None:
-                return
-
-            # Ignore non-zooms
-            if not site_map.viewport:
-                return
-
-            # Retrieve data
-            data = load_metrics(
-                root=root,
-                label=filter_widgets.label,
-                configuration=filter_widgets.configuration,
-                metric=filter_widgets.metric,
-                lead_time_hours_min=filter_widgets.lead_time,
-                rank=filter_widgets.rank,
-                additional_columns=(
-                    "nwm_feature_id",
-                    "usgs_site_code",
-                    "sample_size",
-                    "observed_value_time_min",
-                    "observed_value_time_max",
-                    "reference_time_min",
-                    "reference_time_max"
-                    ),
-                significant=filter_widgets.significant,
-                cache=True
-            ).with_columns(
-                latitude=pl.col("nwm_feature_id").replace_strict(
-                    old=routelink["nwm_feature_id"].implode(),
-                    new=routelink["latitude"].implode()
-                ),
-                longitude=pl.col("nwm_feature_id").replace_strict(
-                    old=routelink["nwm_feature_id"].implode(),
-                    new=routelink["longitude"].implode()
-                )
-            ).filter(
-                pl.col("latitude") <= site_map.viewport["lat_max"],
-                pl.col("latitude") >= site_map.viewport["lat_min"],
-                pl.col("longitude") <= site_map.viewport["lon_max"],
-                pl.col("longitude") >= site_map.viewport["lon_min"]
-            ).sort(
-                filter_widgets.point_column, descending=False
-            )
-
-            # Update ECDF
-            ecdf.update(
-                index=0,
-                xdata=data[filter_widgets.point_column].to_numpy(),
-                xdata_lower=data[filter_widgets.lower_column].to_numpy(),
-                xdata_upper=data[filter_widgets.upper_column].to_numpy(),
-                xlabel=filter_widgets.metric_label,
-                xrange=METRIC_PLOTTING_LIMITS[filter_widgets.metric]
-            )
-        site_map.bind_relayout(handle_relayout)
 
         # Setup template
         self.template = MaterialTemplate(

@@ -1,6 +1,7 @@
 """Methods to generate views of data."""
-from typing import Callable, Any
+from typing import Callable, Any, Generator
 from itertools import cycle
+from dataclasses import dataclass
 
 import polars as pl
 import panel as pn
@@ -667,7 +668,7 @@ class ECDFPlot(Viewer):
             mode="markers"
         )]
         self.layout = go.Layout(
-            height=250,
+            height=255,
             width=300,
             margin=dict(l=0, r=25, t=10, b=0),
             modebar=dict(
@@ -779,12 +780,23 @@ class ECDFMatrix(Viewer):
     def __panel__(self) -> pn.GridBox:
         return pn.GridBox(*self.plots, ncols=self.ncols)
 
+@dataclass
+class ECDFParameters:
+    """Dataclass used to hold empirical CDF plotting parameters."""
+    index: int
+    metric: Metric
+    metric_label: str
+    point_column: str
+    upper_column: str
+    lower_column: str
+
 class ECDFSelector(Viewer):
     """WidetBox with metric selectors corresponding to ECDF plots."""
-    def __init__(self, nplots: int, **params):
+    def __init__(self, nplots: int, filter_widgets: FilterWidgets, **params):
         super().__init__(**params)
 
         # Setup
+        self._filter_widgets = filter_widgets
         metric_names = list(METRIC_LOOKUP.keys())
         self._widgets = [
             pn.widgets.Select(
@@ -797,9 +809,17 @@ class ECDFSelector(Viewer):
     def __panel__(self):
         return pn.WidgetBox("# Empirical CDF", *self._widgets)
 
-    def get_metric(self, index: int) -> Metric:
-        """Returns selected metric at given index."""
-        return METRIC_LOOKUP[self._widgets[index].value]
+    def __iter__(self) -> Generator[ECDFParameters]:
+        for idx, w in enumerate(self._widgets):
+            metric = METRIC_LOOKUP[w.value]
+            yield ECDFParameters(
+                index=idx,
+                metric=metric,
+                metric_label=w.value,
+                point_column=metric + "_" + self._filter_widgets.rank + "_point",
+                upper_column=metric + "_" + self._filter_widgets.rank + "_upper",
+                lower_column=metric + "_" + self._filter_widgets.rank + "_lower"
+            )
 
 class MarkdownView(Viewer):
     """Display Markdown content."""
