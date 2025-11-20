@@ -17,7 +17,7 @@ from .nwm import ModelConfiguration
 from .evaluate import Metric
 from .constants import (ModelDomain, GROUP_SPECIFICATIONS, DOMAIN_LOOKUP,
     CONFIGURATION_LOOKUP, NWMGroupSpecification, METRIC_LOOKUP, RANK_LOOKUP,
-    PlotlyFigure, DEFAULT_CENTER, DEFAULT_ZOOM)
+    PlotlyFigure, DEFAULT_CENTER, DEFAULT_ZOOM, AxisType)
 
 pn.extension('tabulator')
 
@@ -478,6 +478,14 @@ class TimeSeriesView(Viewer):
             collapsible=False,
             hide_header=True
             )
+
+    def set_axis_type(self, axis_type: AxisType) -> None:
+        """Change y-axis type."""
+        # Update
+        self._figure["layout"]["yaxis"].update(type=axis_type)
+
+        # Refresh
+        self._pane.object = self._figure
 
     def toggle_highlight(self, curve_number: int) -> None:
         """Highlight or unhighlight selected trace."""

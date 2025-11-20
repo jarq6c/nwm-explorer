@@ -454,3 +454,12 @@ CONFIGURATION_LINE_TYPE: dict[ModelConfiguration, str] = {
     ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA: "markers"
 }
 """Mapping from Model configuration to line type for plotting."""
+
+class AxisType(StrEnum):
+    """Plotly axis type."""
+    NONE = "-"
+    LINEAR = "linear"
+    LOG = "log"
+    DATE = "date"
+    CATEGORY = "category"
+    MULTICATEGORY = "multicategory"

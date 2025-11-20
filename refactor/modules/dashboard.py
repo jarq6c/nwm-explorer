@@ -313,6 +313,16 @@ class Dashboard(Viewer):
             handle_map_click(0, callback_type)
         filter_widgets.bind(handle_filter_updates)
 
+        # Handle streamflow options
+        def handle_streamflow_options(event: str, callback_type: str) -> None:
+            if event is None:
+                return
+
+            # Change scale
+            if callback_type == "axis_scale":
+                hydrograph.set_axis_type(streamflow_options.axis_scale)
+        streamflow_options.bind(handle_streamflow_options)
+
         # Initialize states
         handle_filter_updates(filter_widgets.label, "intialize")
         handle_relayout(0, "intialize")
