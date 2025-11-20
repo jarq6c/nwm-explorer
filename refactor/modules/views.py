@@ -618,8 +618,9 @@ class BarPlot(Viewer):
             y=ydata,
             customdata=custom_data,
             hovertemplate=(
-                f"{xlabel}: " + "%{x}<br>" +
-                f"{ylabel}: " + "%{customdata[0]:.2f} -- %{customdata[1]:.2f} (%{y:.2f})"
+                f"{ylabel}: " + "%{y:.2f}<br>" +
+                "95% CI: %{customdata[0]:.2f} -- %{customdata[1]:.2f}<br>" +
+                f"{xlabel}: " + "%{x}"
             ),
             error_y=dict(
                 type="data",
@@ -705,9 +706,9 @@ class ECDFPlot(Viewer):
             y=ydata,
             customdata=custom_data,
             hovertemplate=(
-                f"{ylabel}: " + "%{y:.2f}<br>" +
                 f"{xlabel}: " + "%{x:.2f}<br>" +
-                "95% CI: %{customdata[0]:.2f} to %{customdata[1]:.2f}"
+                "95% CI: %{customdata[0]:.2f} to %{customdata[1]:.2f}<br>" +
+                f"{ylabel}: " + "%{y:.2f}"
             )
         ))
 
