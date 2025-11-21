@@ -12,8 +12,8 @@ UNIT_CONVERSIONS: dict[str, float] = {
     MeasurementUnits.CUBIC_FEET_PER_SECOND: 1.0,
     MeasurementUnits.CUBIC_METERS_PER_SECOND: 0.3048 ** 3.0,
     MeasurementUnits.CUBIC_FEET_PER_SECOND_PER_SQUARE_MILE: 1.0,
-    MeasurementUnits.INCHES_PER_HOUR: 1.0,
-    MeasurementUnits.CUMULATIVE_INCHES_PER_HOUR: 1.0
+    MeasurementUnits.INCHES_PER_HOUR: 3.0 / 1936.0,
+    MeasurementUnits.CUMULATIVE_INCHES_PER_HOUR: 3.0 / 1936.0
 }
 """Measurement unit conversion functions. Assumes base units of CFS"""
 
@@ -23,7 +23,8 @@ def compute_conversion_factor(
         measurement_units: str
 ) -> float:
     """
-    Compute conversion factor for given site code and measurement units.
+    Compute conversion factor for given site code and measurement units. Assumes
+    source units are in cubic feet per second.
     """
     # Extract area
     if measurement_units in [

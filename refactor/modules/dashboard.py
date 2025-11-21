@@ -155,10 +155,25 @@ class Dashboard(Viewer):
                 dataframes.append(df)
                 observations = pl.concat(dataframes)
 
+                # Resample
+                if streamflow_options.measurement_units in [
+                    MeasurementUnits.INCHES_PER_HOUR,
+                    MeasurementUnits.CUMULATIVE_INCHES_PER_HOUR
+                ]:
+                    observations = observations.group_by_dynamic(
+                        "value_time", every="1h"
+                    ).agg(pl.col("observed_cfs").mean())
+
                 # Apply conversion
                 if conversion_factor != 1.0:
                     observations = observations.with_columns(
                         pl.col("observed_cfs").mul(conversion_factor)
+                    )
+
+                # Accumulate
+                if streamflow_options.measurement_units == MeasurementUnits.CUMULATIVE_INCHES_PER_HOUR:
+                    observations = observations.with_columns(
+                        pl.col("observed_cfs").cum_sum()
                     )
 
                 # Downcast if possible
@@ -202,6 +217,13 @@ class Dashboard(Viewer):
                     if conversion_factor != 1.0:
                         predictions = predictions.with_columns(
                             pl.col("predicted_cfs").mul(conversion_factor)
+                        )
+
+                    # Accumulate
+                    # TODO These accumulations need to be intialized/pinned to observations
+                    if streamflow_options.measurement_units == MeasurementUnits.CUMULATIVE_INCHES_PER_HOUR:
+                        predictions = predictions.with_columns(
+                            pl.col("predicted_cfs").cum_sum()
                         )
 
                     # Downcast if possible
