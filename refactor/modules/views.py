@@ -1,6 +1,6 @@
 """Methods to generate views of data."""
 from typing import Callable, Any, Generator
-from itertools import cycle
+from itertools import cycle, count
 from dataclasses import dataclass
 
 import polars as pl
@@ -12,6 +12,7 @@ import colorcet as cc
 import pandas as pd
 import numpy.typing as npt
 import numpy as np
+import geopandas as gpd
 
 from .nwm import ModelConfiguration
 from .evaluate import Metric
@@ -248,8 +249,30 @@ class MapView(Viewer):
     def __init__(self, map_layers: list[MapLayer] | None = None, **params):
         super().__init__(**params)
 
-        # Setup
-        self.map_layers = map_layers
+        # Setup extra layers
+        index = count(2)
+        self.layers = {l.name: (next(index), l) for l in map_layers}
+        self.layer_selector = pn.widgets.CheckBoxGroup(
+            name="Map Layers",
+            options=[l.name for l in map_layers]
+        )
+        self.map_layer_selector = pn.Column(
+            "# Map Layers",
+            self.layer_selector
+        )
+
+        # Stub layers
+        layer_color = cycle(cc.glasbey_light)
+        layer_data = [
+            go.Scattermap(
+                    showlegend=False,
+                    name="",
+                    mode="markers",
+                    marker=dict(size=10, color=next(layer_color))
+                ) for _ in map_layers
+        ]
+
+        # Setup main map
         self._domain = None
         self._figure = PlotlyFigure(
             data=[
@@ -273,7 +296,7 @@ class MapView(Viewer):
                     name="",
                     mode="markers"
                     )
-                ],
+                ] + layer_data,
             layout=go.Layout(
                 showlegend=False,
                 height=540,
@@ -331,6 +354,55 @@ class MapView(Viewer):
             }
         pn.bind(catch_relayout, self._pane.param.relayout_data, watch=True,
             callback_type="relayout")
+
+        # Layer selection
+        def handle_layer_selection(event: list[str], callback_type: str) -> None:
+            if event is None or callback_type is None:
+                return
+
+            # Select/deselect each layer
+            for name, (idx, layer) in self.layers.items():
+                if name in event and self._figure["data"][idx]["lat"] is None:
+                    # Load data
+                    if layer.columns is None:
+                        cols = ["geometry"]
+                    elif "geometry" not in layer.columns:
+                        cols = layer.columns+["geometry"]
+                    else:
+                        cols = layer.columns
+                    gdf = gpd.read_parquet(layer.path, columns=cols)
+
+                    # Custom data
+                    if len(cols) != 1:
+                        custom_data = gdf[layer.columns]
+                    else:
+                        custom_data = None
+
+                    # Hover template
+                    hover_template = ""
+                    for cindex, cname in enumerate(layer.columns):
+                        hover_template += f"{cname}: " + "%{customdata[" + str(cindex) + "]}<br>"
+                    hover_template += "Longitude: %{lon}<br>Latitude: %{lat}"
+
+                    # Update trace
+                    self._figure["data"][idx].update(
+                        lat=gdf["geometry"].y,
+                        lon=gdf["geometry"].x,
+                        customdata=custom_data,
+                        hovertemplate=hover_template
+                    )
+                else:
+                    self._figure["data"][idx].update(
+                        lat=None,
+                        lon=None,
+                        customdata=None,
+                        hovertemplate=None
+                    )
+
+            # Update
+            self._pane.object = self._figure
+        pn.bind(handle_layer_selection, self.layer_selector.param.value, watch=True,
+            callback_type="layer")
 
     def __panel__(self):
         return pn.Card(
@@ -830,7 +902,7 @@ class ECDFSelector(Viewer):
         for idx in range(nplots)]
 
     def __panel__(self):
-        return pn.WidgetBox("# Empirical CDF", *self._widgets)
+        return pn.Column("# Empirical CDF", *self._widgets)
 
     def __iter__(self) -> Generator[ECDFParameters]:
         for idx, w in enumerate(self._widgets):

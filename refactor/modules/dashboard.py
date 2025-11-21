@@ -376,6 +376,7 @@ class Dashboard(Viewer):
         # Sidebar
         self.template.sidebar.append(ecdf_filters)
         self.template.sidebar.append(streamflow_options)
+        self.template.sidebar.append(site_map.map_layer_selector)
 
     def __panel__(self) -> MaterialTemplate:
         return self.template

@@ -26,7 +26,7 @@ class StreamflowOptions(Viewer):
         }
 
     def __panel__(self):
-        return pn.WidgetBox("# Streamflow options", *list(self._widgets.values()))
+        return pn.Column("# Streamflow options", *list(self._widgets.values()))
 
     def bind(self, function: Callable) -> None:
         """Bind function to widgets."""

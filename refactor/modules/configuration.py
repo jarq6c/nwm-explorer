@@ -17,9 +17,12 @@ class MapLayer(BaseModel):
         Name to display.
     path: pathlib.Path
         Path to GeoParquet file.
+    columns: list[str], optional
+        List of column values to display on hover.
     """
     name: str
     path: Path
+    columns: list[str] | None = None
 
 class Configuration(BaseModel):
     """

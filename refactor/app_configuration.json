@@ -6,7 +6,8 @@
     "map_layers": [
         {
             "name": "My First Extra Layer",
-            "path": "/path/to/my/data.parquet"
+            "path": "/path/to/my/data.parquet",
+            "columns": ["Name"]
         }
     ]
 }
