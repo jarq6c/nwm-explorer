@@ -18,6 +18,7 @@ from .evaluate import Metric
 from .constants import (ModelDomain, GROUP_SPECIFICATIONS, DOMAIN_LOOKUP,
     CONFIGURATION_LOOKUP, NWMGroupSpecification, METRIC_LOOKUP, RANK_LOOKUP,
     PlotlyFigure, DEFAULT_CENTER, DEFAULT_ZOOM, AxisType)
+from .configuration import MapLayer
 
 pn.extension('tabulator')
 
@@ -244,10 +245,11 @@ class TableView(Viewer):
 
 class MapView(Viewer):
     """Display data on a map."""
-    def __init__(self, **params):
+    def __init__(self, map_layers: list[MapLayer] | None, **params):
         super().__init__(**params)
 
         # Setup
+        self.map_layers = map_layers
         self._domain = None
         self._figure = PlotlyFigure(
             data=[

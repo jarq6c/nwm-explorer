@@ -1,3 +1,9 @@
 {
-    "usgs_api_key": ""
+    "usgs_api_key": "abcdef",
+    "map_layers": [
+        {
+            "name": "My Extra Layer",
+            "path": "/path/to/my/data.parquet"
+        }
+    ]
 }

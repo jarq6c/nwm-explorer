@@ -8,6 +8,19 @@ from pydantic import BaseModel
 
 from .logger import get_logger
 
+class MapLayer(BaseModel):
+    """
+    Model for additional map layers.
+
+    Attributes:
+    name: str
+        Name to display.
+    path: pathlib.Path
+        Path to GeoParquet file.
+    """
+    name: str
+    path: Path
+
 class Configuration(BaseModel):
     """
     Application configuration options.
@@ -16,8 +29,11 @@ class Configuration(BaseModel):
     ----------
     key: str
         USGS API key.
+    map_layers: list[MapLayer]
+        List of additional map layers to show on map.
     """
     usgs_api_key: str
+    map_layers: list[MapLayer]
 
 def load_configuration(configuration_file: Path) -> Configuration:
     """
