@@ -25,7 +25,7 @@ from .logger import get_logger
 from .downloads import download_files, FileValidationError
 from .routelink import download_routelink
 from .constants import (LRU_CACHE_SIZES, SUBDIRECTORIES, GOOGLE_CLOUD_BUCKET_URL,
-    ModelConfiguration, ModelDomain)
+    ModelConfiguration, ModelDomain, URLBuilder)
 
 def netcdf_validator(filepath: Path) -> None:
     """
@@ -531,9 +531,6 @@ def short_range_puerto_rico_no_da(
         suffix=suffix,
         time_slices=time_slices
     )
-
-URLBuilder = Callable[[pd.Timestamp], list[str]]
-"""A function that takes a pandas.Timestamp and returns a list of URLs."""
 
 NWM_URL_BUILDERS: dict[tuple[ModelDomain, ModelConfiguration], URLBuilder] = {
     (ModelDomain.ALASKA,

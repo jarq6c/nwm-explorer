@@ -8,6 +8,12 @@ import polars as pl
 import us
 from plotly.basedatatypes import BaseTraceType
 import plotly.graph_objects as go
+import numpy as np
+import numpy.typing as npt
+import pandas as pd
+
+URLBuilder = Callable[[pd.Timestamp], list[str]]
+"""A function that takes a pandas.Timestamp and returns a list of URLs."""
 
 class ModelDomain(StrEnum):
     """Symbols for model domains."""
@@ -471,3 +477,10 @@ UNIT_CONVERSION_FUNCTIONS: dict[str, Callable] = {
     "inch/h": lambda: None
 }
 """Measurement unit conversion functions. Assumes base units of CFS"""
+
+MetricFunction = Callable[[
+    npt.NDArray[np.float64],
+    npt.NDArray[np.float64],
+    npt.NDArray[np.float64]
+    ], None]
+"""Type hint for Numba functions that generate metrics."""

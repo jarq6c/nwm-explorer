@@ -1,7 +1,7 @@
 """Methods to evaluate pairs."""
 from pathlib import Path
 import inspect
-from typing import Generator, Any, Callable, Literal
+from typing import Generator, Any, Literal
 from concurrent.futures import ProcessPoolExecutor
 import itertools
 import functools
@@ -17,14 +17,8 @@ from .nwm import ModelConfiguration
 from .pairs import scan_pairs, GROUP_SPECIFICATIONS
 from .logger import get_logger
 from .routelink import download_routelink
-from .constants import Metric, SUBDIRECTORIES, LRU_CACHE_SIZES, METRIC_SIGNIFICANCE_THRESHOLD
-
-MetricFunction = Callable[[
-    npt.NDArray[np.float64],
-    npt.NDArray[np.float64],
-    npt.NDArray[np.float64]
-    ], None]
-"""Type hint for Numba functions that generate metrics."""
+from .constants import (Metric, SUBDIRECTORIES, LRU_CACHE_SIZES,
+    METRIC_SIGNIFICANCE_THRESHOLD, MetricFunction)
 
 @guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
 def nash_sutcliffe_efficiency(
