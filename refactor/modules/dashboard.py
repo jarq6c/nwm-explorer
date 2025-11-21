@@ -17,11 +17,15 @@ from .views import (FilterWidgets, MapView, TimeSeriesView, BarPlot, ECDFMatrix,
     MarkdownView, ECDFSelector)
 from .constants import METRIC_PLOTTING_LIMITS, CONFIGURATION_LINE_TYPE
 from .options import StreamflowOptions
+from .configuration import Configuration
 
 class Dashboard(Viewer):
     """Build a dashboard for exploring National Water Model output."""
-    def __init__(self, root: Path, title: str, **params):
+    def __init__(self, configuration: Configuration, **params):
         super().__init__(**params)
+        # Handle configuration
+        root = configuration.root
+        title = configuration.title
 
         # Open routelink
         routelink = download_routelink(root).select(
@@ -39,7 +43,7 @@ class Dashboard(Viewer):
             "reference_time_max": None,
         }
 
-        site_map = MapView()
+        site_map = MapView(map_layers=configuration.map_layers)
         hydrograph = TimeSeriesView()
         barplot = BarPlot()
         ecdf = ECDFMatrix(nplots=4, ncols=2)

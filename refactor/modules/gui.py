@@ -4,33 +4,31 @@ from pathlib import Path
 import panel as pn
 
 from .dashboard import Dashboard
+from .configuration import load_configuration, Configuration
 
 def generate_dashboard(
-        root: Path,
-        title: str
+        configuration: Configuration
         ) -> Dashboard:
     """Instantiate and return a dashboard."""
-    return Dashboard(root, title)
+    return Dashboard(configuration)
 
 def generate_dashboard_closure(
-        root: Path,
-        title: str
+        configuration: Configuration
         ) -> Dashboard:
     """Build and return a closure function that generates new dashboards."""
     def closure():
-        return generate_dashboard(root, title)
+        return generate_dashboard(configuration)
     return closure
 
 def serve_dashboards(
-        root: Path,
-        title: str
+        configuration_file: Path
         ) -> None:
     """Serve dashboards."""
-    # Slugify title
-    slug = title.lower().replace(" ", "-")
+    # Load configuration
+    configuration = load_configuration(configuration_file)
 
     # Serve
     endpoints = {
-        slug: generate_dashboard_closure(root, title)
+        configuration.endpoint: generate_dashboard_closure(configuration)
     }
     pn.serve(endpoints)

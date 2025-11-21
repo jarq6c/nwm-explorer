@@ -13,8 +13,7 @@ from modules.gui import serve_dashboards
 def main() -> None:
     """Main."""
     serve_dashboards(
-        root=Path("/ised/nwm_explorer_data"),
-        title="National Water Model Evaluations"
+        configuration_file=Path("config.json")
     )
     # root = Path("/ised/nwm_explorer_data")
 

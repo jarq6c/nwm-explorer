@@ -27,11 +27,20 @@ class Configuration(BaseModel):
 
     Attributes
     ----------
+    title: str
+        Application name.
+    endpoint: str
+        Endpoint for service.
+    root: pathlib.Path
+        Root data directory.
     key: str
         USGS API key.
     map_layers: list[MapLayer]
         List of additional map layers to show on map.
     """
+    title: str
+    endpoint: str
+    root: Path
     usgs_api_key: str
     map_layers: list[MapLayer]
 

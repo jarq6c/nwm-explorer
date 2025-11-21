@@ -1,8 +1,11 @@
 {
+    "title": "National Water Model Evaluations",
+    "endpoint": "nwm-evaluations",
+    "root": "/path/to/my/data/directory",
     "usgs_api_key": "abcdef",
     "map_layers": [
         {
-            "name": "My Extra Layer",
+            "name": "My First Extra Layer",
             "path": "/path/to/my/data.parquet"
         }
     ]

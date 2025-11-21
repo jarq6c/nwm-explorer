@@ -245,7 +245,7 @@ class TableView(Viewer):
 
 class MapView(Viewer):
     """Display data on a map."""
-    def __init__(self, map_layers: list[MapLayer] | None, **params):
+    def __init__(self, map_layers: list[MapLayer] | None = None, **params):
         super().__init__(**params)
 
         # Setup
