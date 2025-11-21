@@ -190,9 +190,14 @@ def load_site_information(
         ]
 
     # Get data
-    df = scan_site_table(root).select(columns).filter(
-        pl.col("monitoring_location_number") == usgs_site_code
-    ).collect()
+    if "monitoring_location_number" in columns:
+        df = scan_site_table(root).select(columns).filter(
+            pl.col("monitoring_location_number") == usgs_site_code
+        ).collect()
+    else:
+        df = scan_site_table(root).select(columns+["monitoring_location_number"]).filter(
+            pl.col("monitoring_location_number") == usgs_site_code
+        ).collect().select(columns)
 
     # Rename columns
     if rename is not None:

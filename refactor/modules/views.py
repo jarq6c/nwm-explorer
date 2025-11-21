@@ -554,6 +554,14 @@ class TimeSeriesView(Viewer):
             hide_header=True
             )
 
+    def set_yaxis_title(self, title: str) -> None:
+        """Change y-axis title."""
+        # Update
+        self._figure["layout"]["yaxis"]["title"].update(text=title)
+
+        # Refresh
+        self._pane.object = self._figure
+
     def set_axis_type(self, axis_type: AxisType) -> None:
         """Change y-axis type."""
         # Update

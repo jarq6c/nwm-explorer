@@ -15,8 +15,9 @@ from .routelink import download_routelink
 from .usgs import usgs_site_generator, load_site_information
 from .views import (FilterWidgets, MapView, TimeSeriesView, BarPlot, ECDFMatrix,
     MarkdownView, ECDFSelector)
-from .constants import METRIC_PLOTTING_LIMITS, CONFIGURATION_LINE_TYPE
-from .options import StreamflowOptions
+from .constants import (METRIC_PLOTTING_LIMITS, CONFIGURATION_LINE_TYPE, SITE_COLUMN_MAPPING,
+    MeasurementUnits)
+from .options import StreamflowOptions, compute_conversion_factor
 from .configuration import Configuration
 
 class Dashboard(Viewer):
@@ -49,14 +50,6 @@ class Dashboard(Viewer):
         ecdf = ECDFMatrix(nplots=4, ncols=2)
         ecdf_filters = ECDFSelector(nplots=4, filter_widgets=filter_widgets)
         site_information = MarkdownView()
-        site_column_mapping = {
-            "monitoring_location_name": "Name",
-            "monitoring_location_number": "Site code",
-            "hydrologic_unit_code": "HUC",
-            "site_type": "Site type",
-            "drainage_area": "Drainage area (sq.mi.)",
-            "contributing_drainage_area": "Contrib. drain. area (sq.mi.)"
-        }
         streamflow_options = StreamflowOptions()
 
         def handle_map_click(event, callback_type: str) -> None:
@@ -90,7 +83,7 @@ class Dashboard(Viewer):
                 # Build site table
                 info = "| Site Information |  |  \n| :-- | :-- |  \n"
                 for series in load_site_information(root, usgs_site_code,
-                    rename=site_column_mapping).iter_columns():
+                    rename=SITE_COLUMN_MAPPING).iter_columns():
                     info += f"| **{series.name}** | {series.item(0)} |  \n"
                 url = f"https://waterdata.usgs.gov/monitoring-location/USGS-{usgs_site_code}/"
                 info += "| **Monitoring page** | "
@@ -137,6 +130,14 @@ class Dashboard(Viewer):
                     )
             )
 
+            # Unit conversion
+            conversion_factor = compute_conversion_factor(
+                root, usgs_site_code, streamflow_options.measurement_units
+            )
+
+            # Update y-axis title
+            hydrograph.set_yaxis_title(f"Streamflow ({streamflow_options.measurement_units})")
+
             # Stream observations
             dataframes = []
             for df in usgs_site_generator(
@@ -153,6 +154,12 @@ class Dashboard(Viewer):
                 # Append data
                 dataframes.append(df)
                 observations = pl.concat(dataframes)
+
+                # Apply conversion
+                if conversion_factor != 1.0:
+                    observations = observations.with_columns(
+                        pl.col("observed_cfs").mul(conversion_factor)
+                    )
 
                 # Downcast if possible
                 if observations["observed_cfs"].max() < 65000.00:
@@ -190,6 +197,12 @@ class Dashboard(Viewer):
                 for rt in df["datetime_string"].unique():
                     # Extract predictions
                     predictions = df.filter(pl.col("datetime_string") == rt)
+
+                    # Apply conversion
+                    if conversion_factor != 1.0:
+                        predictions = predictions.with_columns(
+                            pl.col("predicted_cfs").mul(conversion_factor)
+                        )
 
                     # Downcast if possible
                     if predictions["predicted_cfs"].max() < 65000.00:

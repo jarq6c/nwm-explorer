@@ -470,17 +470,27 @@ class AxisType(StrEnum):
     CATEGORY = "category"
     MULTICATEGORY = "multicategory"
 
-UNIT_CONVERSION_FUNCTIONS: dict[str, Callable] = {
-    "CFS": lambda: None,
-    "CMS": lambda x: x * 0.3048 ** 3.0,
-    "CFS/sq.mi.": lambda x, area: x / area,
-    "inch/h": lambda: None
-}
-"""Measurement unit conversion functions. Assumes base units of CFS"""
-
 MetricFunction = Callable[[
     npt.NDArray[np.float64],
     npt.NDArray[np.float64],
     npt.NDArray[np.float64]
     ], None]
 """Type hint for Numba functions that generate metrics."""
+
+SITE_COLUMN_MAPPING: dict[str, str] = {
+    "monitoring_location_name": "Name",
+    "monitoring_location_number": "Site code",
+    "hydrologic_unit_code": "HUC",
+    "site_type": "Site type",
+    "drainage_area": "Drainage area (sq.mi.)",
+    "contributing_drainage_area": "Contrib. drain. area (sq.mi.)"
+}
+"""Mapping from site data column to pretty string."""
+
+class MeasurementUnits(StrEnum):
+    """Streamflow measurement units."""
+    CUBIC_FEET_PER_SECOND = "CFS"
+    CUBIC_METERS_PER_SECOND = "CMS"
+    CUBIC_FEET_PER_SECOND_PER_SQUARE_MILE = "CFS/sq.mi."
+    INCHES_PER_HOUR = "inch/h"
+    CUMULATIVE_INCHES_PER_HOUR = "inch/h, accum."
