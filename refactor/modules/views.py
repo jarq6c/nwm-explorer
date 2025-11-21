@@ -443,6 +443,7 @@ class TimeSeriesView(Viewer):
                     remove=["resetview"],
                     orientation="v"
                 ),
+                showlegend=False
             )
         )
 
@@ -525,7 +526,8 @@ class TimeSeriesView(Viewer):
         # Overwrite old traces
         self._figure["data"] = [go.Scatter(
             mode="lines",
-            line={"color": "#000000", "width": 4.0}
+            line={"color": "#000000", "width": 4.0},
+            name=""
         )]
 
         # Update x-range
@@ -552,17 +554,19 @@ class TimeSeriesView(Viewer):
             name: str | None = None,
         ) -> None:
         """Update specific time series."""
+        # Y-axis label
+        ylabel = self._figure["layout"]["yaxis"]["title"]["text"]
+
         # Update x-y data
         self._figure["data"][index].update(
             x=xdata,
-            y=ydata
+            y=ydata,
+            hovertemplate=(
+                f"<b>{name}</b><br>"
+                "Valid: %{x}<br>"
+                f"{ylabel}: " + "%{y:.2f}"
+                )
         )
-
-        # Update name
-        if name:
-            self._figure["data"][index].update(
-                name=name
-            )
 
         # Refresh
         self._pane.object = self._figure
@@ -573,6 +577,9 @@ class TimeSeriesView(Viewer):
             mode: str = "lines"
         ) -> None:
         """Add time series."""
+        # Y-axis label
+        ylabel = self._figure["layout"]["yaxis"]["title"]["text"]
+
         # Add new traces
         for trace in traces:
             self._figure["data"].append(go.Scatter(
@@ -580,7 +587,12 @@ class TimeSeriesView(Viewer):
                 y=trace[1],
                 mode=mode,
                 line={"color": next(self._color_ramp), "width": 2.0},
-                name=trace[2]
+                name="",
+                hovertemplate=(
+                    f"<b>{trace[2]}</b><br>"
+                    "Valid: %{x}<br>"
+                    f"{ylabel}: " + "%{y:.2f}"
+                    )
             ))
 
         # Refresh

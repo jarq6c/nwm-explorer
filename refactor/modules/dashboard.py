@@ -142,14 +142,24 @@ class Dashboard(Viewer):
                 end_time=data_ranges["observed_value_time_max"],
                 cache=True
             ):
+                # Check for data
+                if df.is_empty():
+                    continue
+
                 # Append data
                 dataframes.append(df)
                 observations = pl.concat(dataframes)
 
+                # Downcast if possible
+                if observations["observed_cfs"].max() < 65000.00:
+                    datatype = np.float16
+                else:
+                    datatype = np.float32
+
                 # Replace data
                 hydrograph.update_trace(
                     xdata=observations["value_time"].to_numpy(),
-                    ydata=observations["observed_cfs"].to_numpy().astype(np.float16),
+                    ydata=observations["observed_cfs"].to_numpy().astype(datatype),
                     name=f"USGS-{usgs_site_code}"
                 )
 
@@ -162,17 +172,32 @@ class Dashboard(Viewer):
                 end_time=data_ranges["reference_time_max"],
                 cache=True
             ):
+                # Add date string column
+                df = df.with_columns(
+                    pl.col(
+                        "reference_time"
+                    ).dt.strftime(
+                        "Issued: %Y-%m-%d %HZ"
+                    ).alias("datetime_string")
+                )
+
                 # Add each reference time
                 trace_data = []
-                for rt in df["reference_time"].unique():
+                for rt in df["datetime_string"].unique():
                     # Extract predictions
-                    predictions = df.filter(pl.col("reference_time") == rt)
+                    predictions = df.filter(pl.col("datetime_string") == rt)
+
+                    # Downcast if possible
+                    if predictions["predicted_cfs"].max() < 65000.00:
+                        datatype = np.float16
+                    else:
+                        datatype = np.float32
 
                     # Add trace data
                     trace_data.append((
                         predictions["value_time"].to_numpy(),
-                        predictions["predicted_cfs"].to_numpy().astype(np.float16),
-                        str(rt)
+                        predictions["predicted_cfs"].to_numpy().astype(datatype),
+                        rt
                     ))
 
                 # Add to plot
