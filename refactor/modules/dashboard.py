@@ -1,5 +1,4 @@
 """Dashboard objects."""
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -171,21 +170,16 @@ class Dashboard(Viewer):
                     )
 
                 # Accumulate
-                if streamflow_options.measurement_units == MeasurementUnits.CUMULATIVE_INCHES_PER_HOUR:
+                if streamflow_options.measurement_units in [
+                    MeasurementUnits.CUMULATIVE_INCHES_PER_HOUR]:
                     observations = observations.with_columns(
                         pl.col("observed_cfs").cum_sum()
                     )
 
-                # Downcast if possible
-                if observations["observed_cfs"].max() < 65000.00:
-                    datatype = np.float16
-                else:
-                    datatype = np.float32
-
                 # Replace data
                 hydrograph.update_trace(
                     xdata=observations["value_time"].to_numpy(),
-                    ydata=observations["observed_cfs"].to_numpy().astype(datatype),
+                    ydata=observations["observed_cfs"].to_numpy(),
                     name=f"USGS-{usgs_site_code}"
                 )
 
@@ -221,21 +215,16 @@ class Dashboard(Viewer):
 
                     # Accumulate
                     # TODO These accumulations need to be intialized/pinned to observations
-                    if streamflow_options.measurement_units == MeasurementUnits.CUMULATIVE_INCHES_PER_HOUR:
+                    if streamflow_options.measurement_units in [
+                        MeasurementUnits.CUMULATIVE_INCHES_PER_HOUR]:
                         predictions = predictions.with_columns(
                             pl.col("predicted_cfs").cum_sum()
                         )
 
-                    # Downcast if possible
-                    if predictions["predicted_cfs"].max() < 65000.00:
-                        datatype = np.float16
-                    else:
-                        datatype = np.float32
-
                     # Add trace data
                     trace_data.append((
                         predictions["value_time"].to_numpy(),
-                        predictions["predicted_cfs"].to_numpy().astype(datatype),
+                        predictions["predicted_cfs"].to_numpy()
                         rt
                     ))
 
