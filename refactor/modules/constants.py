@@ -15,15 +15,15 @@ import pandas as pd
 URLBuilder = Callable[[pd.Timestamp], list[str]]
 """A function that takes a pandas.Timestamp and returns a list of URLs."""
 
-class ModelDomain(StrEnum):
-    """Symbols for model domains."""
+class ModelDomainDisplay(StrEnum):
+    """Symbols for model domain display."""
     CONUS = "[CONUS] "
     ALASKA = "[Alaska] "
     HAWAII = "[Hawaii] "
     PUERTO_RICO = "[Puerto Rico] "
 
-class ModelDomainDirectory(StrEnum):
-    """Model domain subdirectories."""
+class ModelDomain(StrEnum):
+    """Model domain."""
     ALASKA = "alaska"
     HAWAII = "hawaii"
     CONUS = "conus"
@@ -130,36 +130,36 @@ ROUTELINK_URL: str = (
 ROUTELINK_PARQUET: Path = Path("routelink.parquet")
 """Default path to polars-compatible RouteLink parquet file used by application."""
 
-ROUTELINK_FILENAMES: dict[ModelDomainDirectory, str] = {
-    ModelDomainDirectory.ALASKA: "RouteLink_AK.csv",
-    ModelDomainDirectory.CONUS: "RouteLink_CONUS.csv",
-    ModelDomainDirectory.HAWAII: "RouteLink_HI.csv",
-    ModelDomainDirectory.PUERTO_RICO: "RouteLink_PRVI.csv"
+ROUTELINK_FILENAMES: dict[ModelDomain, str] = {
+    ModelDomain.ALASKA: "RouteLink_AK.csv",
+    ModelDomain.CONUS: "RouteLink_CONUS.csv",
+    ModelDomain.HAWAII: "RouteLink_HI.csv",
+    ModelDomain.PUERTO_RICO: "RouteLink_PRVI.csv"
 }
 """Mapping from domains to routelink files names."""
 
 GOOGLE_CLOUD_BUCKET_URL: str = "https://storage.googleapis.com/national-water-model/"
 """National Water Model Google Cloud Storage bucket."""
 
-DOMAIN_LOOKUP: dict[ModelConfiguration, ModelDomain] = {
-    ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA: ModelDomain.CONUS,
-    ModelConfiguration.MEDIUM_RANGE_MEM_1: ModelDomain.CONUS,
-    ModelConfiguration.MEDIUM_RANGE_BLEND: ModelDomain.CONUS,
-    ModelConfiguration.MEDIUM_RANGE_NO_DA: ModelDomain.CONUS,
-    ModelConfiguration.SHORT_RANGE: ModelDomain.CONUS,
-    ModelConfiguration.ANALYSIS_ASSIM_EXTEND_ALASKA_NO_DA: ModelDomain.ALASKA,
-    ModelConfiguration.MEDIUM_RANGE_ALASKA_MEM_1: ModelDomain.ALASKA,
-    ModelConfiguration.MEDIUM_RANGE_BLEND_ALASKA: ModelDomain.ALASKA,
-    ModelConfiguration.MEDIUM_RANGE_ALASKA_NO_DA: ModelDomain.ALASKA,
-    ModelConfiguration.SHORT_RANGE_ALASKA: ModelDomain.ALASKA,
-    ModelConfiguration.ANALYSIS_ASSIM_HAWAII_NO_DA: ModelDomain.HAWAII,
-    ModelConfiguration.SHORT_RANGE_HAWAII: ModelDomain.HAWAII,
-    ModelConfiguration.SHORT_RANGE_HAWAII_NO_DA: ModelDomain.HAWAII,
-    ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA: ModelDomain.PUERTO_RICO,
-    ModelConfiguration.SHORT_RANGE_PUERTO_RICO: ModelDomain.PUERTO_RICO,
-    ModelConfiguration.SHORT_RANGE_PUERTO_RICO_NO_DA: ModelDomain.PUERTO_RICO
+DOMAIN_LOOKUP: dict[ModelConfiguration, ModelDomainDisplay] = {
+    ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA: ModelDomainDisplay.CONUS,
+    ModelConfiguration.MEDIUM_RANGE_MEM_1: ModelDomainDisplay.CONUS,
+    ModelConfiguration.MEDIUM_RANGE_BLEND: ModelDomainDisplay.CONUS,
+    ModelConfiguration.MEDIUM_RANGE_NO_DA: ModelDomainDisplay.CONUS,
+    ModelConfiguration.SHORT_RANGE: ModelDomainDisplay.CONUS,
+    ModelConfiguration.ANALYSIS_ASSIM_EXTEND_ALASKA_NO_DA: ModelDomainDisplay.ALASKA,
+    ModelConfiguration.MEDIUM_RANGE_ALASKA_MEM_1: ModelDomainDisplay.ALASKA,
+    ModelConfiguration.MEDIUM_RANGE_BLEND_ALASKA: ModelDomainDisplay.ALASKA,
+    ModelConfiguration.MEDIUM_RANGE_ALASKA_NO_DA: ModelDomainDisplay.ALASKA,
+    ModelConfiguration.SHORT_RANGE_ALASKA: ModelDomainDisplay.ALASKA,
+    ModelConfiguration.ANALYSIS_ASSIM_HAWAII_NO_DA: ModelDomainDisplay.HAWAII,
+    ModelConfiguration.SHORT_RANGE_HAWAII: ModelDomainDisplay.HAWAII,
+    ModelConfiguration.SHORT_RANGE_HAWAII_NO_DA: ModelDomainDisplay.HAWAII,
+    ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA: ModelDomainDisplay.PUERTO_RICO,
+    ModelConfiguration.SHORT_RANGE_PUERTO_RICO: ModelDomainDisplay.PUERTO_RICO,
+    ModelConfiguration.SHORT_RANGE_PUERTO_RICO_NO_DA: ModelDomainDisplay.PUERTO_RICO
 }
-"""Mapping from ModelConfiguration to ModelDomain."""
+"""Mapping from ModelConfiguration to ModelDomainDisplay."""
 
 CONFIGURATION_LOOKUP: dict[ModelConfiguration, str] = {
     ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA: "Extended Analysis & Assimilation"
@@ -272,19 +272,19 @@ RANK_LOOKUP: dict[str, str] = {
 aggregation method used to resample streamflow.
 """
 
-DEFAULT_ZOOM: dict[ModelDomain, int] = {
-    ModelDomain.ALASKA: 5,
-    ModelDomain.CONUS: 3,
-    ModelDomain.HAWAII: 6,
-    ModelDomain.PUERTO_RICO: 8
+DEFAULT_ZOOM: dict[ModelDomainDisplay, int] = {
+    ModelDomainDisplay.ALASKA: 5,
+    ModelDomainDisplay.CONUS: 3,
+    ModelDomainDisplay.HAWAII: 6,
+    ModelDomainDisplay.PUERTO_RICO: 8
 }
 """Default map zoom for each domain."""
 
-DEFAULT_CENTER: dict[ModelDomain, dict[str, float]] = {
-    ModelDomain.ALASKA: {"lat": 60.84683, "lon": -149.05659},
-    ModelDomain.CONUS: {"lat": 38.83348, "lon": -93.97612},
-    ModelDomain.HAWAII: {"lat": 21.24988, "lon": -157.59606},
-    ModelDomain.PUERTO_RICO: {"lat": 18.21807, "lon": -66.32802}
+DEFAULT_CENTER: dict[ModelDomainDisplay, dict[str, float]] = {
+    ModelDomainDisplay.ALASKA: {"lat": 60.84683, "lon": -149.05659},
+    ModelDomainDisplay.CONUS: {"lat": 38.83348, "lon": -93.97612},
+    ModelDomainDisplay.HAWAII: {"lat": 21.24988, "lon": -157.59606},
+    ModelDomainDisplay.PUERTO_RICO: {"lat": 18.21807, "lon": -66.32802}
 }
 """Default map center for each domain."""
 
@@ -427,19 +427,19 @@ class PlotlyFigure(TypedDict):
     data: list[BaseTraceType]
     layout: go.Layout
 
-DEFAULT_ZOOM: dict[ModelDomain, int] = {
-    ModelDomain.ALASKA: 5,
-    ModelDomain.CONUS: 3,
-    ModelDomain.HAWAII: 6,
-    ModelDomain.PUERTO_RICO: 8
+DEFAULT_ZOOM: dict[ModelDomainDisplay, int] = {
+    ModelDomainDisplay.ALASKA: 5,
+    ModelDomainDisplay.CONUS: 3,
+    ModelDomainDisplay.HAWAII: 6,
+    ModelDomainDisplay.PUERTO_RICO: 8
 }
 """Default map zoom for each domain."""
 
-DEFAULT_CENTER: dict[ModelDomain, dict[str, float]] = {
-    ModelDomain.ALASKA: {"lat": 60.84683, "lon": -149.05659},
-    ModelDomain.CONUS: {"lat": 38.83348, "lon": -93.97612},
-    ModelDomain.HAWAII: {"lat": 21.24988, "lon": -157.59606},
-    ModelDomain.PUERTO_RICO: {"lat": 18.21807, "lon": -66.32802}
+DEFAULT_CENTER: dict[ModelDomainDisplay, dict[str, float]] = {
+    ModelDomainDisplay.ALASKA: {"lat": 60.84683, "lon": -149.05659},
+    ModelDomainDisplay.CONUS: {"lat": 38.83348, "lon": -93.97612},
+    ModelDomainDisplay.HAWAII: {"lat": 21.24988, "lon": -157.59606},
+    ModelDomainDisplay.PUERTO_RICO: {"lat": 18.21807, "lon": -66.32802}
 }
 """Default map center for each domain."""
 

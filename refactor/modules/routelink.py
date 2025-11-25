@@ -10,7 +10,7 @@ from yarl import URL
 
 from .logger import get_logger
 from .downloads import download_files
-from .constants import (ModelDomainDirectory, ROUTELINK_URL, ROUTELINK_PARQUET,
+from .constants import (ModelDomain, ROUTELINK_URL, ROUTELINK_PARQUET,
     ROUTELINK_FILENAMES)
 
 def download_routelink(
@@ -81,7 +81,7 @@ def download_routelink(
             data,
             schema_overrides={
                 "usgs_site_code": pl.String,
-                "domain": ModelDomainDirectory,
+                "domain": ModelDomain,
                 "nwm_feature_id": pl.Int64,
                 "latitude": pl.Float64,
                 "longitude": pl.Float64
