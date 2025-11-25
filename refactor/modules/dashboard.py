@@ -219,7 +219,6 @@ class Dashboard(Viewer):
                         )
 
                     # Accumulate
-                    # TODO These accumulations need to be intialized/pinned to observations
                     if streamflow_options.measurement_units in [
                         MeasurementUnits.CUMULATIVE_INCHES_PER_HOUR]:
                         # Get initial observation
