@@ -1,7 +1,6 @@
 """Dashboard objects."""
 from typing import Any
 
-import numpy as np
 import polars as pl
 import panel as pn
 import pandas as pd
@@ -161,7 +160,13 @@ class Dashboard(Viewer):
                 ]:
                     observations = observations.group_by_dynamic(
                         "value_time", every="1h"
-                    ).agg(pl.col("observed_cfs").mean())
+                    ).agg(
+                        pl.col("observed_cfs").mean()
+                    ).upsample(
+                        time_column="value_time", every="1h"
+                    ).fill_null(
+                        strategy="forward"
+                    )
 
                 # Apply conversion
                 if conversion_factor != 1.0:
@@ -217,8 +222,19 @@ class Dashboard(Viewer):
                     # TODO These accumulations need to be intialized/pinned to observations
                     if streamflow_options.measurement_units in [
                         MeasurementUnits.CUMULATIVE_INCHES_PER_HOUR]:
+                        # Get initial observation
+                        intial_time = predictions["value_time"].min() - pl.duration(hours=1)
+                        vals = observations.filter(
+                            pl.col("value_time") == intial_time
+                        )["observed_cfs"]
+                        if vals.is_empty():
+                            val = 0.0
+                        else:
+                            val = vals.item(0)
+
+                        # Accumulate
                         predictions = predictions.with_columns(
-                            pl.col("predicted_cfs").cum_sum()
+                            pl.col("predicted_cfs").cum_sum().add(val)
                         )
 
                     # Add trace data
