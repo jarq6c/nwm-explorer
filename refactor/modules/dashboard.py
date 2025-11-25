@@ -224,7 +224,7 @@ class Dashboard(Viewer):
                     # Add trace data
                     trace_data.append((
                         predictions["value_time"].to_numpy(),
-                        predictions["predicted_cfs"].to_numpy()
+                        predictions["predicted_cfs"].to_numpy(),
                         rt
                     ))
 
