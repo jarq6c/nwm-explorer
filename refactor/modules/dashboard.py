@@ -15,7 +15,7 @@ from .usgs import usgs_site_generator, load_site_information
 from .views import (FilterWidgets, MapView, TimeSeriesView, BarPlot, ECDFMatrix,
     MarkdownView, ECDFSelector)
 from .constants import (METRIC_PLOTTING_LIMITS, CONFIGURATION_LINE_TYPE, SITE_COLUMN_MAPPING,
-    MeasurementUnits)
+    MeasurementUnits, ModelConfiguration)
 from .options import StreamflowOptions, compute_conversion_factor
 from .configuration import Configuration
 
@@ -142,13 +142,6 @@ class Dashboard(Viewer):
                         pl.col("observed_cfs").mul(conversion_factor)
                     )
 
-                # Accumulate
-                if streamflow_options.measurement_units in [
-                    MeasurementUnits.CUMULATIVE_INCHES_PER_HOUR]:
-                    observations = observations.with_columns(
-                        pl.col("observed_cfs").cum_sum()
-                    )
-
                 # Replace data
                 hydrograph.update_trace(
                     xdata=observations["value_time"].to_numpy(),
@@ -184,24 +177,6 @@ class Dashboard(Viewer):
                     if conversion_factor != 1.0:
                         predictions = predictions.with_columns(
                             pl.col("predicted_cfs").mul(conversion_factor)
-                        )
-
-                    # Accumulate
-                    if streamflow_options.measurement_units in [
-                        MeasurementUnits.CUMULATIVE_INCHES_PER_HOUR]:
-                        # Get initial observation
-                        intial_time = predictions["value_time"].min() - pl.duration(hours=1)
-                        vals = observations.filter(
-                            pl.col("value_time") == intial_time
-                        )["observed_cfs"]
-                        if vals.is_empty():
-                            val = 0.0
-                        else:
-                            val = vals.item(0)
-
-                        # Accumulate
-                        predictions = predictions.with_columns(
-                            pl.col("predicted_cfs").cum_sum().add(val)
                         )
 
                     # Add trace data
