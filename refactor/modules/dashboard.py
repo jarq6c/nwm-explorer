@@ -64,6 +64,8 @@ class Dashboard(Viewer):
             "reference_time_min": None,
             "reference_time_max": None,
         }
+        self.usgs_site_code: str | None = None
+        self.nwm_feature_id: int | None = None
 
         site_map = MapView(map_layers=configuration.map_layers)
         hydrograph = TimeSeriesView()
@@ -73,78 +75,17 @@ class Dashboard(Viewer):
         site_information = MarkdownView()
         streamflow_options = StreamflowOptions()
 
-        def handle_map_click(event, callback_type: str) -> None:
+        def draw_hydrograph(event, callback_type: str) -> None:
+            # Ignore non-event
             if event is None:
                 return
 
-            # Check for state
-            if not site_map.click_data:
-                # Clear barplot
-                barplot.erase()
-
-                # Clear hydrograph
-                hydrograph.erase_data(
-                    xrange=(
-                        data_ranges["observed_value_time_min"],
-                        data_ranges["observed_value_time_max"]
-                        )
-                )
-
-                # Clear site info
-                site_information.erase()
+            # Ignore axis scale change
+            if callback_type in ["axis_scale"]:
                 return
 
-            # Parse custom data
-            metadata = site_map.click_data["customdata"]
-            nwm_feature_id = metadata[0]
-            usgs_site_code = metadata[1]
-
-            # Update site info
-            if callback_type == "click":
-                # Build site table
-                info = "| Site Information |  |  \n| :-- | :-- |  \n"
-                for series in load_site_information(root, usgs_site_code,
-                    rename=SITE_COLUMN_MAPPING).iter_columns():
-                    info += f"| **{series.name}** | {series.item(0)} |  \n"
-                url = generate_usgs_url(
-                    usgs_site_code,
-                    data_ranges["observed_value_time_min"],
-                    data_ranges["observed_value_time_max"]
-                    )
-                info += "| **Monitoring page** | "
-                info += f'<a href="{url}" target="_blank">Open new tab</a> |'
-                site_information.update(info)
-
-            # These filters do not update hydrograph or barplot
-            if callback_type in ["lead_time", "significant"]:
-                return
-
-            # Retrieve metrics
-            metric_data = load_site_metrics(
-                root=root,
-                label=filter_widgets.label,
-                configuration=filter_widgets.configuration,
-                metric=filter_widgets.metric,
-                nwm_feature_id=nwm_feature_id,
-                rank=filter_widgets.rank,
-                cache=True
-            )
-
-            # Clear barplot
-            barplot.erase()
-
-            # Update barplot
-            barplot.update(
-                xdata=metric_data["lead_time_hours_min"],
-                ydata=metric_data[filter_widgets.point_column].to_numpy(),
-                ydata_lower=metric_data[filter_widgets.lower_column].to_numpy(),
-                ydata_upper=metric_data[filter_widgets.upper_column].to_numpy(),
-                xlabel="Minimum Lead Time (h)",
-                ylabel=filter_widgets.metric_label
-            )
-
-            # These filters do not update hydrograph
-            if callback_type in ["rank", "metric"]:
+            # Check for site selection
+            if self.usgs_site_code is None:
                 return
 
             # Clear hydrograph
@@ -157,7 +98,7 @@ class Dashboard(Viewer):
 
             # Unit conversion
             conversion_factor = compute_conversion_factor(
-                root, usgs_site_code, streamflow_options.measurement_units
+                root, self.usgs_site_code, streamflow_options.measurement_units
             )
 
             # Update y-axis title
@@ -167,7 +108,7 @@ class Dashboard(Viewer):
             dataframes = []
             for df in usgs_site_generator(
                 root=root,
-                usgs_site_code=usgs_site_code,
+                usgs_site_code=self.usgs_site_code,
                 start_time=data_ranges["observed_value_time_min"],
                 end_time=data_ranges["observed_value_time_max"],
                 cache=True
@@ -212,14 +153,14 @@ class Dashboard(Viewer):
                 hydrograph.update_trace(
                     xdata=observations["value_time"].to_numpy(),
                     ydata=observations["observed_cfs"].to_numpy(),
-                    name=f"USGS-{usgs_site_code}"
+                    name=f"USGS-{self.usgs_site_code}"
                 )
 
             # Stream predictions
             for df in nwm_site_generator(
                 root=root,
                 configuration=filter_widgets.configuration,
-                nwm_feature_id=nwm_feature_id,
+                nwm_feature_id=self.nwm_feature_id,
                 start_time=data_ranges["reference_time_min"],
                 end_time=data_ranges["reference_time_max"],
                 cache=True
@@ -275,6 +216,85 @@ class Dashboard(Viewer):
                     filter_widgets.configuration, "lines"
                 )
                 hydrograph.append_traces(trace_data, mode=mode)
+
+        def handle_map_click(event, callback_type: str) -> None:
+            if event is None:
+                return
+
+            # Check for state
+            if not site_map.click_data:
+                # Clear barplot
+                barplot.erase()
+
+                # Clear hydrograph
+                hydrograph.erase_data(
+                    xrange=(
+                        data_ranges["observed_value_time_min"],
+                        data_ranges["observed_value_time_max"]
+                        )
+                )
+
+                # Clear site info
+                site_information.erase()
+                self.usgs_site_code = None
+                self.nwm_feature_id = None
+                return
+
+            # Parse custom data
+            metadata = site_map.click_data["customdata"]
+            self.nwm_feature_id = metadata[0]
+            self.usgs_site_code = metadata[1]
+
+            # Update site info
+            if callback_type == "click":
+                # Build site table
+                info = "| Site Information |  |  \n| :-- | :-- |  \n"
+                for series in load_site_information(root, self.usgs_site_code,
+                    rename=SITE_COLUMN_MAPPING).iter_columns():
+                    info += f"| **{series.name}** | {series.item(0)} |  \n"
+                url = generate_usgs_url(
+                    self.usgs_site_code,
+                    data_ranges["observed_value_time_min"],
+                    data_ranges["observed_value_time_max"]
+                    )
+                info += "| **Monitoring page** | "
+                info += f'<a href="{url}" target="_blank">Open new tab</a> |'
+                site_information.update(info)
+
+            # These filters do not update hydrograph or barplot
+            if callback_type in ["lead_time", "significant"]:
+                return
+
+            # Retrieve metrics
+            metric_data = load_site_metrics(
+                root=root,
+                label=filter_widgets.label,
+                configuration=filter_widgets.configuration,
+                metric=filter_widgets.metric,
+                nwm_feature_id=self.nwm_feature_id,
+                rank=filter_widgets.rank,
+                cache=True
+            )
+
+            # Clear barplot
+            barplot.erase()
+
+            # Update barplot
+            barplot.update(
+                xdata=metric_data["lead_time_hours_min"],
+                ydata=metric_data[filter_widgets.point_column].to_numpy(),
+                ydata_lower=metric_data[filter_widgets.lower_column].to_numpy(),
+                ydata_upper=metric_data[filter_widgets.upper_column].to_numpy(),
+                xlabel="Minimum Lead Time (h)",
+                ylabel=filter_widgets.metric_label
+            )
+
+            # These filters do not update hydrograph
+            if callback_type in ["rank", "metric"]:
+                return
+
+            # Update hydrograph
+            draw_hydrograph(event, callback_type)
         site_map.bind_click(handle_map_click)
 
         def handle_relayout(event: dict[str, Any], callback_type: str) -> None:
@@ -416,6 +436,10 @@ class Dashboard(Viewer):
             # Change scale
             if callback_type == "axis_scale":
                 hydrograph.set_axis_type(streamflow_options.axis_scale)
+                return
+
+            # Apply options (i.e. change measurement units)
+            draw_hydrograph(event, callback_type)
         streamflow_options.bind(handle_streamflow_options)
 
         # Initialize states
