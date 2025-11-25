@@ -142,6 +142,14 @@ class Dashboard(Viewer):
                         pl.col("observed_cfs").mul(conversion_factor)
                     )
 
+                # Accumulate
+                if streamflow_options.measurement_units in [
+                    MeasurementUnits.CUMULATIVE_INCHES_PER_HOUR
+                ]:
+                    observations = observations.with_columns(
+                        pl.col("observed_cfs").cum_sum()
+                    )
+
                 # Replace data
                 hydrograph.update_trace(
                     xdata=observations["value_time"].to_numpy(),
@@ -150,6 +158,7 @@ class Dashboard(Viewer):
                 )
 
             # Stream predictions
+            accumulated_value = 0.0
             for df in nwm_site_generator(
                 root=root,
                 configuration=filter_widgets.configuration,
@@ -165,11 +174,11 @@ class Dashboard(Viewer):
                     ).dt.strftime(
                         "Issued: %Y-%m-%d %HZ"
                     ).alias("datetime_string")
-                )
+                ).sort(["reference_time", "value_time"])
 
                 # Add each reference time
                 trace_data = []
-                for rt in df["datetime_string"].unique():
+                for rt in df["datetime_string"].unique(maintain_order=True):
                     # Extract predictions
                     predictions = df.filter(pl.col("datetime_string") == rt)
 
@@ -178,6 +187,34 @@ class Dashboard(Viewer):
                         predictions = predictions.with_columns(
                             pl.col("predicted_cfs").mul(conversion_factor)
                         )
+
+                    # Accumulate
+                    if streamflow_options.measurement_units in [
+                        MeasurementUnits.CUMULATIVE_INCHES_PER_HOUR
+                    ]:
+                        # Distinguish between analysis and forecast
+                        if filter_widgets.configuration in [
+                            ModelConfiguration.ANALYSIS_ASSIM_EXTEND_ALASKA_NO_DA,
+                            ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA,
+                            ModelConfiguration.ANALYSIS_ASSIM_HAWAII_NO_DA,
+                            ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA
+                        ]:
+                            predictions = predictions.with_columns(
+                                pl.col("predicted_cfs").cum_sum().add(accumulated_value)
+                            )
+                            accumulated_value = predictions["predicted_cfs"].max()
+                        else:
+                            intial_time = predictions["value_time"].min() - pl.duration(hours=1)
+                            vals = observations.filter(
+                                pl.col("value_time") == intial_time
+                            )["observed_cfs"]
+                            if vals.is_empty():
+                                accumulated_value = 0.0
+                            else:
+                                accumulated_value = vals.item(0)
+                            predictions = predictions.with_columns(
+                                pl.col("predicted_cfs").cum_sum().add(accumulated_value)
+                            )
 
                     # Add trace data
                     trace_data.append((
