@@ -1,5 +1,6 @@
 """Dashboard objects."""
 from typing import Any
+from datetime import datetime
 
 import polars as pl
 import panel as pn
@@ -17,6 +18,28 @@ from .constants import (METRIC_PLOTTING_LIMITS, CONFIGURATION_LINE_TYPE, SITE_CO
     MeasurementUnits)
 from .options import StreamflowOptions, compute_conversion_factor
 from .configuration import Configuration
+
+def generate_usgs_url(
+        usgs_site_code: str,
+        start_datetime: datetime,
+        end_datetime: datetime
+    ) -> str:
+    """Returns URL to USGS monitoring location page."""
+    # Base monitoring location URL
+    url = f"https://waterdata.usgs.gov/monitoring-location/USGS-{usgs_site_code}/#"
+
+    # parameters
+    params = {
+        "dataTypeId": "continuous-00060-0",
+        "showFieldMeasurements": "true",
+        "startDT": start_datetime.strftime("%Y-%m-%dT%H:%M"),
+        "endDT": end_datetime.strftime("%Y-%m-%dT%H:%M")
+    }
+
+    # Finish building URL
+    for k, v in params.items():
+        url += f"&{k}={v}"
+    return url
 
 class Dashboard(Viewer):
     """Build a dashboard for exploring National Water Model output."""
@@ -83,7 +106,11 @@ class Dashboard(Viewer):
                 for series in load_site_information(root, usgs_site_code,
                     rename=SITE_COLUMN_MAPPING).iter_columns():
                     info += f"| **{series.name}** | {series.item(0)} |  \n"
-                url = f"https://waterdata.usgs.gov/monitoring-location/USGS-{usgs_site_code}/"
+                url = generate_usgs_url(
+                    usgs_site_code,
+                    data_ranges["observed_value_time_min"],
+                    data_ranges["observed_value_time_max"]
+                    )
                 info += "| **Monitoring page** | "
                 info += f'<a href="{url}" target="_blank">Open new tab</a> |'
                 site_information.update(info)
