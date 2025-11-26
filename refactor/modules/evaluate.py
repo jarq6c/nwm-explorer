@@ -596,7 +596,7 @@ def evaluate(
         First reference time.
     end_time: pandas.Timestamp
         Last reference time.
-    process: int, optional, default 1
+    processes: int, optional, default 1
         Number of parallel processes to use for computation.
     sites_per_chunk: int, optional, default 1
         Maximum number of sites to load into memory at once.

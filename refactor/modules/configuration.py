@@ -3,16 +3,35 @@ Application-wide configuration.
 """
 from pathlib import Path
 import inspect
+from datetime import datetime
 
 from pydantic import BaseModel
 
 from .logger import get_logger
 
+class Evaluation(BaseModel):
+    """
+    Model for evaluation parameters.
+
+    Attributes
+    ----------
+    label: str
+        Machine-friendly label used to generate parquet store.
+    start_time: pandas.Timestamp
+        First reference time.
+    end_time: pandas.Timestamp
+        Last reference time.
+    """
+    label: str
+    start_time: datetime
+    end_time: datetime
+
 class MapLayer(BaseModel):
     """
     Model for additional map layers.
 
-    Attributes:
+    Attributes
+    ----------
     name: str
         Name to display.
     path: pathlib.Path
@@ -36,16 +55,28 @@ class Configuration(BaseModel):
         Endpoint for service.
     root: pathlib.Path
         Root data directory.
-    key: str
+    usgs_api_key: str
         USGS API key.
     map_layers: list[MapLayer]
         List of additional map layers to show on map.
+    evaluations: list[Evaluation]
+        List of evaluations to run.
+    processes: int, optional, default 1
+        Number of parallel processes to use for computation.
+    sites_per_chunk: int, optional, default 1
+        Maximum number of sites to load into memory at once.
+    retries: int, optional, default 3
+        Number of times to retry downloads.
     """
     title: str
     endpoint: str
     root: Path
     usgs_api_key: str
     map_layers: list[MapLayer]
+    evaluations: list[Evaluation]
+    processes: int = 1
+    sites_per_chunk: int = 1
+    retries: int = 3
 
 def load_configuration(configuration_file: Path) -> Configuration:
     """

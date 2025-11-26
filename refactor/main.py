@@ -8,6 +8,8 @@ import pandas as pd
 from modules.configuration import load_configuration
 from modules.nwm import download_nwm
 from modules.usgs import download_usgs
+from modules.pairs import pair_nwm_usgs
+from modules.evaluate import evaluate as run_evaluation
 from modules.gui import serve_dashboards
 
 app = typer.Typer()
@@ -17,13 +19,14 @@ app = typer.Typer()
 def download(
     start: datetime,
     end: datetime,
-    configuration: Path = Path("config.json")
+    root: Path,
+    jobs: int = 1,
+    retries: int = 3
     ) -> None:
     """
     Download and process NWM and USGS data for evaluations.
     """
-    # Parse configuration
-    config = load_configuration(configuration)
+    # Use time stamps
     start = pd.Timestamp(start)
     end = pd.Timestamp(end)
 
@@ -31,22 +34,119 @@ def download(
     download_nwm(
         start=start,
         end=end,
-        root=config.root,
-        jobs=18,
-        retries=1
+        root=root,
+        jobs=jobs,
+        retries=retries
     )
 
     # USGS downloads
     download_usgs(
         start=start-pd.Timedelta("1d"),
         end=end+pd.Timedelta("10d"),
-        root=config.root
+        root=root,
+        retries=retries
     )
 
 @app.command()
-def serve(configuration: Path = Path("config.json")) -> None:
+def pair(
+    start: datetime,
+    end: datetime,
+    root: Path
+    ) -> None:
     """
-    Serve web application graphical user interface.
+    Resample and pair NWM predictions to USGS observations.
+    """
+    # Use timestamps
+    start = pd.Timestamp(start)
+    end = pd.Timestamp(end)
+
+    # Pair
+    pair_nwm_usgs(
+        root=root,
+        start_date=start,
+        end_date=end
+    )
+
+@app.command()
+def compute(
+    start: datetime,
+    end: datetime,
+    root: Path,
+    label: str,
+    jobs: int = 1,
+    sites_per_chunk: int = 500
+    ) -> None:
+    """
+    Compute evaluation metrics for NWM-USGS pairs.
+    """
+    # Use timestamps
+    start = pd.Timestamp(start)
+    end = pd.Timestamp(end)
+
+    # Evaluate
+    run_evaluation(
+        label=label,
+        root=root,
+        start_time=start,
+        end_time=end,
+        processes=jobs,
+        sites_per_chunk=sites_per_chunk
+    )
+
+@app.command()
+def evaluate(configuration: Path = Path("config.json")) -> None:
+    """
+    Run standard evaluation including download, pair, and compute. Parameters
+    set in configuration file.
+    """
+    # Load configuration
+    config = load_configuration(configuration_file=configuration)
+
+    # Process each evaluation
+    for e in config.evaluations:
+        # Set start and end times
+        start = pd.Timestamp(e.start_time)
+        end = pd.Timestamp(e.end_time)
+
+        # NWM downloads
+        download_nwm(
+            start=start,
+            end=end,
+            root=config.root,
+            jobs=config.processes,
+            retries=config.retries
+        )
+
+        # USGS downloads
+        download_usgs(
+            start=start-pd.Timedelta("1d"),
+            end=end+pd.Timedelta("10d"),
+            root=config.root,
+            retries=config.retries
+        )
+
+        # Pair
+        pair_nwm_usgs(
+            root=config.root,
+            start_date=start,
+            end_date=end
+        )
+
+        # Evaluate
+        run_evaluation(
+            label=e.label,
+            root=config.root,
+            start_time=start,
+            end_time=end,
+            processes=config.processes,
+            sites_per_chunk=config.sites_per_chunk
+        )
+
+@app.command()
+def display(configuration: Path = Path("config.json")) -> None:
+    """
+    Launch graphical application in the browser. Shutdown the application using
+    ctrl+c.
     """
     serve_dashboards(
         configuration_file=configuration
