@@ -14,7 +14,7 @@ from modules.usgs import download_usgs
 from modules.pairs import pair_nwm_usgs
 from modules.evaluate import evaluate as run_evaluation
 from modules.evaluate import scan_evaluations
-from modules.constants import ModelConfiguration, Metric
+from modules.constants import ModelConfiguration, Metric, COLUMN_DESCRIPTIONS
 from modules.gui import serve_dashboards
 
 app = typer.Typer()
@@ -156,7 +156,8 @@ def export(
         output: typer.FileTextWrite | None = None,
         lead_time_hours_min: int = 0,
         rank: Literal["min", "median", "max"] = "median",
-        additional_columns: tuple[str] | None = None
+        additional_columns: tuple[str] | None = None,
+        no_data_value: str | None = None
     ) -> None:
     """
     Export evaluation metrics to CSV.
@@ -197,13 +198,21 @@ def export(
             f"{metric}_{rank}_point",
             f"{metric}_{rank}_upper"
         ]
-    ).collect().write_csv(
-        float_precision=2,
-        datetime_format="%Y-%m-%dT%H:%M"
-        )
+    ).collect()
+
+    # Write header
+    header = "# National Water Model Evaluations\n# \n"
+    for col in data.columns:
+        header += f"# {col}: {COLUMN_DESCRIPTIONS.get(col)}\n"
+    header += "# \n"
+    output.write(header)
 
     # Write data
-    output.write(data)
+    output.write(data.write_csv(
+        float_precision=2,
+        datetime_format="%Y-%m-%dT%H:%M",
+        null_value=no_data_value
+    ))
 
 @app.command()
 def display(configuration: Path = Path("config.json")) -> None:
