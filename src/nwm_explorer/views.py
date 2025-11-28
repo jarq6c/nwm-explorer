@@ -20,6 +20,7 @@ from nwm_explorer.constants import (ModelDomain, GROUP_SPECIFICATIONS, DOMAIN_LO
     CONFIGURATION_LOOKUP, NWMGroupSpecification, METRIC_LOOKUP, RANK_LOOKUP,
     PlotlyFigure, DEFAULT_CENTER, DEFAULT_ZOOM, AxisType)
 from nwm_explorer.configuration import MapLayer
+from nwm_explorer.hypothesis import HYPOTHESIS_TESTS
 
 pn.extension('tabulator')
 
@@ -89,9 +90,9 @@ class FilterWidgets(Viewer):
                 name="Streamflow aggregation method",
                 options=list(RANK_LOOKUP.keys())
             ),
-            "significant": pn.widgets.Select(
-                name="Show",
-                options=["All sites", "Statistically significant"]
+            "hypothesis": pn.widgets.Select(
+                name="Alt. Hypothesis (95% confidence)",
+                options=list(HYPOTHESIS_TESTS.keys())
             ),
             "lead_time": pn.pane.Placeholder()
         }
@@ -187,9 +188,14 @@ class FilterWidgets(Viewer):
         return RANK_LOOKUP[self._widgets["rank"].value]
 
     @property
-    def significant(self) -> bool:
-        """Only show 'statistically significant sites."""
-        return self._widgets["significant"].value == "Statistically significant"
+    def hypothesis(self) -> bool:
+        """Currently selected hypothesis test label."""
+        return self._widgets["hypothesis"].value
+
+    @property
+    def hypothesis_test(self) -> bool:
+        """Currently selected hypothesis test function."""
+        return HYPOTHESIS_TESTS[self._widgets["hypothesis"].value]
 
     @property
     def point_column(self) -> str:
