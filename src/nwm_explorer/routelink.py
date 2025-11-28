@@ -8,9 +8,9 @@ import pandas as pd
 import polars as pl
 from yarl import URL
 
-from .logger import get_logger
-from .downloads import download_files
-from .constants import (ModelDomain, ROUTELINK_URL, ROUTELINK_PARQUET,
+from nwm_explorer.logger import get_logger
+from nwm_explorer.downloads import download_files
+from nwm_explorer.constants import (ModelDomain, ROUTELINK_URL, ROUTELINK_PARQUET,
     ROUTELINK_FILENAMES)
 
 def download_routelink(

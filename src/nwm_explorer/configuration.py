@@ -7,7 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from .logger import get_logger
+from nwm_explorer.logger import get_logger
 
 class Evaluation(BaseModel):
     """

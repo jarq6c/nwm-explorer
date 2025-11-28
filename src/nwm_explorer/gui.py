@@ -3,8 +3,8 @@ from pathlib import Path
 
 import panel as pn
 
-from .dashboard import Dashboard
-from .configuration import load_configuration, Configuration
+from nwm_explorer.dashboard import Dashboard
+from nwm_explorer.configuration import load_configuration, Configuration
 
 def generate_dashboard(
         configuration: Configuration

@@ -6,11 +6,11 @@ import inspect
 import pandas as pd
 import polars as pl
 
-from .routelink import download_routelink
-from .nwm import scan_nwm
-from .usgs import scan_usgs, STATE_LIST
-from .logger import get_logger
-from .constants import (ModelConfiguration, LRU_CACHE_SIZES, SUBDIRECTORIES,
+from nwm_explorer.routelink import download_routelink
+from nwm_explorer.nwm import scan_nwm
+from nwm_explorer.usgs import scan_usgs, STATE_LIST
+from nwm_explorer.logger import get_logger
+from nwm_explorer.constants import (ModelConfiguration, LRU_CACHE_SIZES, SUBDIRECTORIES,
     GROUP_SPECIFICATIONS)
 
 @functools.lru_cache(LRU_CACHE_SIZES["pairs"])

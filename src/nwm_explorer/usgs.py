@@ -21,10 +21,10 @@ import pandas as pd
 import polars as pl
 import geopandas as gpd
 
-from .logger import get_logger
-from .downloads import download_files
-from .configuration import Configuration
-from .constants import (LRU_CACHE_SIZES, SUBDIRECTORIES, SiteTypeSlug,
+from nwm_explorer.logger import get_logger
+from nwm_explorer.downloads import download_files
+from nwm_explorer.configuration import Configuration
+from nwm_explorer.constants import (LRU_CACHE_SIZES, SUBDIRECTORIES, SiteTypeSlug,
     NWIS_BASE_URL, MONITORING_LOCATION_BASE_URL, STATE_LIST, SITE_TYPES,
     SITE_SCHEMA)
 

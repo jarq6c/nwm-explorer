@@ -21,10 +21,10 @@ import pandas as pd
 import polars as pl
 import xarray as xr
 
-from .logger import get_logger
-from .downloads import download_files, FileValidationError
-from .routelink import download_routelink
-from .constants import (LRU_CACHE_SIZES, SUBDIRECTORIES, GOOGLE_CLOUD_BUCKET_URL,
+from nwm_explorer.logger import get_logger
+from nwm_explorer.downloads import download_files, FileValidationError
+from nwm_explorer.routelink import download_routelink
+from nwm_explorer.constants import (LRU_CACHE_SIZES, SUBDIRECTORIES, GOOGLE_CLOUD_BUCKET_URL,
     ModelConfiguration, ModelDomain, URLBuilder)
 
 def netcdf_validator(filepath: Path) -> None:

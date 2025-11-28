@@ -14,12 +14,12 @@ import numpy.typing as npt
 import numpy as np
 import geopandas as gpd
 
-from .nwm import ModelConfiguration
-from .evaluate import Metric
-from .constants import (ModelDomain, GROUP_SPECIFICATIONS, DOMAIN_LOOKUP,
+from nwm_explorer.nwm import ModelConfiguration
+from nwm_explorer.evaluate import Metric
+from nwm_explorer.constants import (ModelDomain, GROUP_SPECIFICATIONS, DOMAIN_LOOKUP,
     CONFIGURATION_LOOKUP, NWMGroupSpecification, METRIC_LOOKUP, RANK_LOOKUP,
     PlotlyFigure, DEFAULT_CENTER, DEFAULT_ZOOM, AxisType)
-from .configuration import MapLayer
+from nwm_explorer.configuration import MapLayer
 
 pn.extension('tabulator')
 

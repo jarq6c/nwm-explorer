@@ -12,7 +12,7 @@ import aiohttp
 from aiohttp.typedefs import LooseHeaders
 import aiofiles
 
-from .logger import get_logger
+from nwm_explorer.logger import get_logger
 
 class FileValidationError(Exception):
     """Exception raised when file fails to validate."""

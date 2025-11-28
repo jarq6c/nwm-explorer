@@ -8,14 +8,14 @@ import typer
 import pandas as pd
 import polars as pl
 
-from .configuration import load_configuration
-from .nwm import download_nwm
-from .usgs import download_usgs
-from .pairs import pair_nwm_usgs
-from .evaluate import evaluate as run_evaluation
-from .evaluate import scan_evaluations
-from .constants import ModelConfiguration, Metric, COLUMN_DESCRIPTIONS
-from .gui import serve_dashboards
+from nwm_explorer.configuration import load_configuration
+from nwm_explorer.nwm import download_nwm
+from nwm_explorer.usgs import download_usgs
+from nwm_explorer.pairs import pair_nwm_usgs
+from nwm_explorer.evaluate import evaluate as run_evaluation
+from nwm_explorer.evaluate import scan_evaluations
+from nwm_explorer.constants import ModelConfiguration, Metric, COLUMN_DESCRIPTIONS
+from nwm_explorer.gui import serve_dashboards
 
 app = typer.Typer()
 """Main typer command-line application."""

@@ -1,13 +1,23 @@
 {
     "title": "National Water Model Evaluations",
     "endpoint": "nwm-evaluations",
-    "root": "/path/to/my/data/directory",
-    "usgs_api_key": "abcdef",
+    "root": "/path/to/my/data",
+    "usgs_api_key": "ABCDEF12345",
+    "processes": 2,
+    "sites_per_chunk": 500,
+    "retries": 3,
+    "evaluations": [
+        {
+            "label": "test_run_1",
+            "start_time": "2024-10-01",
+            "end_time": "2024-10-03"
+        }
+    ],
     "map_layers": [
         {
-            "name": "My First Extra Layer",
-            "path": "/path/to/my/data.parquet",
-            "columns": ["Name"]
+            "name": "My Extra Layer",
+            "path": "/path/to/my/extra/layer.parquet",
+            "columns": ["attribute_1"]
         }
     ]
 }

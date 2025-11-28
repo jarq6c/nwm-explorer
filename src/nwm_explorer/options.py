@@ -5,8 +5,8 @@ from pathlib import Path
 import panel as pn
 from panel.viewable import Viewer
 
-from .constants import AxisType, MeasurementUnits
-from .usgs import load_site_information
+from nwm_explorer.constants import AxisType, MeasurementUnits
+from nwm_explorer.usgs import load_site_information
 
 UNIT_CONVERSIONS: dict[str, float] = {
     MeasurementUnits.CUBIC_FEET_PER_SECOND: 1.0,

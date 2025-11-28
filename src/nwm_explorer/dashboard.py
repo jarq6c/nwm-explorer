@@ -8,16 +8,16 @@ import pandas as pd
 from panel.template import MaterialTemplate
 from panel.viewable import Viewer
 
-from .nwm import nwm_site_generator
-from .evaluate import load_metrics, scan_evaluations, load_site_metrics
-from .routelink import download_routelink
-from .usgs import usgs_site_generator, load_site_information
-from .views import (FilterWidgets, MapView, TimeSeriesView, BarPlot, ECDFMatrix,
+from nwm_explorer.nwm import nwm_site_generator
+from nwm_explorer.evaluate import load_metrics, scan_evaluations, load_site_metrics
+from nwm_explorer.routelink import download_routelink
+from nwm_explorer.usgs import usgs_site_generator, load_site_information
+from nwm_explorer.views import (FilterWidgets, MapView, TimeSeriesView, BarPlot, ECDFMatrix,
     MarkdownView, ECDFSelector)
-from .constants import (METRIC_PLOTTING_LIMITS, CONFIGURATION_LINE_TYPE, SITE_COLUMN_MAPPING,
+from nwm_explorer.constants import (METRIC_PLOTTING_LIMITS, CONFIGURATION_LINE_TYPE, SITE_COLUMN_MAPPING,
     MeasurementUnits, ModelConfiguration)
-from .options import StreamflowOptions, compute_conversion_factor
-from .configuration import Configuration
+from nwm_explorer.options import StreamflowOptions, compute_conversion_factor
+from nwm_explorer.configuration import Configuration
 
 def generate_usgs_url(
         usgs_site_code: str,

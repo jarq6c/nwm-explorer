@@ -13,11 +13,11 @@ import numpy.typing as npt
 from numba import float64, guvectorize
 from arch.bootstrap import StationaryBootstrap, optimal_block_length
 
-from .nwm import ModelConfiguration
-from .pairs import scan_pairs, GROUP_SPECIFICATIONS
-from .logger import get_logger
-from .routelink import download_routelink
-from .constants import (Metric, SUBDIRECTORIES, LRU_CACHE_SIZES,
+from nwm_explorer.nwm import ModelConfiguration
+from nwm_explorer.pairs import scan_pairs, GROUP_SPECIFICATIONS
+from nwm_explorer.logger import get_logger
+from nwm_explorer.routelink import download_routelink
+from nwm_explorer.constants import (Metric, SUBDIRECTORIES, LRU_CACHE_SIZES,
     METRIC_SIGNIFICANCE_THRESHOLD, MetricFunction)
 
 @guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
