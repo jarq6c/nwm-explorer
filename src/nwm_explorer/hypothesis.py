@@ -33,6 +33,11 @@ class HypothesisTest(Protocol):
 
 HYPOTHESIS_TESTS: dict[str, HypothesisTest | None] = {
     "None": None,
-    "metric is not 0.0": lambda lower, upper: (lower > 0.0) | (upper < 0.0 )
+    "metric is not 0.0": lambda lower, upper: (lower > 0.0) | (upper < 0.0 ),
+    "metric is not 1.0": lambda lower, upper: (lower > 1.0) | (upper < 1.0 ),
+    "metric greater than 0.0": lambda lower, _: (lower > 0.0),
+    "metric less than 0.0": lambda _, upper: (upper < 0.0 ),
+    "metric greater than 1.0": lambda lower, _: (lower > 1.0),
+    "metric less than 1.0": lambda _, upper: (upper < 1.0 )
 }
 """Mapping from strings to hypothesis test functions."""
