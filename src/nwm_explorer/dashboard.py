@@ -182,6 +182,21 @@ class Dashboard(Viewer):
                     # Extract predictions
                     predictions = df.filter(pl.col("datetime_string") == rt)
 
+                    # Resample
+                    if streamflow_options.measurement_units in [
+                        MeasurementUnits.INCHES_PER_HOUR,
+                        MeasurementUnits.CUMULATIVE_INCHES_PER_HOUR
+                    ]:
+                        predictions = predictions.group_by_dynamic(
+                            "value_time", every="1h", group_by="reference_time"
+                        ).agg(
+                            pl.col("predicted_cfs").mean()
+                        ).upsample(
+                            time_column="value_time", every="1h"
+                        ).fill_null(
+                            strategy="forward"
+                        )
+
                     # Apply conversion
                     if conversion_factor != 1.0:
                         predictions = predictions.with_columns(
