@@ -14,8 +14,8 @@ from nwm_explorer.routelink import download_routelink
 from nwm_explorer.usgs import usgs_site_generator, load_site_information
 from nwm_explorer.views import (FilterWidgets, MapView, TimeSeriesView, BarPlot, ECDFMatrix,
     MarkdownView, ECDFSelector)
-from nwm_explorer.constants import (METRIC_PLOTTING_LIMITS, CONFIGURATION_LINE_TYPE, SITE_COLUMN_MAPPING,
-    MeasurementUnits, ModelConfiguration)
+from nwm_explorer.constants import (METRIC_PLOTTING_LIMITS, CONFIGURATION_LINE_TYPE,
+    SITE_COLUMN_MAPPING, MeasurementUnits, ModelConfiguration)
 from nwm_explorer.options import StreamflowOptions, compute_conversion_factor
 from nwm_explorer.configuration import Configuration
 
@@ -344,7 +344,7 @@ class Dashboard(Viewer):
                         "usgs_site_code",
                         "sample_size"
                         ),
-                    significant=filter_widgets.significant,
+                    condition=filter_widgets.hypothesis,
                     cache=True
                 ).with_columns(
                     latitude=pl.col("nwm_feature_id").replace_strict(
@@ -402,7 +402,7 @@ class Dashboard(Viewer):
                     "reference_time_min",
                     "reference_time_max"
                     ),
-                significant=filter_widgets.significant,
+                condition=filter_widgets.hypothesis,
                 cache=True
             ).with_columns(
                 latitude=pl.col("nwm_feature_id").replace_strict(

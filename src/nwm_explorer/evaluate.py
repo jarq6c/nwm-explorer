@@ -18,7 +18,8 @@ from nwm_explorer.pairs import scan_pairs, GROUP_SPECIFICATIONS
 from nwm_explorer.logger import get_logger
 from nwm_explorer.routelink import download_routelink
 from nwm_explorer.constants import (Metric, SUBDIRECTORIES, LRU_CACHE_SIZES,
-    METRIC_SIGNIFICANCE_THRESHOLD, MetricFunction)
+    MetricFunction)
+from nwm_explorer.hypothesis import HYPOTHESIS_TESTS
 
 @guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
 def nash_sutcliffe_efficiency(
@@ -728,7 +729,7 @@ def load_metrics_no_cache(
         lead_time_hours_min: int = 0,
         rank: Literal["min", "median", "max"] = "median",
         additional_columns: tuple[str] | None = None,
-        significant: bool = False,
+        condition: str | None = None,
 ) -> pl.DataFrame:
     """
     Returns DataFrame of metrics.
@@ -753,8 +754,8 @@ def load_metrics_no_cache(
         6-hourly aggregation. Short Range Alaska returns 5-hourly aggregations.
     additional_columns: tuple[str], optional, default ("nwm_feature_id",)
         Additional columns (often metadata) to return with metric values.
-    significant: bool, optional, default False
-        If True, only return 'statistically significant' values.
+    condition: str, optional
+        Conditional test to apply to filter out metrics.
     
     Returns
     -------
@@ -781,15 +782,15 @@ def load_metrics_no_cache(
         ] + additional_columns
     ).collect()
 
-    # Apply significance test
-    if significant:
-        threshold = METRIC_SIGNIFICANCE_THRESHOLD[metric]
-        return data.with_columns(
-            significant=~(
-                (pl.col(f"{metric}_{rank}_lower") <= threshold) &
-                (pl.col(f"{metric}_{rank}_upper") >= threshold)
+    # Apply hypothesis test
+    func = HYPOTHESIS_TESTS.get(condition)
+    if func is not None:
+        return data.filter(
+            func(
+                data[f"{metric}_{rank}_lower"].to_numpy(),
+                data[f"{metric}_{rank}_upper"].to_numpy()
             )
-        ).filter(pl.col("significant"))
+        )
     return data
 
 @functools.lru_cache(LRU_CACHE_SIZES["evaluations"])
@@ -801,7 +802,7 @@ def load_metrics_cache(
         lead_time_hours_min: int = 0,
         rank: Literal["min", "median", "max"] = "median",
         additional_columns: tuple[str] | None = None,
-        significant: bool = False
+        condition: str | None = None
 ) -> pl.DataFrame:
     """
     Returns DataFrame of metrics. Cache result.
@@ -826,8 +827,8 @@ def load_metrics_cache(
         6-hourly aggregation. Short Range Alaska returns 5-hourly aggregations.
     additional_columns: tuple[str], optional, default ("nwm_feature_id",)
         Additional columns (often metadata) to return with metric values.
-    significant: bool, optional, default False
-        If True, only return 'statistically significant' values.
+    condition: str, optional
+        Conditional test to apply to filter out metrics.
     
     Returns
     -------
@@ -854,15 +855,15 @@ def load_metrics_cache(
         ] + additional_columns
     ).collect()
 
-    # Apply significance test
-    if significant:
-        threshold = METRIC_SIGNIFICANCE_THRESHOLD[metric]
-        return data.with_columns(
-            significant=~(
-                (pl.col(f"{metric}_{rank}_lower") <= threshold) &
-                (pl.col(f"{metric}_{rank}_upper") >= threshold)
+    # Apply hypothesis test
+    func = HYPOTHESIS_TESTS.get(condition)
+    if func is not None:
+        return data.filter(
+            func(
+                data[f"{metric}_{rank}_lower"].to_numpy(),
+                data[f"{metric}_{rank}_upper"].to_numpy()
             )
-        ).filter(pl.col("significant"))
+        )
     return data
 
 def load_metrics(
@@ -873,7 +874,7 @@ def load_metrics(
         lead_time_hours_min: int = 0,
         rank: Literal["min", "median", "max"] = "median",
         additional_columns: tuple[str] | None = None,
-        significant: bool = False,
+        condition: str | None = None,
         cache: bool = False
 ) -> pl.DataFrame:
     """
@@ -899,8 +900,8 @@ def load_metrics(
         6-hourly aggregation. Short Range Alaska returns 5-hourly aggregations.
     additional_columns: tuple[str], optional, default ("nwm_feature_id",)
         Additional columns (often metadata) to return with metric values.
-    significant: bool, optional, default False
-        If True, only return 'statistically significant' values.
+    condition: str, optional
+        Conditional test to apply to filter out metrics.
     cache: bool, optional, default False
         If true, cache result.
     
@@ -918,7 +919,7 @@ def load_metrics(
             lead_time_hours_min=lead_time_hours_min,
             rank=rank,
             additional_columns=additional_columns,
-            significant=significant
+            condition=condition
         )
     return load_metrics_no_cache(
         root=root,
@@ -928,7 +929,7 @@ def load_metrics(
         lead_time_hours_min=lead_time_hours_min,
         rank=rank,
         additional_columns=additional_columns,
-        significant=significant
+        condition=condition
     )
 
 def load_site_metrics(
