@@ -16,38 +16,40 @@ Once installed, the CLI is accessible from an activated python environment using
 $ nwm-explorer --help
 ```
 ```console
-Usage: nwm-explorer [OPTIONS] COMMAND [ARGS]...
+ Usage: nwm-explorer [OPTIONS] COMMAND [ARGS]...                                                                                                   
+                                                                                                                                                   
+╭─ Options ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ --install-completion          Install completion for the current shell.                                                                         │
+│ --show-completion             Show completion for the current shell, to copy it or customize the installation.                                  │
+│ --help                        Show this message and exit.                                                                                       │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ download   Download and process NWM and USGS data for evaluations.                                                                              │
+│ pair       Resample and pair NWM predictions to USGS observations.                                                                              │
+│ compute    Compute evaluation metrics for NWM-USGS pairs.                                                                                       │
+│ evaluate   Run standard evaluation including download, pair, and compute. Parameters set in configuration file.                                 │
+│ export     Export evaluation metrics to CSV.                                                                                                    │
+│ display    Launch graphical application in the browser. Shutdown the application using ctrl+c.                                                  │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
-Options:
-  --help  Show this message and exit.
-
-Commands:
-  build     Download and process data required by evaluations.
-  display   Visualize and explore evaluation data.
-  evaluate  Run a standard evaluation.
-  export    Export predictions, observations, or evaluations to CSV.
 ```
-Note that each command (`build`, `display`, `evaluate`, `export` will show additional information using `--help`)
+Note that each command (`download`, `pair`, `compute`, etc. will show additional information using `--help`)
 
 ### Standard Usage
-Generally, users will want to run the `build`, `evaluate` and `display` commands in sequence to generate and explore NWM evaluations. Suppose we wanted to perform an ad-hoc evaluation of NWM forecasts issued from 2023-10-01 to 2023-10-03. We would run the following operations to achieve this:
-```bash
-# First, retrieve and pair the required data
-# This command will retrieve model output and matching observations.
-# It will use up to 4 cores (j) to for data processing and retry retrievals up to twice (r).
-$ nwm-explorer build -s 2023-10-01 -e 2023-10-03 -j 4 -r 2
-
-# Second, run the standard evaluation over the same period.
-# Note here we give this evaluation a special label (l). If a label isn't specified,
-# The software will assign a generic label.
-$ nwm-explorer evaluate -s 2023-10-01 -e 2023-10-03 -j 4 -l my_evaluation
-
-# Lastly, we can view the results of this evaluation using the GUI
-$ nwm-explorer display
+Generally, users will want to run the `evaluate` and `display` commands in sequence to generate and explore NWM evaluations. The `evaluate` command will run generate standard evaluation metrics given the parameters in the JSON configuration file. For example, the configuration snippet below will run an evaluation labeled `test_run_1` on National Water Model forecasts and analyses from 2024-10-01 to 2024-10-03. Running `nwm-explorer evaluate` will `download` NWM and USGS time series, `pair` time series, and `compute` evaluation metrics. After `compute` completes, metrics can be explored using the GUI by running `nwm-explorer display`.
+```json
+# config.json
+    "evaluations": [
+        {
+            "label": "test_run_1",
+            "start_time": "2024-10-01",
+            "end_time": "2024-10-03"
+        }
+    ],
 ```
 
 ## Graphical User Interface
 
 The GUI includes many options for exploring evaluation results including mapping of metrics, filtering by lead time or confidence bounds, regional histograms, hydrographs, and site information.
 
-![GUI](https://raw.githubusercontent.com/jarq6c/nwm-explorer/main/images/gui.JPG)
+![GUI](https://raw.githubusercontent.com/jarq6c/nwm-explorer/main/images/gui.png)
