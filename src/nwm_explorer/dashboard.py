@@ -7,6 +7,8 @@ import panel as pn
 import pandas as pd
 from panel.template import MaterialTemplate
 from panel.viewable import Viewer
+import numpy as np
+import numpy.typing as npt
 
 from nwm_explorer.nwm import nwm_site_generator
 from nwm_explorer.evaluate import load_metrics, scan_evaluations, load_site_metrics
@@ -66,6 +68,7 @@ class Dashboard(Viewer):
         }
         self.usgs_site_code: str | None = None
         self.nwm_feature_id: int | None = None
+        self.nwm_feature_id_list: npt.NDArray[np.int64] | None = None
 
         site_map = MapView(map_layers=configuration.map_layers)
         hydrograph = TimeSeriesView()
@@ -344,7 +347,6 @@ class Dashboard(Viewer):
                         "usgs_site_code",
                         "sample_size"
                         ),
-                    condition=filter_widgets.hypothesis,
                     cache=True
                 ).with_columns(
                     latitude=pl.col("nwm_feature_id").replace_strict(
@@ -355,6 +357,8 @@ class Dashboard(Viewer):
                         old=routelink["nwm_feature_id"].implode(),
                         new=routelink["longitude"].implode()
                     )
+                ).filter(
+                    pl.col("nwm_feature_id").is_in(self.nwm_feature_id_list)
                 )
 
                 # Sort data
@@ -420,6 +424,7 @@ class Dashboard(Viewer):
             data_ranges["observed_value_time_max"] = data["observed_value_time_max"].max()
             data_ranges["reference_time_min"] = data["reference_time_min"].min()
             data_ranges["reference_time_max"] = data["reference_time_max"].max()
+            self.nwm_feature_id_list = data["nwm_feature_id"].to_numpy()
 
             # Update map
             site_map.update(
