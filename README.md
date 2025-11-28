@@ -38,7 +38,6 @@ Note that each command (`download`, `pair`, `compute`, etc. will show additional
 ### Standard Usage
 Generally, users will want to run the `evaluate` and `display` commands in sequence to generate and explore NWM evaluations. The `evaluate` command will run generate standard evaluation metrics given the parameters in the JSON configuration file. For example, the configuration snippet below will run an evaluation labeled `test_run_1` on National Water Model forecasts and analyses from 2024-10-01 to 2024-10-03. Running `nwm-explorer evaluate` will `download` NWM and USGS time series, `pair` time series, and `compute` evaluation metrics. After `compute` completes, metrics can be explored using the GUI by running `nwm-explorer display`.
 ```json
-# config.json
     "evaluations": [
         {
             "label": "test_run_1",
@@ -50,6 +49,6 @@ Generally, users will want to run the `evaluate` and `display` commands in seque
 
 ## Graphical User Interface
 
-The GUI includes many options for exploring evaluation results including mapping of metrics, filtering by lead time or confidence bounds, regional histograms, hydrographs, and site information.
+The GUI includes many options for exploring evaluation results including mapping of metrics, filtering by lead time or aggregation, regional CDFs, hydrographs, and site information.
 
 ![GUI](https://raw.githubusercontent.com/jarq6c/nwm-explorer/main/images/gui.png)
