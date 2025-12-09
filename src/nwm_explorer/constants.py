@@ -37,6 +37,7 @@ class ModelConfiguration(StrEnum):
     ANALYSIS_ASSIM_PUERTO_RICO_NO_DA = "analysis_assim_puertorico_no_da"
     MEDIUM_RANGE_MEM_1 = "medium_range_mem1"
     MEDIUM_RANGE_BLEND = "medium_range_blend"
+    MEDIUM_RANGE_BLEND_MEM_1 = "medium_range_blend_mem1"
     MEDIUM_RANGE_NO_DA = "medium_range_no_da"
     MEDIUM_RANGE_NDFD = "medium_range_ndfd"
     MEDIUM_RANGE_ALASKA_MEM_1 = "medium_range_alaska_mem1"
@@ -145,6 +146,7 @@ GOOGLE_CLOUD_BUCKET_URL: str = "https://storage.googleapis.com/national-water-mo
 DOMAIN_LOOKUP: dict[ModelConfiguration, ModelDomainDisplay] = {
     ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA: ModelDomainDisplay.CONUS,
     ModelConfiguration.MEDIUM_RANGE_MEM_1: ModelDomainDisplay.CONUS,
+    ModelConfiguration.MEDIUM_RANGE_BLEND_MEM_1: ModelDomainDisplay.CONUS,
     ModelConfiguration.MEDIUM_RANGE_BLEND: ModelDomainDisplay.CONUS,
     ModelConfiguration.MEDIUM_RANGE_NO_DA: ModelDomainDisplay.CONUS,
     ModelConfiguration.MEDIUM_RANGE_NDFD: ModelDomainDisplay.CONUS,
@@ -168,6 +170,7 @@ CONFIGURATION_LOOKUP: dict[ModelConfiguration, str] = {
                                                     " (MRMS/Stage IV, No-DA)",
     ModelConfiguration.MEDIUM_RANGE_MEM_1: "Medium Range Deterministic (GFS)",
     ModelConfiguration.MEDIUM_RANGE_BLEND: "Medium Range Deterministic (NBM)",
+    ModelConfiguration.MEDIUM_RANGE_BLEND_MEM_1: "Medium Range Member 1 (NBM)",
     ModelConfiguration.MEDIUM_RANGE_NO_DA: "Medium Range Deterministic (GFS, No-DA)",
     ModelConfiguration.MEDIUM_RANGE_NDFD: "Medium Range Deterministic (NDFD)",
     ModelConfiguration.SHORT_RANGE: "Short Range (HRRR)",
@@ -244,6 +247,7 @@ GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
         select_columns=["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
     ),
     ModelConfiguration.MEDIUM_RANGE_MEM_1: NWMGroupSpecification(lead_time_hours_max=240),
+    ModelConfiguration.MEDIUM_RANGE_BLEND_MEM_1: NWMGroupSpecification(lead_time_hours_max=240),
     ModelConfiguration.MEDIUM_RANGE_BLEND: NWMGroupSpecification(lead_time_hours_max=240),
     ModelConfiguration.MEDIUM_RANGE_NO_DA: NWMGroupSpecification(lead_time_hours_max=240),
     ModelConfiguration.MEDIUM_RANGE_NDFD: NWMGroupSpecification(lead_time_hours_max=240),

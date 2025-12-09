@@ -307,6 +307,26 @@ def medium_range_mem_1(
         time_slices=time_slices
     )
 
+def medium_range_blend_mem_1(
+        reference_date: pd.Timestamp
+) -> list[str]:
+    """
+    Generate public urls for medium_range_blend_mem1.
+    """
+    configuration = "medium_range_blend_mem1/"
+    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 6)]
+    file_type = "medium_range_blend.channel_rt_1."
+    suffix = "conus.nc"
+    time_slices = ["f" + str(p).zfill(3) + "." for p in range(1, 241)]
+    return build_gcs_public_urls(
+        reference_date=reference_date,
+        configuration=configuration,
+        prefixes=prefixes,
+        file_type=file_type,
+        suffix=suffix,
+        time_slices=time_slices
+    )
+
 def medium_range_ndfd(
         reference_date: pd.Timestamp
 ) -> list[str]:
@@ -315,7 +335,7 @@ def medium_range_ndfd(
     """
     configuration = "medium_range_ndfd/"
     prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 6)]
-    file_type = "medium_range_ndfd.channel_rt_1."
+    file_type = "medium_range_ndfd.channel_rt."
     suffix = "conus.nc"
     time_slices = ["f" + str(p).zfill(3) + "." for p in range(1, 241)]
     return build_gcs_public_urls(
@@ -574,6 +594,7 @@ NWM_URL_BUILDERS: dict[tuple[ModelDomain, ModelConfiguration], URLBuilder] = {
     (ModelDomain.PUERTO_RICO,
      ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA): analysis_assim_puerto_rico_no_da,
     (ModelDomain.CONUS, ModelConfiguration.MEDIUM_RANGE_MEM_1): medium_range_mem_1,
+    (ModelDomain.CONUS, ModelConfiguration.MEDIUM_RANGE_BLEND_MEM_1): medium_range_blend_mem_1,
     (ModelDomain.CONUS, ModelConfiguration.MEDIUM_RANGE_BLEND): medium_range_blend,
     (ModelDomain.CONUS, ModelConfiguration.MEDIUM_RANGE_NO_DA): medium_range_no_da,
     (ModelDomain.CONUS, ModelConfiguration.MEDIUM_RANGE_NDFD): medium_range_ndfd,
@@ -674,7 +695,7 @@ def download_nwm(
             logger.info("Building %s", ofile)
             ofile.parent.mkdir(exist_ok=True, parents=True)
 
-            logger.info("Generating Google Cloud URLs")
+            logger.info("Generating NetCDF URLs")
             urls = builder(rd)
 
             # Temporary download directory
