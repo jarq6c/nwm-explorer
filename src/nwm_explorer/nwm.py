@@ -247,6 +247,26 @@ def analysis_assim_extend_no_da(
         time_slices=time_slices
     )
 
+def analysis_assim_no_da(
+        reference_date: pd.Timestamp
+) -> list[str]:
+    """
+    Generate public urls for analysis_assim_no_da.
+    """
+    configuration = "analysis_assim_no_da/"
+    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24)]
+    file_type = "analysis_assim_no_da.channel_rt."
+    suffix = "conus.nc"
+    time_slices = ["tm02."]
+    return build_gcs_public_urls(
+        reference_date=reference_date,
+        configuration=configuration,
+        prefixes=prefixes,
+        file_type=file_type,
+        suffix=suffix,
+        time_slices=time_slices
+    )
+
 def analysis_assim_hawaii_no_da(
         reference_date: pd.Timestamp
 ) -> list[str]:
@@ -589,6 +609,8 @@ NWM_URL_BUILDERS: dict[tuple[ModelDomain, ModelConfiguration], URLBuilder] = {
      ModelConfiguration.ANALYSIS_ASSIM_EXTEND_ALASKA_NO_DA): analysis_assim_extend_alaska_no_da,
     (ModelDomain.CONUS,
      ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA): analysis_assim_extend_no_da,
+    (ModelDomain.CONUS,
+     ModelConfiguration.ANALYSIS_ASSIM_NO_DA): analysis_assim_no_da,
     (ModelDomain.HAWAII,
      ModelConfiguration.ANALYSIS_ASSIM_HAWAII_NO_DA): analysis_assim_hawaii_no_da,
     (ModelDomain.PUERTO_RICO,

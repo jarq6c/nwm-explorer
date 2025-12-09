@@ -33,6 +33,7 @@ class ModelConfiguration(StrEnum):
     """Model configurations."""
     ANALYSIS_ASSIM_EXTEND_ALASKA_NO_DA = "analysis_assim_extend_alaska_no_da"
     ANALYSIS_ASSIM_EXTEND_NO_DA = "analysis_assim_extend_no_da"
+    ANALYSIS_ASSIM_NO_DA = "analysis_assim_no_da"
     ANALYSIS_ASSIM_HAWAII_NO_DA = "analysis_assim_hawaii_no_da"
     ANALYSIS_ASSIM_PUERTO_RICO_NO_DA = "analysis_assim_puertorico_no_da"
     MEDIUM_RANGE_MEM_1 = "medium_range_mem1"
@@ -145,6 +146,7 @@ GOOGLE_CLOUD_BUCKET_URL: str = "https://storage.googleapis.com/national-water-mo
 
 DOMAIN_LOOKUP: dict[ModelConfiguration, ModelDomainDisplay] = {
     ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA: ModelDomainDisplay.CONUS,
+    ModelConfiguration.ANALYSIS_ASSIM_NO_DA: ModelDomainDisplay.CONUS,
     ModelConfiguration.MEDIUM_RANGE_MEM_1: ModelDomainDisplay.CONUS,
     ModelConfiguration.MEDIUM_RANGE_BLEND_MEM_1: ModelDomainDisplay.CONUS,
     ModelConfiguration.MEDIUM_RANGE_BLEND: ModelDomainDisplay.CONUS,
@@ -168,6 +170,8 @@ DOMAIN_LOOKUP: dict[ModelConfiguration, ModelDomainDisplay] = {
 CONFIGURATION_LOOKUP: dict[ModelConfiguration, str] = {
     ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA: "Extended Analysis & Assimilation"
                                                     " (MRMS/Stage IV, No-DA)",
+    ModelConfiguration.ANALYSIS_ASSIM_NO_DA: "Analysis & Assimilation"
+                                                    " (MRMS, No-DA)",
     ModelConfiguration.MEDIUM_RANGE_MEM_1: "Medium Range Deterministic (GFS)",
     ModelConfiguration.MEDIUM_RANGE_BLEND: "Medium Range Deterministic (NBM)",
     ModelConfiguration.MEDIUM_RANGE_BLEND_MEM_1: "Medium Range Member 1 (NBM)",
@@ -243,6 +247,10 @@ GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
         lead_time_hours_max=48
     ),
     ModelConfiguration.ANALYSIS_ASSIM_EXTEND_NO_DA: NWMGroupSpecification(
+        group_by_columns=["nwm_feature_id"],
+        select_columns=["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
+    ),
+    ModelConfiguration.ANALYSIS_ASSIM_NO_DA: NWMGroupSpecification(
         group_by_columns=["nwm_feature_id"],
         select_columns=["nwm_feature_id", "reference_time", "value_time", "predicted_cfs"]
     ),
