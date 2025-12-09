@@ -9,6 +9,7 @@ import pandas as pd
 import polars as pl
 
 from nwm_explorer.configuration import load_configuration
+from nwm_explorer.routelink import download_routelink
 from nwm_explorer.nwm import download_nwm
 from nwm_explorer.usgs import download_usgs
 from nwm_explorer.pairs import pair_nwm_usgs
@@ -26,7 +27,8 @@ def download(
     end: datetime,
     root: Path,
     jobs: int = 1,
-    retries: int = 3
+    retries: int = 3,
+    nwm_base_url: str | None = None
     ) -> None:
     """
     Download and process NWM and USGS data for evaluations.
@@ -35,13 +37,20 @@ def download(
     start = pd.Timestamp(start)
     end = pd.Timestamp(end)
 
+    # Make root
+    root.mkdir(exist_ok=True, parents=True)
+
+    # Routelink
+    download_routelink(root=root)
+
     # NWM downloads
     download_nwm(
         start=start,
         end=end,
         root=root,
         jobs=jobs,
-        retries=retries
+        retries=retries,
+        nwm_base_url=nwm_base_url
     )
 
     # USGS downloads
@@ -107,6 +116,12 @@ def evaluate(configuration: Path = Path("config.json")) -> None:
     # Load configuration
     config = load_configuration(configuration_file=configuration)
 
+    # Make root
+    config.root.mkdir(exist_ok=True, parents=True)
+
+    # Routelink
+    download_routelink(root=config.root)
+
     # Process each evaluation
     for e in config.evaluations:
         # Set start and end times
@@ -119,7 +134,8 @@ def evaluate(configuration: Path = Path("config.json")) -> None:
             end=end,
             root=config.root,
             jobs=config.processes,
-            retries=config.retries
+            retries=config.retries,
+            nwm_base_url=config.nwm_base_url
         )
 
         # USGS downloads

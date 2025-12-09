@@ -38,7 +38,9 @@ dependencies = [
     "plotly",
     "colorcet",
     "arch",
-    "us"
+    "us",
+    "h5netcdf",
+    "pydantic"
 ]
 dynamic = ["version"]
 

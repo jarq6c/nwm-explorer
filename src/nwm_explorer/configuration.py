@@ -67,6 +67,8 @@ class Configuration(BaseModel):
         Maximum number of sites to load into memory at once.
     retries: int, optional, default 3
         Number of times to retry downloads.
+    nwm_base_url: str, optional
+        Base URL from which to retrieve NWM NetCDF files.
     """
     title: str
     endpoint: str
@@ -77,6 +79,7 @@ class Configuration(BaseModel):
     processes: int = 1
     sites_per_chunk: int = 1
     retries: int = 3
+    nwm_base_url: str | None = None
 
 def load_configuration(configuration_file: Path) -> Configuration:
     """

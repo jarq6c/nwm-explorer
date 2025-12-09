@@ -7,7 +7,7 @@ Methods
 - scan_nwm
 """
 from tempfile import TemporaryDirectory
-from typing import Callable, Generator
+from typing import Generator
 from dataclasses import dataclass
 from pathlib import Path
 import inspect
@@ -88,7 +88,7 @@ def process_netcdf(
     dfs = []
     for fp in job.filepaths:
         # Extract data
-        with xr.open_dataset(fp, engine="h5netcdf") as ds:
+        with xr.open_dataset(fp) as ds:
             df = ds[job.variables].sel(feature_id=job.features
                 ).to_dataframe().reset_index().dropna()
             if "time" not in df:
@@ -138,10 +138,22 @@ def process_netcdf_parallel(
     -------
     pandas.DataFrame
     """
+    # Get logger
+    name = __loader__.name + "." + inspect.currentframe().f_code.co_name
+    logger = get_logger(name)
+
     job_files = np.array_split(filepaths, max_processes)
     jobs = [NetCDFJob(j, variables, features) for j in job_files]
     with ProcessPoolExecutor(max_workers=max_processes) as pool:
-        return pd.concat(pool.map(process_netcdf, jobs), ignore_index=True)
+        if len(jobs) == 0:
+            logger.info("No jobs to process")
+            return pd.DataFrame()
+
+        try:
+            return pd.concat(pool.map(process_netcdf, jobs), ignore_index=True)
+        except ValueError as e:
+            logger.info("Unable to process files %s", e)
+    return pd.DataFrame()
 
 def generate_reference_dates(
         start: str | pd.Timestamp,
@@ -284,6 +296,26 @@ def medium_range_mem_1(
     configuration = "medium_range_mem1/"
     prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 6)]
     file_type = "medium_range.channel_rt_1."
+    suffix = "conus.nc"
+    time_slices = ["f" + str(p).zfill(3) + "." for p in range(1, 241)]
+    return build_gcs_public_urls(
+        reference_date=reference_date,
+        configuration=configuration,
+        prefixes=prefixes,
+        file_type=file_type,
+        suffix=suffix,
+        time_slices=time_slices
+    )
+
+def medium_range_ndfd(
+        reference_date: pd.Timestamp
+) -> list[str]:
+    """
+    Generate public urls for medium_range_ndfd.
+    """
+    configuration = "medium_range_ndfd/"
+    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 6)]
+    file_type = "medium_range_ndfd.channel_rt_1."
     suffix = "conus.nc"
     time_slices = ["f" + str(p).zfill(3) + "." for p in range(1, 241)]
     return build_gcs_public_urls(
@@ -544,6 +576,7 @@ NWM_URL_BUILDERS: dict[tuple[ModelDomain, ModelConfiguration], URLBuilder] = {
     (ModelDomain.CONUS, ModelConfiguration.MEDIUM_RANGE_MEM_1): medium_range_mem_1,
     (ModelDomain.CONUS, ModelConfiguration.MEDIUM_RANGE_BLEND): medium_range_blend,
     (ModelDomain.CONUS, ModelConfiguration.MEDIUM_RANGE_NO_DA): medium_range_no_da,
+    (ModelDomain.CONUS, ModelConfiguration.MEDIUM_RANGE_NDFD): medium_range_ndfd,
     (ModelDomain.ALASKA, ModelConfiguration.MEDIUM_RANGE_ALASKA_MEM_1): medium_range_alaska_mem_1,
     (ModelDomain.ALASKA, ModelConfiguration.MEDIUM_RANGE_BLEND_ALASKA): medium_range_blend_alaska,
     (ModelDomain.ALASKA, ModelConfiguration.MEDIUM_RANGE_ALASKA_NO_DA): medium_range_alaska_no_da,
@@ -576,7 +609,8 @@ def download_nwm(
         end: pd.Timestamp,
         root: Path,
         jobs: int = 1,
-        retries: int = 3
+        retries: int = 3,
+        nwm_base_url: str | None = None
 ) -> None:
     """
     Download and process NWM output.
@@ -593,10 +627,17 @@ def download_nwm(
         Number of parallel process used to process NWM output.
     retries: int, optional, default 3
         Number of times to retry NetCDF file downloads.
+    nwm_base_url: str, optional
+        Base URL from which to retrieve NWM NetCDF files.
     """
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
+
+    # Set base URL
+    if nwm_base_url is not None:
+        logger.info("NWM file server: %s", nwm_base_url)
+        os.environ["NWM_BASE_URL"] = nwm_base_url
 
     # Load routelink
     routelink = download_routelink(root).select(
@@ -665,6 +706,12 @@ def download_nwm(
                     features[domain],
                     jobs
                 )
+
+                # Check for data
+                if data.empty:
+                    logger.info("No data to write")
+                    continue
+
                 logger.info("Saving %s", ofile)
                 pl.DataFrame(data).with_columns(
                     pl.col("value_time").dt.cast_time_unit("ms"),

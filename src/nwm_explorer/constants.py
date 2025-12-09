@@ -38,6 +38,7 @@ class ModelConfiguration(StrEnum):
     MEDIUM_RANGE_MEM_1 = "medium_range_mem1"
     MEDIUM_RANGE_BLEND = "medium_range_blend"
     MEDIUM_RANGE_NO_DA = "medium_range_no_da"
+    MEDIUM_RANGE_NDFD = "medium_range_ndfd"
     MEDIUM_RANGE_ALASKA_MEM_1 = "medium_range_alaska_mem1"
     MEDIUM_RANGE_BLEND_ALASKA = "medium_range_blend_alaska"
     MEDIUM_RANGE_ALASKA_NO_DA = "medium_range_alaska_no_da"
@@ -146,6 +147,7 @@ DOMAIN_LOOKUP: dict[ModelConfiguration, ModelDomainDisplay] = {
     ModelConfiguration.MEDIUM_RANGE_MEM_1: ModelDomainDisplay.CONUS,
     ModelConfiguration.MEDIUM_RANGE_BLEND: ModelDomainDisplay.CONUS,
     ModelConfiguration.MEDIUM_RANGE_NO_DA: ModelDomainDisplay.CONUS,
+    ModelConfiguration.MEDIUM_RANGE_NDFD: ModelDomainDisplay.CONUS,
     ModelConfiguration.SHORT_RANGE: ModelDomainDisplay.CONUS,
     ModelConfiguration.ANALYSIS_ASSIM_EXTEND_ALASKA_NO_DA: ModelDomainDisplay.ALASKA,
     ModelConfiguration.MEDIUM_RANGE_ALASKA_MEM_1: ModelDomainDisplay.ALASKA,
@@ -167,6 +169,7 @@ CONFIGURATION_LOOKUP: dict[ModelConfiguration, str] = {
     ModelConfiguration.MEDIUM_RANGE_MEM_1: "Medium Range Deterministic (GFS)",
     ModelConfiguration.MEDIUM_RANGE_BLEND: "Medium Range Deterministic (NBM)",
     ModelConfiguration.MEDIUM_RANGE_NO_DA: "Medium Range Deterministic (GFS, No-DA)",
+    ModelConfiguration.MEDIUM_RANGE_NDFD: "Medium Range Deterministic (NDFD)",
     ModelConfiguration.SHORT_RANGE: "Short Range (HRRR)",
     ModelConfiguration.ANALYSIS_ASSIM_EXTEND_ALASKA_NO_DA: "Extended Analysis & Assimilation"
                                                            " (MRMS/Stage IV, No-DA)",
@@ -243,6 +246,7 @@ GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
     ModelConfiguration.MEDIUM_RANGE_MEM_1: NWMGroupSpecification(lead_time_hours_max=240),
     ModelConfiguration.MEDIUM_RANGE_BLEND: NWMGroupSpecification(lead_time_hours_max=240),
     ModelConfiguration.MEDIUM_RANGE_NO_DA: NWMGroupSpecification(lead_time_hours_max=240),
+    ModelConfiguration.MEDIUM_RANGE_NDFD: NWMGroupSpecification(lead_time_hours_max=240),
     ModelConfiguration.SHORT_RANGE: NWMGroupSpecification(
         window_interval=6,
         lead_time_hours_max=18
