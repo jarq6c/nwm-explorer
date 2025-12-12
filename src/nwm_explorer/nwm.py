@@ -571,7 +571,7 @@ def short_range_puerto_rico(
     Generate public urls for short_range_puertorico.
     """
     configuration = "short_range_puertorico/"
-    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(6, 30, 12)]
+    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 6)]
     file_type = "short_range.channel_rt."
     suffix = "puertorico.nc"
     time_slices = ["f" + str(p).zfill(3) + "." for p in range(1, 49)]
@@ -591,7 +591,7 @@ def short_range_puerto_rico_no_da(
     Generate public urls for short_range_puertorico_no_da.
     """
     configuration = "short_range_puertorico_no_da/"
-    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(6, 30, 12)]
+    prefixes = ["nwm.t" + str(p).zfill(2) + "z." for p in range(0, 24, 6)]
     file_type = "short_range_no_da.channel_rt."
     suffix = "puertorico.nc"
     time_slices = ["f" + str(p).zfill(3) + "." for p in range(1, 49)]

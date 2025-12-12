@@ -477,6 +477,10 @@ def load_pool(
             ).collect()
         )
 
+    # Check for data
+    if len(dataframes) == 0:
+        return pl.DataFrame()
+
     # Compute lead time and pool pairs
     logger.info("Pooling pairs")
     return pl.concat(
@@ -655,6 +659,11 @@ def evaluate(
                         )
                     )
                 )
+
+            # Check for data
+            if len(dataframes) == 0:
+                logger.info("No groups, skipping %s", ofile)
+                continue
 
             # Concatenate into a single dataframe
             logger.info("Concatenating groups")

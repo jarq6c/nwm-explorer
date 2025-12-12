@@ -13,6 +13,12 @@ from nwm_explorer.logger import get_logger
 from nwm_explorer.constants import (ModelConfiguration, LRU_CACHE_SIZES, SUBDIRECTORIES,
     GROUP_SPECIFICATIONS)
 
+class PairingError(Exception):
+    """Custom exception raised for pairing errors."""
+    def __init__(self, message: str = "Pairing error occured."):
+        self.message = message
+        super().__init__(self.message)
+
 @functools.lru_cache(LRU_CACHE_SIZES["pairs"])
 def routelink_cache(root: Path) -> pl.DataFrame:
     """Scan and collect routelink."""
@@ -171,6 +177,12 @@ def pair_nwm_usgs(
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
 
+    # Check for minimum data
+    period = end_date - start_date
+    if period < pd.Timedelta("30d"):
+        logger.info("Cannot pair %s to %s", str(start_date), str(end_date))
+        raise PairingError("Minimum period to pair is 30 days")
+
     # Pair
     prediction_store = scan_nwm(root)
     date_range = pd.date_range(
@@ -218,6 +230,11 @@ def pair_nwm_usgs(
                 every=f"{specs.window_interval}h",
                 group_by=specs.group_by_columns
             ).agg(*aggregations)
+
+            # Check for data
+            if pred.is_empty():
+                logger.info("Found no predictions")
+                continue
 
             # Get date range
             first = pred["value_time"].min()
