@@ -28,6 +28,8 @@ def download(
     root: Path,
     jobs: int = 1,
     retries: int = 3,
+    configuration: ModelConfiguration | None = None,
+    observations: bool = True,
     nwm_base_url: str | None = None
     ) -> None:
     """
@@ -50,16 +52,18 @@ def download(
         root=root,
         jobs=jobs,
         retries=retries,
-        nwm_base_url=nwm_base_url
+        nwm_base_url=nwm_base_url,
+        configuration=configuration
     )
 
     # USGS downloads
-    download_usgs(
-        start=start-pd.Timedelta("1d"),
-        end=end+pd.Timedelta("10d"),
-        root=root,
-        retries=retries
-    )
+    if observations:
+        download_usgs(
+            start=start-pd.Timedelta("1d"),
+            end=end+pd.Timedelta("10d"),
+            root=root,
+            retries=retries
+        )
 
 @app.command()
 def pair(

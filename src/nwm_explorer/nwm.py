@@ -653,7 +653,8 @@ def download_nwm(
         root: Path,
         jobs: int = 1,
         retries: int = 3,
-        nwm_base_url: str | None = None
+        nwm_base_url: str | None = None,
+        configuration: ModelConfiguration | None = None
 ) -> None:
     """
     Download and process NWM output.
@@ -672,6 +673,8 @@ def download_nwm(
         Number of times to retry NetCDF file downloads.
     nwm_base_url: str, optional
         Base URL from which to retrieve NWM NetCDF files.
+    configuraton: ModelConfiguration, optional
+        Limit download to a single model configuration.
     """
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
@@ -698,7 +701,11 @@ def download_nwm(
 
     # Download and process data
     features = {}
-    for (domain, configuration), builder in NWM_URL_BUILDERS.items():
+    for (domain, config), builder in NWM_URL_BUILDERS.items():
+        # Ignore other configurations
+        if configuration and config != configuration:
+            continue
+
         # Extract features
         if domain not in features:
             features[domain] = routelink.filter(
@@ -707,7 +714,7 @@ def download_nwm(
         # Process each reference day
         for rd in reference_dates:
             # Output file
-            ofile = build_nwm_filepath(root, configuration, rd)
+            ofile = build_nwm_filepath(root, config, rd)
 
             # Skip existing files
             if ofile.exists():
@@ -722,7 +729,7 @@ def download_nwm(
 
             # Temporary download directory
             with TemporaryDirectory(
-                prefix=f"{configuration}_{rd.strftime("%Y%m%d")}_",
+                prefix=f"{config}_{rd.strftime("%Y%m%d")}_",
                 dir=odir
                 ) as td:
                 file_paths = [Path(td) / f"part_{i}.nc" for i in range(len(urls))]
