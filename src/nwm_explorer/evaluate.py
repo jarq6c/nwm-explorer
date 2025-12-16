@@ -18,7 +18,7 @@ from nwm_explorer.pairs import scan_pairs, GROUP_SPECIFICATIONS
 from nwm_explorer.logger import get_logger
 from nwm_explorer.routelink import download_routelink
 from nwm_explorer.constants import (Metric, SUBDIRECTORIES, LRU_CACHE_SIZES,
-    MetricFunction)
+    MetricFunction, NO_THRESHOLD_LABEL)
 from nwm_explorer.hypothesis import HYPOTHESIS_TESTS
 
 @guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
@@ -412,15 +412,15 @@ def bootstrap_metrics(
                 )
 
             # Generate posterior distribution
-            posterior = []
+            posterior = np.empty(1000, dtype=np.float64)
             estimate = np.empty(shape=1, dtype=np.float64)
-            for samples in bs.bootstrap(1000):
+            for iteration, samples in enumerate(bs.bootstrap(1000)):
                 # Generate an index
                 idx = samples[0][0]
 
                 # Apply the new index and compute the metric
                 func(y_true[idx], y_pred[idx], estimate)
-                posterior.append(estimate[0])
+                posterior[iteration] = estimate[0]
 
             # Compute confidence interval
             ci = np.quantile(posterior, [0.025, 0.975])
@@ -625,7 +625,10 @@ def evaluate(
         # Process each configuration
         for config, specs in GROUP_SPECIFICATIONS.items():
             # Prepare output file
-            ofile = root / f"{subdirectory}/label={label}/configuration={config}/E0.parquet"
+            ofile = root / (
+                f"{subdirectory}/label={label}/threshold={NO_THRESHOLD_LABEL}/" +
+                f"configuration={config}/E0.parquet"
+            )
             if ofile.exists():
                 logger.info("Found %s", ofile)
                 continue
@@ -691,6 +694,7 @@ def scan_evaluations_no_cache(root: Path) -> pl.LazyFrame:
         root / f"{subdirectory}/",
         hive_schema={
             "label": pl.String,
+            "threshold": pl.String,
             "configuration": pl.Enum(ModelConfiguration)
         }
     )
@@ -739,6 +743,7 @@ def load_metrics_no_cache(
         rank: Literal["min", "median", "max"] = "median",
         additional_columns: tuple[str] | None = None,
         condition: str | None = None,
+        threshold: str = NO_THRESHOLD_LABEL
 ) -> pl.DataFrame:
     """
     Returns DataFrame of metrics.
@@ -765,6 +770,8 @@ def load_metrics_no_cache(
         Additional columns (often metadata) to return with metric values.
     condition: str, optional
         Conditional test to apply to filter out metrics.
+    threshold: str, optional
+        Streamflow threshold label applied.
     
     Returns
     -------
@@ -781,6 +788,7 @@ def load_metrics_no_cache(
         root
     ).filter(
         pl.col("label") == label,
+        pl.col("threshold") == threshold,
         pl.col("configuration") == configuration,
         pl.col("lead_time_hours_min") == lead_time_hours_min
     ).select(
@@ -811,7 +819,8 @@ def load_metrics_cache(
         lead_time_hours_min: int = 0,
         rank: Literal["min", "median", "max"] = "median",
         additional_columns: tuple[str] | None = None,
-        condition: str | None = None
+        condition: str | None = None,
+        threshold: str = NO_THRESHOLD_LABEL
 ) -> pl.DataFrame:
     """
     Returns DataFrame of metrics. Cache result.
@@ -838,6 +847,8 @@ def load_metrics_cache(
         Additional columns (often metadata) to return with metric values.
     condition: str, optional
         Conditional test to apply to filter out metrics.
+    threshold: str, optional
+        Streamflow threshold label applied.
     
     Returns
     -------
@@ -854,6 +865,7 @@ def load_metrics_cache(
         root, cache=True
     ).filter(
         pl.col("label") == label,
+        pl.col("threshold") == threshold,
         pl.col("configuration") == configuration,
         pl.col("lead_time_hours_min") == lead_time_hours_min
     ).select(
@@ -884,6 +896,7 @@ def load_metrics(
         rank: Literal["min", "median", "max"] = "median",
         additional_columns: tuple[str] | None = None,
         condition: str | None = None,
+        threshlold: str = NO_THRESHOLD_LABEL,
         cache: bool = False
 ) -> pl.DataFrame:
     """
@@ -911,6 +924,8 @@ def load_metrics(
         Additional columns (often metadata) to return with metric values.
     condition: str, optional
         Conditional test to apply to filter out metrics.
+    threshold: str, optional
+        Streamflow threshold label applied.
     cache: bool, optional, default False
         If true, cache result.
     
@@ -928,7 +943,8 @@ def load_metrics(
             lead_time_hours_min=lead_time_hours_min,
             rank=rank,
             additional_columns=additional_columns,
-            condition=condition
+            condition=condition,
+            threshlold=threshlold
         )
     return load_metrics_no_cache(
         root=root,
@@ -938,7 +954,8 @@ def load_metrics(
         lead_time_hours_min=lead_time_hours_min,
         rank=rank,
         additional_columns=additional_columns,
-        condition=condition
+        condition=condition,
+        threshold=threshlold
     )
 
 def load_site_metrics(
@@ -948,6 +965,7 @@ def load_site_metrics(
         metric: Metric,
         nwm_feature_id: int,
         rank: Literal["min", "median", "max"] = "median",
+        threshold: str = NO_THRESHOLD_LABEL,
         cache: bool = False
 ) -> pl.DataFrame:
     """
@@ -971,6 +989,8 @@ def load_site_metrics(
         will typically return daily streamflow aggregated to minimum, median, or
         maximum streamflow. Short Range CONUS, Hawaii, and Puerto Rico return
         6-hourly aggregation. Short Range Alaska returns 5-hourly aggregations.
+    threshold: str, optional
+        Streamflow threshold label applied.
     cache: bool, optional, default False
         If true, cache underlying polars.LazyFrame.
     
@@ -981,6 +1001,7 @@ def load_site_metrics(
     # Retrieve
     return scan_evaluations(root, cache).filter(
         pl.col("label") == label,
+        pl.col("threshold") == threshold,
         pl.col("configuration") == configuration,
         pl.col("nwm_feature_id") == nwm_feature_id
     ).select(

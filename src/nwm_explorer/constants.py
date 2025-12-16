@@ -613,3 +613,6 @@ COLUMN_DESCRIPTIONS: dict[str, str] = {
     "kling_gupta_efficiency_max_upper": "Kling-Gupta model efficiency of maximum predicted streamflow, upper 95% confidence estimate"
 }
 """Mapping from columns to descriptions."""
+
+NO_THRESHOLD_LABEL: str = "None"
+"""Label to indicate no threshold applied."""
