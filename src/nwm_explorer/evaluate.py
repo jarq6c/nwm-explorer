@@ -316,7 +316,8 @@ def bootstrap_metrics(
     data: pd.DataFrame,
     minimum_sample_size: int = 30,
     minimum_mean: float = 0.01,
-    minimum_variance: float = 0.000025
+    minimum_variance: float = 0.000025,
+    bootstrap_iterations: int = 1000
     ) -> dict[str, Any]:
     """
     Use stationary bootstrap to generate metrics with confidence intervals.
@@ -334,6 +335,8 @@ def bootstrap_metrics(
     minimum_variance: float, optional, default 0.000025
         Smallest variance of observed time series required to compute
         confidence intervals.
+    bootstrap_iterations: int, optional, default 1000
+        Number of posterior bootstrap samples to generate.
     
     Returns
     -------
@@ -359,13 +362,20 @@ def bootstrap_metrics(
         "sample_size": data["nwm_feature_id"].count()
     }
 
+    # Allocate posterior distribution
+    posterior = np.empty(bootstrap_iterations, dtype=np.float64)
+    estimate = np.empty(shape=1, dtype=np.float64)
+
     # Compute metrics
     for rank in ["min", "median", "max"]:
         # Extract numpy arrays for Numba functions
         y_true = data[f"observed_cfs_{rank}"].to_numpy(dtype=np.float64)
         y_pred = data[f"predicted_cfs_{rank}"].to_numpy(dtype=np.float64)
 
-        # Compute each metric
+        # Initialize bootstrap samples
+        idxs = []
+
+        # Process each metric
         for label, func in METRIC_FUNCTIONS.items():
             # Point estimate
             # NOTE Numba has magic that implicitly instantiates point, but
@@ -392,33 +402,33 @@ def bootstrap_metrics(
                 result[f"{label}_{rank}_upper"] = np.nan
                 continue
 
-            # Optimal block size
+            # Optimal block size for bootstrap
             # NOTE Normalizing the values seems to produce more consistent
             #  block sizes. Here we let the "true" values determine the block size.
-            max_value = np.max(y_true) * 1.01
-            normalized = y_true / max_value
-            block_size = optimal_block_length(normalized)["stationary"][0]
-            if np.isnan(block_size):
-                block_size = 1
-            else:
-                block_size = max(1, int(block_size))
+            if len(idxs) == 0:
+                max_value = np.max(y_true) * 1.01
+                normalized = y_true / max_value
+                block_size = optimal_block_length(normalized)["stationary"][0]
+                if np.isnan(block_size):
+                    block_size = 1
+                else:
+                    block_size = max(1, int(block_size))
 
-            # Resample the array index to apply to both y_true and y_pred
-            index = np.arange(y_true.size)
-            bs = StationaryBootstrap(
-                block_size,
-                index,
-                seed=2025
-                )
+                # Resample the array index to apply to both y_true and y_pred
+                index = np.arange(y_true.size)
+                bs = StationaryBootstrap(
+                    block_size,
+                    index,
+                    seed=2025
+                    )
 
-            # Generate posterior distribution
-            posterior = np.empty(1000, dtype=np.float64)
-            estimate = np.empty(shape=1, dtype=np.float64)
-            for iteration, samples in enumerate(bs.bootstrap(1000)):
-                # Generate an index
-                idx = samples[0][0]
+                # Bootstrap sample time series
+                for samples in bs.bootstrap(bootstrap_iterations):
+                    # Generate an index
+                    idxs.append(samples[0][0])
 
-                # Apply the new index and compute the metric
+            # Apply the new index and compute the metric
+            for iteration, idx in enumerate(idxs):
                 func(y_true[idx], y_pred[idx], estimate)
                 posterior[iteration] = estimate[0]
 
