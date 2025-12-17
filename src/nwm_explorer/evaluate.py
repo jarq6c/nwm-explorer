@@ -362,9 +362,9 @@ def bootstrap_metrics(
         "sample_size": data["nwm_feature_id"].count()
     }
 
-    # Allocate posterior distribution
-    posterior = np.empty(bootstrap_iterations, dtype=np.float64)
-    estimate = np.empty(shape=1, dtype=np.float64)
+    # Allocate memory
+    posterior = np.zeros(bootstrap_iterations, dtype=np.float64)
+    estimate = np.zeros(shape=1, dtype=np.float64)
 
     # Compute metrics
     for rank in ["min", "median", "max"]:
@@ -380,9 +380,8 @@ def bootstrap_metrics(
             # Point estimate
             # NOTE Numba has magic that implicitly instantiates point, but
             #  it makes the linter mad.
-            point = np.empty(shape=1, dtype=np.float64)
-            func(y_true, y_pred, point)
-            result[f"{label}_{rank}_point"] = point[0]
+            func(y_true, y_pred, estimate)
+            result[f"{label}_{rank}_point"] = estimate[0]
 
             # Sample size too small reliably to compute confidence interval
             if result["sample_size"] < minimum_sample_size:
