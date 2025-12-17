@@ -151,6 +151,316 @@ def compute_contingency_table(
     compute_false_negatives(y_true, y_pred, false_negatives)
     compute_true_negatives(y_true, y_pred, true_negatives)
 
+@nb.guvectorize([
+    (nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.float64[:])
+    ],
+    "(n),(n),(n),(n)->(n)")
+def probability_of_detection(
+    true_positives: npt.NDArray[np.int64],
+    false_positives: npt.NDArray[np.int64],
+    false_negatives: npt.NDArray[np.int64],
+    true_negatives: npt.NDArray[np.int64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of probability of detection.
+        
+    Parameters
+    ----------
+    true_positives: NDArray[np.int64], required
+        True positives.
+    false_positives: NDArray[np.int64], required
+        False positives.
+    false_negatives: NDArray[np.int64], required
+        False negatives.
+    true_negatives: NDArray[np.int64], required
+        True negatives.
+    result: NDArray[np.int64], required
+        Resulting values.
+        
+    Returns
+    -------
+    None
+    """
+    for i in range(true_positives.shape[0]):
+        denominator = true_positives[i] + false_negatives[i]
+        if denominator <= 0.0:
+            result[i] = np.nan
+        else:
+            result[i] = true_positives[i] / denominator
+
+@nb.guvectorize([
+    (nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.float64[:])
+    ],
+    "(n),(n),(n),(n)->(n)")
+def probability_of_false_detection(
+    true_positives: npt.NDArray[np.int64],
+    false_positives: npt.NDArray[np.int64],
+    false_negatives: npt.NDArray[np.int64],
+    true_negatives: npt.NDArray[np.int64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of probability of false detection.
+        
+    Parameters
+    ----------
+    true_positives: NDArray[np.int64], required
+        True positives.
+    false_positives: NDArray[np.int64], required
+        False positives.
+    false_negatives: NDArray[np.int64], required
+        False negatives.
+    true_negatives: NDArray[np.int64], required
+        True negatives.
+    result: NDArray[np.int64], required
+        Resulting values.
+        
+    Returns
+    -------
+    None
+    """
+    for i in range(false_positives.shape[0]):
+        denominator = false_positives[i] + true_negatives[i]
+        if denominator <= 0.0:
+            result[i] = np.nan
+        else:
+            result[i] = false_positives[i] / denominator
+
+@nb.guvectorize([
+    (nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.float64[:])
+    ],
+    "(n),(n),(n),(n)->(n)")
+def probability_of_false_alarm(
+    true_positives: npt.NDArray[np.int64],
+    false_positives: npt.NDArray[np.int64],
+    false_negatives: npt.NDArray[np.int64],
+    true_negatives: npt.NDArray[np.int64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of probability of false alarm.
+        
+    Parameters
+    ----------
+    true_positives: NDArray[np.int64], required
+        True positives.
+    false_positives: NDArray[np.int64], required
+        False positives.
+    false_negatives: NDArray[np.int64], required
+        False negatives.
+    true_negatives: NDArray[np.int64], required
+        True negatives.
+    result: NDArray[np.int64], required
+        Resulting values.
+        
+    Returns
+    -------
+    None
+    """
+    for i in range(false_positives.shape[0]):
+        denominator = false_positives[i] + true_positives[i]
+        if denominator <= 0.0:
+            result[i] = np.nan
+        else:
+            result[i] = false_positives[i] / denominator
+
+@nb.guvectorize([
+    (nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.float64[:])
+    ],
+    "(n),(n),(n),(n)->(n)")
+def threat_score(
+    true_positives: npt.NDArray[np.int64],
+    false_positives: npt.NDArray[np.int64],
+    false_negatives: npt.NDArray[np.int64],
+    true_negatives: npt.NDArray[np.int64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of threat score.
+        
+    Parameters
+    ----------
+    true_positives: NDArray[np.int64], required
+        True positives.
+    false_positives: NDArray[np.int64], required
+        False positives.
+    false_negatives: NDArray[np.int64], required
+        False negatives.
+    true_negatives: NDArray[np.int64], required
+        True negatives.
+    result: NDArray[np.int64], required
+        Resulting values.
+        
+    Returns
+    -------
+    None
+    """
+    for i in range(true_positives.shape[0]):
+        denominator = true_positives[i] + false_positives[i] + false_negatives[i]
+        if denominator <= 0.0:
+            result[i] = np.nan
+        else:
+            result[i] = true_positives[i] / denominator
+
+@nb.guvectorize([
+    (nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.float64[:])
+    ],
+    "(n),(n),(n),(n)->(n)")
+def frequency_bias(
+    true_positives: npt.NDArray[np.int64],
+    false_positives: npt.NDArray[np.int64],
+    false_negatives: npt.NDArray[np.int64],
+    true_negatives: npt.NDArray[np.int64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of frequency bias.
+        
+    Parameters
+    ----------
+    true_positives: NDArray[np.int64], required
+        True positives.
+    false_positives: NDArray[np.int64], required
+        False positives.
+    false_negatives: NDArray[np.int64], required
+        False negatives.
+    true_negatives: NDArray[np.int64], required
+        True negatives.
+    result: NDArray[np.int64], required
+        Resulting values.
+        
+    Returns
+    -------
+    None
+    """
+    for i in range(true_positives.shape[0]):
+        denominator = true_positives[i] + false_negatives[i]
+        if denominator <= 0.0:
+            result[i] = np.nan
+        else:
+            result[i] = (true_positives[i] + false_positives[i]) / denominator
+
+@nb.guvectorize([
+    (nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.float64[:])
+    ],
+    "(n),(n),(n),(n)->(n)")
+def percent_correct(
+    true_positives: npt.NDArray[np.int64],
+    false_positives: npt.NDArray[np.int64],
+    false_negatives: npt.NDArray[np.int64],
+    true_negatives: npt.NDArray[np.int64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of percent correct.
+        
+    Parameters
+    ----------
+    true_positives: NDArray[np.int64], required
+        True positives.
+    false_positives: NDArray[np.int64], required
+        False positives.
+    false_negatives: NDArray[np.int64], required
+        False negatives.
+    true_negatives: NDArray[np.int64], required
+        True negatives.
+    result: NDArray[np.int64], required
+        Resulting values.
+        
+    Returns
+    -------
+    None
+    """
+    for i in range(true_positives.shape[0]):
+        denominator = (
+            true_positives[i] +
+            false_positives[i] +
+            false_negatives[i] +
+            true_negatives[i]
+        )
+        if denominator <= 0.0:
+            result[i] = np.nan
+        else:
+            result[i] = (true_positives[i] + true_negatives[i]) / denominator
+
+@nb.guvectorize([
+    (nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.float64[:])
+    ],
+    "(n),(n),(n),(n)->(n)")
+def base_chance(
+    true_positives: npt.NDArray[np.int64],
+    false_positives: npt.NDArray[np.int64],
+    false_negatives: npt.NDArray[np.int64],
+    true_negatives: npt.NDArray[np.int64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of base chance.
+        
+    Parameters
+    ----------
+    true_positives: NDArray[np.int64], required
+        True positives.
+    false_positives: NDArray[np.int64], required
+        False positives.
+    false_negatives: NDArray[np.int64], required
+        False negatives.
+    true_negatives: NDArray[np.int64], required
+        True negatives.
+    result: NDArray[np.int64], required
+        Resulting values.
+        
+    Returns
+    -------
+    None
+    """
+    # TODO Finishing updating metric computations
+    for i in range(true_positives.shape[0]):
+        denominator = true_positives[i] + false_negatives[i]
+        if denominator <= 0.0:
+            result[i] = np.nan
+        else:
+            result[i] = true_positives[i] / denominator
+
+@nb.guvectorize([
+    (nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.float64[:])
+    ],
+    "(n),(n),(n),(n)->(n)")
+def equitable_threat_score(
+    true_positives: npt.NDArray[np.int64],
+    false_positives: npt.NDArray[np.int64],
+    false_negatives: npt.NDArray[np.int64],
+    true_negatives: npt.NDArray[np.int64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of equitable threat score.
+        
+    Parameters
+    ----------
+    true_positives: NDArray[np.int64], required
+        True positives.
+    false_positives: NDArray[np.int64], required
+        False positives.
+    false_negatives: NDArray[np.int64], required
+        False negatives.
+    true_negatives: NDArray[np.int64], required
+        True negatives.
+    result: NDArray[np.int64], required
+        Resulting values.
+        
+    Returns
+    -------
+    None
+    """
+    for i in range(true_positives.shape[0]):
+        denominator = true_positives[i] + false_negatives[i]
+        if denominator <= 0.0:
+            result[i] = np.nan
+        else:
+            result[i] = true_positives[i] / denominator
+
 def main():
     rng = np.random.default_rng(seed=2025)
     x = rng.choice([False, True], 100)
@@ -163,28 +473,31 @@ def main():
     tn = np.empty(shape=1, dtype=np.int64)
     compute_contingency_table(x, y, tp, fp, fn, tn)
 
-    a = tp[0]
-    b = fp[0]
-    c = fn[0]
-    d = tn[0]
+    pod = np.empty(shape=1, dtype=np.float64)
+    probability_of_detection(tp, fp, fn, tn, pod)
+    pofd = np.empty(shape=1, dtype=np.float64)
+    probability_of_false_detection(tp, fp, fn, tn, pofd)
+    pofa = np.empty(shape=1, dtype=np.float64)
+    probability_of_false_alarm(tp, fp, fn, tn, pofa)
+    csi = np.empty(shape=1, dtype=np.float64)
+    threat_score(tp, fp, fn, tn, csi)
+    fbi = np.empty(shape=1, dtype=np.float64)
+    frequency_bias(tp, fp, fn, tn, fbi)
+    pc = np.empty(shape=1, dtype=np.float64)
+    percent_correct(tp, fp, fn, tn, pc)
+    base = np.empty(shape=1, dtype=np.float64)
+    base_chance(tp, fp, fn, tn, base)
+    ets = np.empty(shape=1, dtype=np.float64)
+    equitable_threat_score(tp, fp, fn, tn, ets)
 
-    pod = a / (a+c)
-    pofd = b / (b+d)
-    pofa = b / (b+a)
-    csi = a / (a+b+c)
-    fbi = (a+b) / (a+c)
-    pc = (a+d) / (a+b+c+d)
-    base = ((a+b) * (a+c)) // (a+b+c+d)
-    ets = (a-base) / (a+b+c-base)
-
-    print(f"POD: {pod:.3f}")
-    print(f"POFD: {pofd:.3f}")
-    print(f"POFA: {pofa:.3f}")
-    print(f"CSI: {csi:.3f}")
-    print(f"FBI: {fbi:.3f}")
-    print(f"PC: {pc:.3f}")
-    print(f"Base: {base:.3f}")
-    print(f"ETS: {ets:.3f}")
+    print(f"POD: {pod[0]:.3f}")
+    print(f"POFD: {pofd[0]:.3f}")
+    print(f"POFA: {pofa[0]:.3f}")
+    print(f"CSI: {csi[0]:.3f}")
+    print(f"FBI: {fbi[0]:.3f}")
+    print(f"PC: {pc[0]:.3f}")
+    print(f"Base: {base[0]:.3f}")
+    print(f"ETS: {ets[0]:.3f}")
 
 if __name__ == "__main__":
     main()
