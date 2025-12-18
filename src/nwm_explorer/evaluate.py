@@ -1537,7 +1537,7 @@ def load_metrics(
         rank: Literal["min", "median", "max"] = "median",
         additional_columns: tuple[str] | None = None,
         condition: str | None = None,
-        threshlold: str = NO_THRESHOLD_LABEL,
+        threshold: str = NO_THRESHOLD_LABEL,
         cache: bool = False
 ) -> pl.DataFrame:
     """
@@ -1585,7 +1585,7 @@ def load_metrics(
             rank=rank,
             additional_columns=additional_columns,
             condition=condition,
-            threshlold=threshlold
+            threshold=threshold
         )
     return load_metrics_no_cache(
         root=root,
@@ -1596,7 +1596,7 @@ def load_metrics(
         rank=rank,
         additional_columns=additional_columns,
         condition=condition,
-        threshold=threshlold
+        threshold=threshold
     )
 
 def load_site_metrics(

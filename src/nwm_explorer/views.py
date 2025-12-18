@@ -64,7 +64,12 @@ def build_lead_time_strings(
 
 class FilterWidgets(Viewer):
     """Holds various data filtering widgets and values."""
-    def __init__(self, evaluation_options: list[str], **params):
+    def __init__(
+            self,
+            evaluation_options: list[str],
+            threshold_options: list[str],
+            **params
+        ):
         super().__init__(**params)
 
         # Merge domain and configuration look-ups
@@ -77,6 +82,10 @@ class FilterWidgets(Viewer):
             "label": pn.widgets.Select(
                 name="Evaluation",
                 options=evaluation_options
+            ),
+            "threshold": pn.widgets.Select(
+                name="Threshold",
+                options=threshold_options
             ),
             "configuration": pn.widgets.Select(
                 name="Model Configuration",
@@ -166,6 +175,11 @@ class FilterWidgets(Viewer):
     def label(self) -> str:
         """Currently selected evaluation label."""
         return self._widgets["label"].value
+
+    @property
+    def threshold(self) -> str:
+        """Currently selected evaluation threshold."""
+        return self._widgets["threshold"].value
 
     @property
     def configuration(self) -> ModelConfiguration:

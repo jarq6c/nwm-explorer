@@ -58,7 +58,9 @@ class Dashboard(Viewer):
 
         filter_widgets = FilterWidgets(
             evaluation_options=scan_evaluations(root, cache=True).select(
-                "label").collect().unique()["label"].to_list()
+                "label").collect().unique()["label"].to_list(),
+            threshold_options=scan_evaluations(root, cache=True).select(
+                "threshold").collect().unique()["threshold"].to_list()
         )
         data_ranges: dict[str, pd.Timestamp] = {
             "observed_value_time_min": None,
@@ -303,6 +305,7 @@ class Dashboard(Viewer):
                 metric=filter_widgets.metric,
                 nwm_feature_id=self.nwm_feature_id,
                 rank=filter_widgets.rank,
+                threshold=filter_widgets.threshold,
                 cache=True
             )
 
@@ -347,6 +350,7 @@ class Dashboard(Viewer):
                         "usgs_site_code",
                         "sample_size"
                         ),
+                    threshold=filter_widgets.threshold,
                     cache=True
                 ).with_columns(
                     latitude=pl.col("nwm_feature_id").replace_strict(
@@ -407,6 +411,7 @@ class Dashboard(Viewer):
                     "reference_time_max"
                     ),
                 condition=filter_widgets.hypothesis,
+                threshold=filter_widgets.threshold,
                 cache=True
             ).with_columns(
                 latitude=pl.col("nwm_feature_id").replace_strict(
