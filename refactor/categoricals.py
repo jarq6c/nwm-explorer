@@ -415,13 +415,21 @@ def base_chance(
     -------
     None
     """
-    # TODO Finishing updating metric computations
     for i in range(true_positives.shape[0]):
-        denominator = true_positives[i] + false_negatives[i]
+        denominator = (
+            true_positives[i] +
+            false_positives[i] +
+            false_negatives[i] +
+            true_negatives[i]
+        )
         if denominator <= 0.0:
             result[i] = np.nan
         else:
-            result[i] = true_positives[i] / denominator
+            result[i] = (
+                (true_positives[i] + false_positives[i]) *
+                (true_positives[i] + false_negatives[i]) /
+                denominator
+            )
 
 @nb.guvectorize([
     (nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.float64[:])
@@ -454,50 +462,98 @@ def equitable_threat_score(
     -------
     None
     """
+    a_r = np.zeros(shape=true_positives.shape, dtype=np.float64)
+    base_chance(
+        true_positives,
+        false_positives,
+        false_negatives,
+        true_negatives,
+        a_r
+    )
     for i in range(true_positives.shape[0]):
-        denominator = true_positives[i] + false_negatives[i]
+        if np.isnan(a_r[i]):
+            result[i] = np.nan
+            continue
+        denominator = true_positives[i] + false_positives[i] + false_negatives[i] - a_r[i]
         if denominator <= 0.0:
             result[i] = np.nan
         else:
-            result[i] = true_positives[i] / denominator
+            result[i] = (true_positives[i] - a_r[i]) / denominator
 
 def main():
     rng = np.random.default_rng(seed=2025)
-    x = rng.choice([False, True], 100)
-    y = rng.choice([False, True], 100)
+    bootstrap_samples = 1000
+    time_series_length = 100
+    choices = [False, True]
+    qs = [0.025, 0.975]
 
-    # contingency table
-    tp = np.empty(shape=1, dtype=np.int64)
-    fp = np.empty(shape=1, dtype=np.int64)
-    fn = np.empty(shape=1, dtype=np.int64)
-    tn = np.empty(shape=1, dtype=np.int64)
-    compute_contingency_table(x, y, tp, fp, fn, tn)
+    xs, ys = [], []
+    for _ in range(bootstrap_samples):
+        # Simulate bootstrap
+        xs.append(rng.choice(choices, time_series_length))
+        ys.append(rng.choice(choices, time_series_length))
 
-    pod = np.empty(shape=1, dtype=np.float64)
-    probability_of_detection(tp, fp, fn, tn, pod)
-    pofd = np.empty(shape=1, dtype=np.float64)
-    probability_of_false_detection(tp, fp, fn, tn, pofd)
-    pofa = np.empty(shape=1, dtype=np.float64)
-    probability_of_false_alarm(tp, fp, fn, tn, pofa)
-    csi = np.empty(shape=1, dtype=np.float64)
-    threat_score(tp, fp, fn, tn, csi)
-    fbi = np.empty(shape=1, dtype=np.float64)
-    frequency_bias(tp, fp, fn, tn, fbi)
-    pc = np.empty(shape=1, dtype=np.float64)
-    percent_correct(tp, fp, fn, tn, pc)
-    base = np.empty(shape=1, dtype=np.float64)
-    base_chance(tp, fp, fn, tn, base)
-    ets = np.empty(shape=1, dtype=np.float64)
-    equitable_threat_score(tp, fp, fn, tn, ets)
+    from time import perf_counter
+    print("Computing...")
+    start = perf_counter()
 
-    print(f"POD: {pod[0]:.3f}")
-    print(f"POFD: {pofd[0]:.3f}")
-    print(f"POFA: {pofa[0]:.3f}")
-    print(f"CSI: {csi[0]:.3f}")
-    print(f"FBI: {fbi[0]:.3f}")
-    print(f"PC: {pc[0]:.3f}")
-    print(f"Base: {base[0]:.3f}")
-    print(f"ETS: {ets[0]:.3f}")
+    tps = np.zeros(shape=bootstrap_samples, dtype=np.int64)
+    fps = np.zeros(shape=bootstrap_samples, dtype=np.int64)
+    fns = np.zeros(shape=bootstrap_samples, dtype=np.int64)
+    tns = np.zeros(shape=bootstrap_samples, dtype=np.int64)
+
+    tp = np.zeros(shape=1, dtype=np.int64)
+    fp = np.zeros(shape=1, dtype=np.int64)
+    fn = np.zeros(shape=1, dtype=np.int64)
+    tn = np.zeros(shape=1, dtype=np.int64)
+
+    for idx, (x, y) in enumerate(zip(xs, ys)):
+        # contingency table
+        compute_contingency_table(x, y, tp, fp, fn, tn)
+
+        # Store result
+        tps[idx] = tp[0]
+        fps[idx] = fp[0]
+        fns[idx] = fn[0]
+        tns[idx] = tn[0]
+
+    pod = np.zeros(shape=bootstrap_samples, dtype=np.float64)
+    probability_of_detection(tps, fps, fns, tns, pod)
+    pofd = np.zeros(shape=bootstrap_samples, dtype=np.float64)
+    probability_of_false_detection(tps, fps, fns, tns, pofd)
+    pofa = np.zeros(shape=bootstrap_samples, dtype=np.float64)
+    probability_of_false_alarm(tps, fps, fns, tns, pofa)
+    csi = np.zeros(shape=bootstrap_samples, dtype=np.float64)
+    threat_score(tps, fps, fns, tns, csi)
+    fbi = np.zeros(shape=bootstrap_samples, dtype=np.float64)
+    frequency_bias(tps, fps, fns, tns, fbi)
+    pc = np.zeros(shape=bootstrap_samples, dtype=np.float64)
+    percent_correct(tps, fps, fns, tns, pc)
+    base = np.zeros(shape=bootstrap_samples, dtype=np.float64)
+    base_chance(tps, fps, fns, tns, base)
+    ets = np.zeros(shape=bootstrap_samples, dtype=np.float64)
+    equitable_threat_score(tps, fps, fns, tns, ets)
+
+    pods = np.quantile(pod, qs)
+    pofds = np.quantile(pofd, qs)
+    pofas = np.quantile(pofa, qs)
+    csis = np.quantile(csi, qs)
+    fbis = np.quantile(fbi, qs)
+    pcs = np.quantile(pc, qs)
+    bases = np.quantile(base, qs)
+    etss = np.quantile(ets, qs)
+
+    duration = perf_counter() - start
+    print(f"Time: {duration:.4f} s")
+
+    print(f"POD: {pods[0]:.3f} - {pods[1]:.3f}")
+    print(f"POFD: {pofds[0]:.3f} - {pofds[1]:.3f}")
+    print(f"POFA: {pofas[0]:.3f} - {pofas[1]:.3f}")
+    print(f"CSI: {csis[0]:.3f} - {csis[1]:.3f}")
+    print(f"FBI: {fbis[0]:.3f} - {fbis[1]:.3f}")
+    print(f"PC: {pcs[0]:.3f} - {pcs[1]:.3f}")
+    print(f"Base: {bases[0]:.3f} - {bases[1]:.3f}")
+    print(f"ETS: {etss[0]:.3f} - {etss[1]:.3f}")
 
 if __name__ == "__main__":
     main()
