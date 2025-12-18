@@ -63,6 +63,17 @@ class Metric(StrEnum):
     RELATIVE_STANDARD_DEVIATION = "relative_standard_deviation"
     KLING_GUPTA_EFFICIENCY = "kling_gupta_efficiency"
 
+class CategoricalMetric(StrEnum):
+    """Symbols for common categorical metrics."""
+    PROBABILITY_OF_DETECTION = "probability_of_detection"
+    PROBABILITY_OF_FALSE_DETECTION = "probability_of_false_detection"
+    PROBABILITY_OF_FALSE_ALARM = "probability_of_false_alarm"
+    THREAT_SCORE = "threat_score"
+    FREQUENCY_BIAS = "frequency_bias"
+    PERCENT_CORRECT = "percent_correct"
+    BASE_CHANCE = "base_chance"
+    EQUITABLE_THREAT_SCORE = "equitable_threat_score"
+
 class SiteTypeSlug(StrEnum):
     """Machine-friendly site types."""
     STREAM = "stream"
@@ -492,6 +503,15 @@ MetricFunction = Callable[[
     npt.NDArray[np.float64]
     ], None]
 """Type hint for Numba functions that generate metrics."""
+
+CategoricalMetricFunction = Callable[[
+    npt.NDArray[np.int64],
+    npt.NDArray[np.int64],
+    npt.NDArray[np.int64],
+    npt.NDArray[np.int64],
+    npt.NDArray[np.float64]
+    ], None]
+"""Type hint for Numba functions that generate categorical metrics."""
 
 SITE_COLUMN_MAPPING: dict[str, str] = {
     "monitoring_location_name": "Name",

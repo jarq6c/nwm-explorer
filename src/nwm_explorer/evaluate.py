@@ -10,7 +10,7 @@ import polars as pl
 import pandas as pd
 import numpy as np
 import numpy.typing as npt
-from numba import float64, guvectorize
+import numba as nb
 from arch.bootstrap import StationaryBootstrap, optimal_block_length
 
 from nwm_explorer.nwm import ModelConfiguration
@@ -18,10 +18,10 @@ from nwm_explorer.pairs import scan_pairs, GROUP_SPECIFICATIONS
 from nwm_explorer.logger import get_logger
 from nwm_explorer.routelink import download_routelink
 from nwm_explorer.constants import (Metric, SUBDIRECTORIES, LRU_CACHE_SIZES,
-    MetricFunction, NO_THRESHOLD_LABEL)
+    MetricFunction, NO_THRESHOLD_LABEL, CategoricalMetric, CategoricalMetricFunction)
 from nwm_explorer.hypothesis import HYPOTHESIS_TESTS
 
-@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+@nb.guvectorize([(nb.float64[:], nb.float64[:], nb.float64[:])], "(n),(n)->()")
 def nash_sutcliffe_efficiency(
     y_true: npt.NDArray[np.float64],
     y_pred: npt.NDArray[np.float64],
@@ -50,7 +50,7 @@ def nash_sutcliffe_efficiency(
         return
     result[0] = 1.0 - np.sum((y_true - y_pred) ** 2.0) / variance
 
-@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+@nb.guvectorize([(nb.float64[:], nb.float64[:], nb.float64[:])], "(n),(n)->()")
 def relative_mean_bias(
     y_true: npt.NDArray[np.float64],
     y_pred: npt.NDArray[np.float64],
@@ -80,7 +80,7 @@ def relative_mean_bias(
         return
     result[0] = np.sum(y_pred - y_true) / np.sum(y_true)
 
-@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+@nb.guvectorize([(nb.float64[:], nb.float64[:], nb.float64[:])], "(n),(n)->()")
 def pearson_correlation_coefficient(
     y_true: npt.NDArray[np.float64],
     y_pred: npt.NDArray[np.float64],
@@ -116,7 +116,7 @@ def pearson_correlation_coefficient(
         return
     result[0] = num / den
 
-@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+@nb.guvectorize([(nb.float64[:], nb.float64[:], nb.float64[:])], "(n),(n)->()")
 def relative_standard_deviation(
     y_true: npt.NDArray[np.float64],
     y_pred: npt.NDArray[np.float64],
@@ -146,7 +146,7 @@ def relative_standard_deviation(
         return
     result[0] = np.std(y_pred) / std_dev
 
-@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+@nb.guvectorize([(nb.float64[:], nb.float64[:], nb.float64[:])], "(n),(n)->()")
 def relative_mean(
     y_true: npt.NDArray[np.float64],
     y_pred: npt.NDArray[np.float64],
@@ -176,7 +176,7 @@ def relative_mean(
         return
     result[0] = np.mean(y_pred) / mean
 
-@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+@nb.guvectorize([(nb.float64[:], nb.float64[:], nb.float64[:])], "(n),(n)->()")
 def relative_median(
     y_true: npt.NDArray[np.float64],
     y_pred: npt.NDArray[np.float64],
@@ -206,7 +206,7 @@ def relative_median(
         return
     result[0] = np.median(y_pred) / median
 
-@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+@nb.guvectorize([(nb.float64[:], nb.float64[:], nb.float64[:])], "(n),(n)->()")
 def relative_minimum(
     y_true: npt.NDArray[np.float64],
     y_pred: npt.NDArray[np.float64],
@@ -235,7 +235,7 @@ def relative_minimum(
         return
     result[0] = np.min(y_pred) / minimum
 
-@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+@nb.guvectorize([(nb.float64[:], nb.float64[:], nb.float64[:])], "(n),(n)->()")
 def relative_maximum(
     y_true: npt.NDArray[np.float64],
     y_pred: npt.NDArray[np.float64],
@@ -264,7 +264,7 @@ def relative_maximum(
         return
     result[0] = np.max(y_pred) / maximum
 
-@guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()")
+@nb.guvectorize([(nb.float64[:], nb.float64[:], nb.float64[:])], "(n),(n)->()")
 def kling_gupta_efficiency(
     y_true: npt.NDArray[np.float64],
     y_pred: npt.NDArray[np.float64],
@@ -299,6 +299,483 @@ def kling_gupta_efficiency(
         ((rel_mean[0] - 1.0)) ** 2.0
         ))
 
+@nb.guvectorize([(nb.bool[:], nb.bool[:], nb.int64[:])], "(n),(n)->()")
+def compute_true_positives(
+    y_true: npt.NDArray[np.bool],
+    y_pred: npt.NDArray[np.bool],
+    result: npt.NDArray[np.int64]
+    ) -> None:
+    """
+    Numba compatible implementation of contigency table cross-tabulation for
+    true positives.
+        
+    Parameters
+    ----------
+    y_true: NDArray[np.bool], required
+        Ground truth (correct) target values, also called observations,
+        measurements, or observed values.
+    y_pred: NDArray[np.bool], required
+        Estimated target values, also called simulations, forecasts, or modeled values.
+    result: NDArray[np.int64], required
+        Stores tabulated value.
+        
+    Returns
+    -------
+    None
+    """
+    # True positives
+    result[0] = np.sum(np.where(y_true & y_pred, 1, 0), dtype=np.int64)
+
+@nb.guvectorize([(nb.bool[:], nb.bool[:], nb.int64[:])], "(n),(n)->()")
+def compute_false_positives(
+    y_true: npt.NDArray[np.bool],
+    y_pred: npt.NDArray[np.bool],
+    result: npt.NDArray[np.int64]
+    ) -> None:
+    """
+    Numba compatible implementation of contigency table cross-tabulation for
+    false positives.
+        
+    Parameters
+    ----------
+    y_true: NDArray[np.bool], required
+        Ground truth (correct) target values, also called observations,
+        measurements, or observed values.
+    y_pred: NDArray[np.bool], required
+        Estimated target values, also called simulations, forecasts, or modeled values.
+    result: NDArray[np.int64], required
+        Stores tabulated value.
+        
+    Returns
+    -------
+    None
+    """
+    # False positives
+    result[0] = np.sum(np.where(~y_true & y_pred, 1, 0), dtype=np.int64)
+
+@nb.guvectorize([(nb.bool[:], nb.bool[:], nb.int64[:])], "(n),(n)->()")
+def compute_false_negatives(
+    y_true: npt.NDArray[np.bool],
+    y_pred: npt.NDArray[np.bool],
+    result: npt.NDArray[np.int64]
+    ) -> None:
+    """
+    Numba compatible implementation of contigency table cross-tabulation for
+    false negatives.
+        
+    Parameters
+    ----------
+    y_true: NDArray[np.bool], required
+        Ground truth (correct) target values, also called observations,
+        measurements, or observed values.
+    y_pred: NDArray[np.bool], required
+        Estimated target values, also called simulations, forecasts, or modeled values.
+    result: NDArray[np.int64], required
+        Stores tabulated value.
+        
+    Returns
+    -------
+    None
+    """
+    # False negatives
+    result[0] = np.sum(np.where(y_true & ~y_pred, 1, 0), dtype=np.int64)
+
+@nb.guvectorize([(nb.bool[:], nb.bool[:], nb.int64[:])], "(n),(n)->()")
+def compute_true_negatives(
+    y_true: npt.NDArray[np.bool],
+    y_pred: npt.NDArray[np.bool],
+    result: npt.NDArray[np.int64]
+    ) -> None:
+    """
+    Numba compatible implementation of contigency table cross-tabulation for
+    true negatives.
+        
+    Parameters
+    ----------
+    y_true: NDArray[np.bool], required
+        Ground truth (correct) target values, also called observations,
+        measurements, or observed values.
+    y_pred: NDArray[np.bool], required
+        Estimated target values, also called simulations, forecasts, or modeled values.
+    result: NDArray[np.int64], required
+        Stores tabulated value.
+        
+    Returns
+    -------
+    None
+    """
+    # True negatives
+    result[0] = np.sum(np.where(~y_true & ~y_pred, 1, 0), dtype=np.int64)
+
+@nb.guvectorize(
+    [(nb.bool[:], nb.bool[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:])],
+    "(n),(n)->(),(),(),()"
+)
+def compute_contingency_table(
+    y_true: npt.NDArray[np.bool],
+    y_pred: npt.NDArray[np.bool],
+    true_positives: npt.NDArray[np.int64],
+    false_positives: npt.NDArray[np.int64],
+    false_negatives: npt.NDArray[np.int64],
+    true_negatives: npt.NDArray[np.int64]
+    ) -> None:
+    """
+    Numba compatible implementation of contigency table cross-tabulation.
+        
+    Parameters
+    ----------
+    y_true: NDArray[np.bool], required
+        Ground truth (correct) target values, also called observations,
+        measurements, or observed values.
+    y_pred: NDArray[np.bool], required
+        Estimated target values, also called simulations, forecasts, or modeled values.
+    true_positives: NDArray[np.int64], required
+        Stores tabulated true positives.
+    false_positives: NDArray[np.int64], required
+        Stores tabulated false positives.
+    false_negatives: NDArray[np.int64], required
+        Stores tabulated false negatives.
+    true_negatives: NDArray[np.int64], required
+        Stores tabulated true negatives.
+        
+    Returns
+    -------
+    None
+    """
+    compute_true_positives(y_true, y_pred, true_positives)
+    compute_false_positives(y_true, y_pred, false_positives)
+    compute_false_negatives(y_true, y_pred, false_negatives)
+    compute_true_negatives(y_true, y_pred, true_negatives)
+
+@nb.guvectorize([
+    (nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.float64[:])
+    ],
+    "(n),(n),(n),(n)->(n)")
+def probability_of_detection(
+    true_positives: npt.NDArray[np.int64],
+    false_positives: npt.NDArray[np.int64],
+    false_negatives: npt.NDArray[np.int64],
+    true_negatives: npt.NDArray[np.int64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of probability of detection.
+        
+    Parameters
+    ----------
+    true_positives: NDArray[np.int64], required
+        True positives.
+    false_positives: NDArray[np.int64], required
+        False positives.
+    false_negatives: NDArray[np.int64], required
+        False negatives.
+    true_negatives: NDArray[np.int64], required
+        True negatives.
+    result: NDArray[np.int64], required
+        Resulting values.
+        
+    Returns
+    -------
+    None
+    """
+    for i in range(true_positives.shape[0]):
+        denominator = true_positives[i] + false_negatives[i]
+        if denominator <= 0.0:
+            result[i] = np.nan
+        else:
+            result[i] = true_positives[i] / denominator
+
+@nb.guvectorize([
+    (nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.float64[:])
+    ],
+    "(n),(n),(n),(n)->(n)")
+def probability_of_false_detection(
+    true_positives: npt.NDArray[np.int64],
+    false_positives: npt.NDArray[np.int64],
+    false_negatives: npt.NDArray[np.int64],
+    true_negatives: npt.NDArray[np.int64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of probability of false detection.
+        
+    Parameters
+    ----------
+    true_positives: NDArray[np.int64], required
+        True positives.
+    false_positives: NDArray[np.int64], required
+        False positives.
+    false_negatives: NDArray[np.int64], required
+        False negatives.
+    true_negatives: NDArray[np.int64], required
+        True negatives.
+    result: NDArray[np.int64], required
+        Resulting values.
+        
+    Returns
+    -------
+    None
+    """
+    for i in range(false_positives.shape[0]):
+        denominator = false_positives[i] + true_negatives[i]
+        if denominator <= 0.0:
+            result[i] = np.nan
+        else:
+            result[i] = false_positives[i] / denominator
+
+@nb.guvectorize([
+    (nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.float64[:])
+    ],
+    "(n),(n),(n),(n)->(n)")
+def probability_of_false_alarm(
+    true_positives: npt.NDArray[np.int64],
+    false_positives: npt.NDArray[np.int64],
+    false_negatives: npt.NDArray[np.int64],
+    true_negatives: npt.NDArray[np.int64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of probability of false alarm.
+        
+    Parameters
+    ----------
+    true_positives: NDArray[np.int64], required
+        True positives.
+    false_positives: NDArray[np.int64], required
+        False positives.
+    false_negatives: NDArray[np.int64], required
+        False negatives.
+    true_negatives: NDArray[np.int64], required
+        True negatives.
+    result: NDArray[np.int64], required
+        Resulting values.
+        
+    Returns
+    -------
+    None
+    """
+    for i in range(false_positives.shape[0]):
+        denominator = false_positives[i] + true_positives[i]
+        if denominator <= 0.0:
+            result[i] = np.nan
+        else:
+            result[i] = false_positives[i] / denominator
+
+@nb.guvectorize([
+    (nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.float64[:])
+    ],
+    "(n),(n),(n),(n)->(n)")
+def threat_score(
+    true_positives: npt.NDArray[np.int64],
+    false_positives: npt.NDArray[np.int64],
+    false_negatives: npt.NDArray[np.int64],
+    true_negatives: npt.NDArray[np.int64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of threat score.
+        
+    Parameters
+    ----------
+    true_positives: NDArray[np.int64], required
+        True positives.
+    false_positives: NDArray[np.int64], required
+        False positives.
+    false_negatives: NDArray[np.int64], required
+        False negatives.
+    true_negatives: NDArray[np.int64], required
+        True negatives.
+    result: NDArray[np.int64], required
+        Resulting values.
+        
+    Returns
+    -------
+    None
+    """
+    for i in range(true_positives.shape[0]):
+        denominator = true_positives[i] + false_positives[i] + false_negatives[i]
+        if denominator <= 0.0:
+            result[i] = np.nan
+        else:
+            result[i] = true_positives[i] / denominator
+
+@nb.guvectorize([
+    (nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.float64[:])
+    ],
+    "(n),(n),(n),(n)->(n)")
+def frequency_bias(
+    true_positives: npt.NDArray[np.int64],
+    false_positives: npt.NDArray[np.int64],
+    false_negatives: npt.NDArray[np.int64],
+    true_negatives: npt.NDArray[np.int64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of frequency bias.
+        
+    Parameters
+    ----------
+    true_positives: NDArray[np.int64], required
+        True positives.
+    false_positives: NDArray[np.int64], required
+        False positives.
+    false_negatives: NDArray[np.int64], required
+        False negatives.
+    true_negatives: NDArray[np.int64], required
+        True negatives.
+    result: NDArray[np.int64], required
+        Resulting values.
+        
+    Returns
+    -------
+    None
+    """
+    for i in range(true_positives.shape[0]):
+        denominator = true_positives[i] + false_negatives[i]
+        if denominator <= 0.0:
+            result[i] = np.nan
+        else:
+            result[i] = (true_positives[i] + false_positives[i]) / denominator
+
+@nb.guvectorize([
+    (nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.float64[:])
+    ],
+    "(n),(n),(n),(n)->(n)")
+def percent_correct(
+    true_positives: npt.NDArray[np.int64],
+    false_positives: npt.NDArray[np.int64],
+    false_negatives: npt.NDArray[np.int64],
+    true_negatives: npt.NDArray[np.int64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of percent correct.
+        
+    Parameters
+    ----------
+    true_positives: NDArray[np.int64], required
+        True positives.
+    false_positives: NDArray[np.int64], required
+        False positives.
+    false_negatives: NDArray[np.int64], required
+        False negatives.
+    true_negatives: NDArray[np.int64], required
+        True negatives.
+    result: NDArray[np.int64], required
+        Resulting values.
+        
+    Returns
+    -------
+    None
+    """
+    for i in range(true_positives.shape[0]):
+        denominator = (
+            true_positives[i] +
+            false_positives[i] +
+            false_negatives[i] +
+            true_negatives[i]
+        )
+        if denominator <= 0.0:
+            result[i] = np.nan
+        else:
+            result[i] = (true_positives[i] + true_negatives[i]) / denominator
+
+@nb.guvectorize([
+    (nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.float64[:])
+    ],
+    "(n),(n),(n),(n)->(n)")
+def base_chance(
+    true_positives: npt.NDArray[np.int64],
+    false_positives: npt.NDArray[np.int64],
+    false_negatives: npt.NDArray[np.int64],
+    true_negatives: npt.NDArray[np.int64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of base chance.
+        
+    Parameters
+    ----------
+    true_positives: NDArray[np.int64], required
+        True positives.
+    false_positives: NDArray[np.int64], required
+        False positives.
+    false_negatives: NDArray[np.int64], required
+        False negatives.
+    true_negatives: NDArray[np.int64], required
+        True negatives.
+    result: NDArray[np.int64], required
+        Resulting values.
+        
+    Returns
+    -------
+    None
+    """
+    for i in range(true_positives.shape[0]):
+        denominator = (
+            true_positives[i] +
+            false_positives[i] +
+            false_negatives[i] +
+            true_negatives[i]
+        )
+        if denominator <= 0.0:
+            result[i] = np.nan
+        else:
+            result[i] = (
+                (true_positives[i] + false_positives[i]) *
+                (true_positives[i] + false_negatives[i]) /
+                denominator
+            )
+
+@nb.guvectorize([
+    (nb.int64[:], nb.int64[:], nb.int64[:], nb.int64[:], nb.float64[:])
+    ],
+    "(n),(n),(n),(n)->(n)")
+def equitable_threat_score(
+    true_positives: npt.NDArray[np.int64],
+    false_positives: npt.NDArray[np.int64],
+    false_negatives: npt.NDArray[np.int64],
+    true_negatives: npt.NDArray[np.int64],
+    result: npt.NDArray[np.float64]
+    ) -> None:
+    """
+    Numba compatible implementation of equitable threat score.
+        
+    Parameters
+    ----------
+    true_positives: NDArray[np.int64], required
+        True positives.
+    false_positives: NDArray[np.int64], required
+        False positives.
+    false_negatives: NDArray[np.int64], required
+        False negatives.
+    true_negatives: NDArray[np.int64], required
+        True negatives.
+    result: NDArray[np.int64], required
+        Resulting values.
+        
+    Returns
+    -------
+    None
+    """
+    a_r = np.zeros(shape=true_positives.shape, dtype=np.float64)
+    base_chance(
+        true_positives,
+        false_positives,
+        false_negatives,
+        true_negatives,
+        a_r
+    )
+    for i in range(true_positives.shape[0]):
+        if np.isnan(a_r[i]):
+            result[i] = np.nan
+            continue
+        denominator = true_positives[i] + false_positives[i] + false_negatives[i] - a_r[i]
+        if denominator <= 0.0:
+            result[i] = np.nan
+        else:
+            result[i] = (true_positives[i] - a_r[i]) / denominator
+
 METRIC_FUNCTIONS: dict[Metric, MetricFunction] = {
     Metric.NASH_SUTCLIFFE_EFFICIENCY: nash_sutcliffe_efficiency,
     Metric.RELATIVE_MEAN_BIAS: relative_mean_bias,
@@ -311,6 +788,17 @@ METRIC_FUNCTIONS: dict[Metric, MetricFunction] = {
     Metric.KLING_GUPTA_EFFICIENCY: kling_gupta_efficiency
 }
 """Mapping from metrics to functions used to compute them."""
+
+CATEOGRICAL_METRIC_FUNCTIONS: dict[CategoricalMetric, CategoricalMetricFunction] = {
+    CategoricalMetric.PROBABILITY_OF_DETECTION: probability_of_detection,
+    CategoricalMetric.PROBABILITY_OF_FALSE_DETECTION: probability_of_false_detection,
+    CategoricalMetric.PROBABILITY_OF_FALSE_ALARM: probability_of_false_alarm,
+    CategoricalMetric.FREQUENCY_BIAS: frequency_bias,
+    CategoricalMetric.THREAT_SCORE: threat_score,
+    CategoricalMetric.EQUITABLE_THREAT_SCORE: equitable_threat_score,
+    CategoricalMetric.PERCENT_CORRECT: percent_correct,
+}
+"""Mapping from categorical metrics to functions used to compute them."""
 
 def bootstrap_metrics(
     data: pd.DataFrame,
@@ -366,6 +854,16 @@ def bootstrap_metrics(
     # Allocate memory
     posterior = np.zeros(bootstrap_iterations, dtype=np.float64)
     estimate = np.zeros(shape=1, dtype=np.float64)
+    tp = np.zeros(shape=1, dtype=np.int64)
+    fp = np.zeros(shape=1, dtype=np.int64)
+    fn = np.zeros(shape=1, dtype=np.int64)
+    tn = np.zeros(shape=1, dtype=np.int64)
+
+    # Memory for contingency table posteriors
+    tps = np.zeros(shape=bootstrap_iterations, dtype=np.int64)
+    fps = np.zeros(shape=bootstrap_iterations, dtype=np.int64)
+    fns = np.zeros(shape=bootstrap_iterations, dtype=np.int64)
+    tns = np.zeros(shape=bootstrap_iterations, dtype=np.int64)
 
     # Compute continuous metrics
     for rank in ["min", "median", "max"]:
@@ -384,7 +882,7 @@ def bootstrap_metrics(
         # Sample size
         result["sample_size"] = len(y_pred)
 
-        # Process each metric
+        # Process each continuous metric
         for label, func in METRIC_FUNCTIONS.items():
             # Sample size too small to compute metric
             if result["sample_size"] == 0:
@@ -448,6 +946,83 @@ def bootstrap_metrics(
                 posterior[iteration] = estimate[0]
 
             # Compute confidence interval
+            ci = np.quantile(posterior, [0.025, 0.975])
+            result[f"{label}_{rank}_lower"] = ci[0]
+            result[f"{label}_{rank}_upper"] = ci[1]
+
+        # Re-initialize bootstrap samples
+        idxs = []
+
+        # Generate dichotomous variables
+        y_true = data[f"observed_cfs_{rank}"].to_numpy(dtype=np.float64)
+        y_true_bool = y_true >= result["threshold_value"]
+        y_pred = data[f"predicted_cfs_{rank}"].to_numpy(dtype=np.float64)
+        y_pred_bool = y_pred >= result["threshold_value"]
+
+        # Process each categorical metric
+        for label, func in CATEOGRICAL_METRIC_FUNCTIONS.items():
+            # Sample size too small to compute metric
+            if result["threshold"] == NO_THRESHOLD_LABEL:
+                result[f"{label}_{rank}_point"] = np.nan
+                result[f"{label}_{rank}_lower"] = np.nan
+                result[f"{label}_{rank}_upper"] = np.nan
+                continue
+
+            # Point estimate
+            # NOTE Numba has magic that implicitly instantiates point, but
+            #  it makes the linter mad.
+            compute_contingency_table(y_true_bool, y_pred_bool, tp, fp, fn, tn)
+            func(tp, fp, fn, tn, estimate)
+            result[f"{label}_{rank}_point"] = estimate[0]
+
+            # Sample size too small reliably to compute confidence interval
+            if result["sample_size"] < minimum_sample_size:
+                result[f"{label}_{rank}_lower"] = np.nan
+                result[f"{label}_{rank}_upper"] = np.nan
+                continue
+
+            # Optimal block size for bootstrap
+            # NOTE Normalizing the values seems to produce more consistent
+            #  block sizes. Here we let the "true" values determine the block size.
+            if len(idxs) == 0:
+                max_value = np.max(y_true) * 1.01
+                normalized = y_true / max_value
+                block_size = optimal_block_length(normalized)["stationary"][0]
+                if np.isnan(block_size):
+                    block_size = 1
+                else:
+                    block_size = max(1, int(block_size))
+
+                # Resample the array index to apply to both y_true and y_pred
+                index = np.arange(y_true.size)
+                bs = StationaryBootstrap(
+                    block_size,
+                    index,
+                    seed=2025
+                    )
+
+                # Bootstrap sample time series
+                for samples in bs.bootstrap(bootstrap_iterations):
+                    # Generate an index
+                    idxs.append(samples[0][0])
+
+                # Apply the new index and compute the metric
+                for iteration, idx in enumerate(idxs):
+                    # Contingency table
+                    compute_contingency_table(
+                        y_true_bool[idx],
+                        y_pred_bool[idx],
+                        tp, fp, fn, tn
+                    )
+
+                    # Store results
+                    tps[iteration] = tp[0]
+                    fps[iteration] = fp[0]
+                    fns[iteration] = fn[0]
+                    tns[iteration] = tn[0]
+
+            # Compute confidence interval
+            func(tps, fps, fns, tns, posterior)
             ci = np.quantile(posterior, [0.025, 0.975])
             result[f"{label}_{rank}_lower"] = ci[0]
             result[f"{label}_{rank}_upper"] = ci[1]
