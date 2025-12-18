@@ -92,7 +92,9 @@ def compute(
     root: Path,
     label: str,
     jobs: int = 1,
-    sites_per_chunk: int = 500
+    sites_per_chunk: int = 500,
+    threshold_file: Path | None = None,
+    threshold_column: list[str] | None = None
     ) -> None:
     """
     Compute evaluation metrics for NWM-USGS pairs.
@@ -108,7 +110,9 @@ def compute(
         start_time=start,
         end_time=end,
         processes=jobs,
-        sites_per_chunk=sites_per_chunk
+        sites_per_chunk=sites_per_chunk,
+        threshold_file=threshold_file,
+        threshold_columns=threshold_column
     )
 
 @app.command()

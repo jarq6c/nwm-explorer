@@ -359,24 +359,40 @@ def bootstrap_metrics(
         "observed_cfs_max": data["observed_cfs_max"].max(),
         "observed_value_time_min": data["observed_value_time_min"].min(),
         "observed_value_time_max": data["observed_value_time_max"].max(),
-        "sample_size": data["nwm_feature_id"].count()
+        "threshold": data["threshold"].iloc[0],
+        "threshold_value": data["threshold_value"].iloc[0]
     }
 
     # Allocate memory
     posterior = np.zeros(bootstrap_iterations, dtype=np.float64)
     estimate = np.zeros(shape=1, dtype=np.float64)
 
-    # Compute metrics
+    # Compute continuous metrics
     for rank in ["min", "median", "max"]:
         # Extract numpy arrays for Numba functions
         y_true = data[f"observed_cfs_{rank}"].to_numpy(dtype=np.float64)
         y_pred = data[f"predicted_cfs_{rank}"].to_numpy(dtype=np.float64)
 
+        # Condition continuous metrics
+        if result["threshold"] != NO_THRESHOLD_LABEL:
+            y_true = y_true[y_pred >= result["threshold_value"]]
+            y_pred = y_pred[y_pred >= result["threshold_value"]]
+
         # Initialize bootstrap samples
         idxs = []
 
+        # Sample size
+        result["sample_size"] = len(y_pred)
+
         # Process each metric
         for label, func in METRIC_FUNCTIONS.items():
+            # Sample size too small to compute metric
+            if result["sample_size"] == 0:
+                result[f"{label}_{rank}_point"] = np.nan
+                result[f"{label}_{rank}_lower"] = np.nan
+                result[f"{label}_{rank}_upper"] = np.nan
+                continue
+
             # Point estimate
             # NOTE Numba has magic that implicitly instantiates point, but
             #  it makes the linter mad.
@@ -443,7 +459,9 @@ def load_pool(
         start_time: pd.Timestamp,
         end_time: pd.Timestamp,
         lead_time_interval: int,
-        features: npt.NDArray[np.int64]
+        features: npt.NDArray[np.int64],
+        threshold_map: pl.DataFrame | None = None,
+        threshold_column: str | None = None
         ) -> pl.DataFrame:
     """
     Load and group forecast pairs into lead time pools.
@@ -492,7 +510,7 @@ def load_pool(
 
     # Compute lead time and pool pairs
     logger.info("Pooling pairs")
-    return pl.concat(
+    data: pl.DataFrame = pl.concat(
         dataframes
     ).with_columns(
         lead_time_hours_min=(pl.col("predicted_value_time_min").sub(pl.col("reference_time")) /
@@ -522,13 +540,33 @@ def load_pool(
         pl.col("observed_value_time_max").max()
     )
 
+    # Add thresholds
+    if threshold_column == NO_THRESHOLD_LABEL:
+        logger.info("Adding stub thresholds")
+        data = data.with_columns(
+            pl.Series(name="threshold", values=[NO_THRESHOLD_LABEL]*len(data["nwm_feature_id"])),
+            pl.Series(name="threshold_value", values=[np.nan]*len(data["nwm_feature_id"]))
+        )
+    else:
+        logger.info("Mapping thresholds")
+        data = data.with_columns(
+            pl.Series(name="threshold", values=[threshold_column]*len(data["nwm_feature_id"])),
+            threshold_value=pl.col("nwm_feature_id").replace_strict(
+                old=threshold_map["nwm_feature_id"].implode(),
+                new=threshold_map[threshold_column].implode()
+            )
+        )
+    return data
+
 def prediction_pool_generator(
         root: Path,
         configuration: ModelConfiguration,
         start_time: pd.Timestamp,
         end_time: pd.Timestamp,
         lead_time_interval: int,
-        sites_per_chunk: int = 1
+        sites_per_chunk: int = 1,
+        threshold_map: pl.DataFrame | None = None,
+        threshold_column: str | None = None
 ) -> Generator[list[pd.DataFrame]]:
     """
     Iteratively, load and group forecast pairs into lead time pools. Returns a
@@ -577,7 +615,9 @@ def prediction_pool_generator(
             start_time=start_time,
             end_time=end_time,
             lead_time_interval=lead_time_interval,
-            features=features
+            features=features,
+            threshold_map=threshold_map,
+            threshold_column=threshold_column
         )
 
         # Check for data
@@ -594,7 +634,9 @@ def evaluate(
         start_time: pd.Timestamp,
         end_time: pd.Timestamp,
         processes: int = 1,
-        sites_per_chunk: int = 1
+        sites_per_chunk: int = 1,
+        threshold_file: Path | None = None,
+        threshold_columns: list[str] | None = None
 ) -> None:
     """
     Iteratively, load and group forecast pairs into lead time pools. Returns a
@@ -627,63 +669,78 @@ def evaluate(
     logger.info("Running evaluation %s", label)
     logger.info("Range: %s to %s", start_time, end_time)
 
+    # Load thresholds
+    thresholds = None
+    tholds = [NO_THRESHOLD_LABEL]
+    if threshold_file is None:
+        logger.info("No thresholds applied")
+    else:
+        logger.info("Loading %s", threshold_file)
+        thresholds = pl.scan_parquet(threshold_file).select(
+            ["nwm_feature_id"]+threshold_columns
+        ).collect()
+        tholds = tholds+threshold_columns
+
     # Start process pool
     logger.info("Starting %d processes", processes)
     subdirectory = SUBDIRECTORIES["evaluations"]
     with ProcessPoolExecutor(max_workers=processes) as parallel_computer:
         # Process each configuration
         for config, specs in GROUP_SPECIFICATIONS.items():
-            # Prepare output file
-            ofile = root / (
-                f"{subdirectory}/label={label}/threshold={NO_THRESHOLD_LABEL}/" +
-                f"configuration={config}/E0.parquet"
-            )
-            if ofile.exists():
-                logger.info("Found %s", ofile)
-                continue
-            ofile.parent.mkdir(exist_ok=True, parents=True)
+            for thold in tholds:
+                # Prepare output file
+                ofile = root / (
+                    f"{subdirectory}/label={label}/threshold={thold}/" +
+                    f"configuration={config}/E0.parquet"
+                )
+                if ofile.exists():
+                    logger.info("Found %s", ofile)
+                    continue
+                ofile.parent.mkdir(exist_ok=True, parents=True)
 
-            # Process in chunks
-            logger.info("Evaluating %s", config)
-            logger.info("Grouping into chunks of %d sites", sites_per_chunk)
-            batch_counter = itertools.count(1)
-            dataframes = []
-            for groups in prediction_pool_generator(
-                root=root,
-                configuration=config,
-                start_time=start_time,
-                end_time=end_time,
-                lead_time_interval=specs.window_interval,
-                sites_per_chunk=sites_per_chunk
-            ):
-                # Chunk size
-                logger.info("Batch: %d", next(batch_counter))
-                chunksize = len(groups) // processes + 1
-                logger.info("Evaluating %d groups", len(groups))
-                logger.info("Running %d groups per process", chunksize)
+                # Process in chunks
+                logger.info("Building %s", ofile)
+                logger.info("Grouping into chunks of %d sites", sites_per_chunk)
+                batch_counter = itertools.count(1)
+                dataframes = []
+                for groups in prediction_pool_generator(
+                    root=root,
+                    configuration=config,
+                    start_time=start_time,
+                    end_time=end_time,
+                    lead_time_interval=specs.window_interval,
+                    sites_per_chunk=sites_per_chunk,
+                    threshold_map=thresholds,
+                    threshold_column=thold
+                ):
+                    # Chunk size
+                    logger.info("Batch: %d", next(batch_counter))
+                    chunksize = len(groups) // processes + 1
+                    logger.info("Evaluating %d groups", len(groups))
+                    logger.info("Running %d groups per process", chunksize)
 
-                # Compute and collect results
-                logger.info("Computing metrics")
-                dataframes.append(
-                    pd.DataFrame.from_records(
-                        parallel_computer.map(
-                            bootstrap_metrics, groups, chunksize=chunksize
+                    # Compute and collect results
+                    logger.info("Computing metrics")
+                    dataframes.append(
+                        pd.DataFrame.from_records(
+                            parallel_computer.map(
+                                bootstrap_metrics, groups, chunksize=chunksize
+                            )
                         )
                     )
-                )
 
-            # Check for data
-            if len(dataframes) == 0:
-                logger.info("No groups, skipping %s", ofile)
-                continue
+                # Check for data
+                if len(dataframes) == 0:
+                    logger.info("No groups, skipping %s", ofile)
+                    continue
 
-            # Concatenate into a single dataframe
-            logger.info("Concatenating groups")
-            results = pd.concat(dataframes, ignore_index=True)
+                # Concatenate into a single dataframe
+                logger.info("Concatenating groups")
+                results = pd.concat(dataframes, ignore_index=True)
 
-            # Save results
-            logger.info("Saving %s", ofile)
-            pl.DataFrame(results).write_parquet(ofile)
+                # Save results
+                logger.info("Saving %s", ofile)
+                pl.DataFrame(results).write_parquet(ofile)
 
 def scan_evaluations_no_cache(root: Path) -> pl.LazyFrame:
     """
