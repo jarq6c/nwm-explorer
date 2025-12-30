@@ -277,7 +277,7 @@ GROUP_SPECIFICATIONS: dict[ModelConfiguration, NWMGroupSpecification] = {
 }
 """Mapping from ModelConfiguration to group-by specifications."""
 
-METRIC_LOOKUP: dict[str, Metric] = {
+METRIC_LOOKUP: dict[str, Metric | CategoricalMetric] = {
     "Kling-Gupta efficiency": Metric.KLING_GUPTA_EFFICIENCY,
     "Nash-Sutcliffe efficiency": Metric.NASH_SUTCLIFFE_EFFICIENCY,
     "Relative mean": Metric.RELATIVE_MEAN,
@@ -286,7 +286,14 @@ METRIC_LOOKUP: dict[str, Metric] = {
     "Relative mean bias": Metric.RELATIVE_MEAN_BIAS,
     "Relative median": Metric.RELATIVE_MEDIAN,
     "Relative minimum": Metric.RELATIVE_MINIMUM,
-    "Relative maximum": Metric.RELATIVE_MAXIMUM
+    "Relative maximum": Metric.RELATIVE_MAXIMUM,
+    "Probability of detection": CategoricalMetric.PROBABILITY_OF_DETECTION,
+    "Probability of false detection": CategoricalMetric.PROBABILITY_OF_FALSE_DETECTION,
+    "Probability of false alarm": CategoricalMetric.PROBABILITY_OF_FALSE_ALARM,
+    "Critical success index": CategoricalMetric.THREAT_SCORE,
+    "Frequency bias": CategoricalMetric.FREQUENCY_BIAS,
+    "Percent correct": CategoricalMetric.PERCENT_CORRECT,
+    "Equitable threat score": CategoricalMetric.EQUITABLE_THREAT_SCORE
 }
 """Mapping from pretty strings to evaluation Metric."""
 
@@ -315,7 +322,7 @@ DEFAULT_CENTER: dict[ModelDomainDisplay, dict[str, float]] = {
 }
 """Default map center for each domain."""
 
-METRIC_PLOTTING_LIMITS: dict[Metric, tuple[float, float]] = {
+METRIC_PLOTTING_LIMITS: dict[Metric | CategoricalMetric, tuple[float, float]] = {
     Metric.RELATIVE_MEAN_BIAS: (-1.0, 1.0),
     Metric.PEARSON_CORRELATION_COEFFICIENT: (-1.0, 1.0),
     Metric.NASH_SUTCLIFFE_EFFICIENCY: (-1.0, 1.0),
@@ -324,7 +331,14 @@ METRIC_PLOTTING_LIMITS: dict[Metric, tuple[float, float]] = {
     Metric.RELATIVE_MEDIAN: (0.0, 2.0),
     Metric.RELATIVE_MINIMUM: (0.0, 2.0),
     Metric.RELATIVE_MAXIMUM: (0.0, 2.0),
-    Metric.KLING_GUPTA_EFFICIENCY: (-1.0, 1.0)
+    Metric.KLING_GUPTA_EFFICIENCY: (-1.0, 1.0),
+    CategoricalMetric.PROBABILITY_OF_DETECTION: (0.0, 1.0),
+    CategoricalMetric.PROBABILITY_OF_FALSE_DETECTION: (0.0, 1.0),
+    CategoricalMetric.PROBABILITY_OF_FALSE_ALARM: (0.0, 1.0),
+    CategoricalMetric.THREAT_SCORE: (0.0, 1.0),
+    CategoricalMetric.FREQUENCY_BIAS: (0.0, 2.0),
+    CategoricalMetric.PERCENT_CORRECT: (0.0, 1.0),
+    CategoricalMetric.EQUITABLE_THREAT_SCORE: (0.0, 1.0),
 }
 """Mapping from Metrics to plotting limits (cmin, cmax)."""
 
@@ -469,19 +483,6 @@ DEFAULT_CENTER: dict[ModelDomainDisplay, dict[str, float]] = {
     ModelDomainDisplay.PUERTO_RICO: {"lat": 18.21807, "lon": -66.32802}
 }
 """Default map center for each domain."""
-
-METRIC_PLOTTING_LIMITS: dict[Metric, tuple[float, float]] = {
-    Metric.RELATIVE_MEAN_BIAS: (-1.0, 1.0),
-    Metric.PEARSON_CORRELATION_COEFFICIENT: (-1.0, 1.0),
-    Metric.NASH_SUTCLIFFE_EFFICIENCY: (-1.0, 1.0),
-    Metric.RELATIVE_MEAN: (0.0, 2.0),
-    Metric.RELATIVE_STANDARD_DEVIATION: (0.0, 2.0),
-    Metric.RELATIVE_MEDIAN: (0.0, 2.0),
-    Metric.RELATIVE_MINIMUM: (0.0, 2.0),
-    Metric.RELATIVE_MAXIMUM: (0.0, 2.0),
-    Metric.KLING_GUPTA_EFFICIENCY: (-1.0, 1.0)
-}
-"""Mapping from Metrics to plotting limits (cmin, cmax)."""
 
 CONFIGURATION_LINE_TYPE: dict[ModelConfiguration, str] = {
     ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA: "markers"

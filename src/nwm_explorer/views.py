@@ -18,7 +18,7 @@ from nwm_explorer.nwm import ModelConfiguration
 from nwm_explorer.evaluate import Metric
 from nwm_explorer.constants import (ModelDomain, GROUP_SPECIFICATIONS, DOMAIN_LOOKUP,
     CONFIGURATION_LOOKUP, NWMGroupSpecification, METRIC_LOOKUP, RANK_LOOKUP,
-    PlotlyFigure, DEFAULT_CENTER, DEFAULT_ZOOM, AxisType)
+    PlotlyFigure, DEFAULT_CENTER, DEFAULT_ZOOM, AxisType, CategoricalMetric)
 from nwm_explorer.configuration import MapLayer
 from nwm_explorer.hypothesis import HYPOTHESIS_TESTS
 
@@ -187,7 +187,7 @@ class FilterWidgets(Viewer):
         return self._configuration_lookup[self._widgets["configuration"].value][1]
 
     @property
-    def metric(self) -> Metric:
+    def metric(self) -> Metric | CategoricalMetric:
         """Currently selected evaluation metric."""
         return METRIC_LOOKUP[self._widgets["metric"].value]
 
