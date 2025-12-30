@@ -654,7 +654,8 @@ def download_nwm(
         jobs: int = 1,
         retries: int = 3,
         nwm_base_url: str | None = None,
-        configuration: ModelConfiguration | None = None
+        configuration: ModelConfiguration | None = None,
+        skip: list[ModelConfiguration] | None = None
 ) -> None:
     """
     Download and process NWM output.
@@ -675,6 +676,8 @@ def download_nwm(
         Base URL from which to retrieve NWM NetCDF files.
     configuraton: ModelConfiguration, optional
         Limit download to a single model configuration.
+    skip: list[ModelConfiguration], optional
+        Skip evaluating these configurations.
     """
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
@@ -704,6 +707,10 @@ def download_nwm(
     for (domain, config), builder in NWM_URL_BUILDERS.items():
         # Ignore other configurations
         if configuration and config != configuration:
+            continue
+
+        # Skip configurations
+        if skip and config in skip:
             continue
 
         # Extract features

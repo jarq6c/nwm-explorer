@@ -920,7 +920,7 @@ def bootstrap_metrics(
             #  block sizes. Here we let the "true" values determine the block size.
             if len(idxs) == 0:
                 max_value = np.max(y_true) * 1.01
-                normalized = y_true / max_value
+                normalized = y_true / max(0.01, max_value)
                 block_size = optimal_block_length(normalized)["stationary"][0]
                 if np.isnan(block_size):
                     block_size = 1
@@ -986,7 +986,7 @@ def bootstrap_metrics(
             #  block sizes. Here we let the "true" values determine the block size.
             if len(idxs) == 0:
                 max_value = np.max(y_true) * 1.01
-                normalized = y_true / max_value
+                normalized = y_true / max(0.01, max_value)
                 block_size = optimal_block_length(normalized)["stationary"][0]
                 if np.isnan(block_size):
                     block_size = 1

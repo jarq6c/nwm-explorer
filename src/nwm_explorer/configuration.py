@@ -8,6 +8,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from nwm_explorer.logger import get_logger
+from nwm_explorer.constants import ModelConfiguration
 
 class Evaluation(BaseModel):
     """
@@ -21,10 +22,13 @@ class Evaluation(BaseModel):
         First reference time.
     end_time: pandas.Timestamp
         Last reference time.
+    skip: list[ModelConfiguration], optional
+        Skip evaluating these configurations.
     """
     label: str
     start_time: datetime
     end_time: datetime
+    skip: list[ModelConfiguration] | None = None
 
 class MapLayer(BaseModel):
     """
@@ -80,6 +84,8 @@ class Configuration(BaseModel):
     sites_per_chunk: int = 1
     retries: int = 3
     nwm_base_url: str | None = None
+    threshold_file: Path | None = None
+    threshold_columns: list[str] | None
 
 def load_configuration(configuration_file: Path) -> Configuration:
     """

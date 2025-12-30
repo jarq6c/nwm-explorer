@@ -143,7 +143,8 @@ def evaluate(configuration: Path = Path("config.json")) -> None:
             root=config.root,
             jobs=config.processes,
             retries=config.retries,
-            nwm_base_url=config.nwm_base_url
+            nwm_base_url=config.nwm_base_url,
+            skip=e.skip
         )
 
         # USGS downloads
@@ -168,7 +169,9 @@ def evaluate(configuration: Path = Path("config.json")) -> None:
             start_time=start,
             end_time=end,
             processes=config.processes,
-            sites_per_chunk=config.sites_per_chunk
+            sites_per_chunk=config.sites_per_chunk,
+            threshold_file=config.threshold_file,
+            threshold_columns=config.threshold_columns
         )
 
 @app.command()
