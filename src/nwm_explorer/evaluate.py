@@ -981,6 +981,18 @@ def bootstrap_metrics(
                 result[f"{label}_{rank}_upper"] = np.nan
                 continue
 
+            # Values too small to reliably compute confidence interval
+            if np.mean(y_true) < minimum_mean:
+                result[f"{label}_{rank}_lower"] = np.nan
+                result[f"{label}_{rank}_upper"] = np.nan
+                continue
+
+            # Variance too small to reliably compute confidence interval
+            if np.var(y_true) < minimum_variance:
+                result[f"{label}_{rank}_lower"] = np.nan
+                result[f"{label}_{rank}_upper"] = np.nan
+                continue
+
             # Optimal block size for bootstrap
             # NOTE Normalizing the values seems to produce more consistent
             #  block sizes. Here we let the "true" values determine the block size.
