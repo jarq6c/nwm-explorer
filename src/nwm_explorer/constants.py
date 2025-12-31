@@ -485,7 +485,8 @@ DEFAULT_CENTER: dict[ModelDomainDisplay, dict[str, float]] = {
 """Default map center for each domain."""
 
 CONFIGURATION_LINE_TYPE: dict[ModelConfiguration, str] = {
-    ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA: "markers"
+    ModelConfiguration.ANALYSIS_ASSIM_PUERTO_RICO_NO_DA: "markers",
+    ModelConfiguration.ANALYSIS_ASSIM_NO_DA: "markers"
 }
 """Mapping from Model configuration to line type for plotting."""
 
