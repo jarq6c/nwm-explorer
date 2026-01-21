@@ -1,12 +1,14 @@
 """CartoPy example."""
 from pathlib import Path
 from dataclasses import dataclass
+from itertools import count
 
 from pydantic import BaseModel
 
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+import polars as pl
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import VPacker, TextArea, AnchoredOffsetbox
 
@@ -73,32 +75,48 @@ def main(debug: bool = False) -> None:
     crs_proj4 = crs.proj4_init
 
     # Load RFC boundaries
-    ifile = Path.home() / "Downloads/rfc_boundaries/rfc_nwm_domain_boundaries_4326.geojson"
+    ifile = Path.home() / "Projects/data/rfc_boundaries/rfc_nwm_domain_boundaries_4326.geojson"
     boundaries = gpd.read_file(ifile).to_crs(crs_proj4)
 
     # Handle OCONUS separately
     conus = boundaries[boundaries["domain"] == "CONUS"]
 
-    # Fabricate evaluation results
-    rng = np.random.default_rng(seed=2026)
-    minx, miny, maxx, maxy = conus.total_bounds
-    scores = gpd.GeoDataFrame(
-        data={
-            "score": rng.uniform(0, 1, 8000),
-            "error": rng.gamma(1, 1, 8000)
-            },
-        geometry=gpd.points_from_xy(
-            x=rng.uniform(minx, maxx, 8000),
-            y=rng.uniform(miny, maxy, 8000),
-            crs=conus.crs
-        )
-    )
-
-    # Add CIs
-    scores["score_lower"] = scores["score"].sub(scores["error"])
-    scores.loc[scores["score_lower"] < 0.0, "score_lower"] = 0.0
-    scores["score_upper"] = scores["score"].add(scores["error"])
-    scores.loc[scores["score_upper"] > 1.0, "score_upper"] = 1.0
+    # Load evaluation results
+    metric_name = "probability_of_detection"
+    metric_rank = "max"
+    metric_min = 0.0
+    metric_max = 1.0
+    metric_lead_times = (24, 48)
+    model_configuration = "medium_range_mem1"
+    threshold = "q85_cfs"
+    label = "FY2024-FY2025"
+    scores = pl.scan_parquet(
+        "/ised/nwm_explorer_data/evaluations",
+        hive_schema={
+            "label": pl.String,
+            "threshold": pl.String,
+            "configuration": pl.String
+        }
+    ).filter(
+        pl.col("label") == label,
+        pl.col("threshold") == threshold,
+        pl.col("configuration") == model_configuration,
+        pl.col("lead_time_hours_min") == metric_lead_times[0]
+    ).select([
+        "nwm_feature_id",
+        f"{metric_name}_{metric_rank}_point",
+        f"{metric_name}_{metric_rank}_lower",
+        f"{metric_name}_{metric_rank}_upper"
+    ]).collect().drop_nulls(
+        subset=f"{metric_name}_{metric_rank}_point"
+    ).with_columns(
+        pl.col(f"{metric_name}_{metric_rank}_lower").fill_null(metric_min),
+        pl.col(f"{metric_name}_{metric_rank}_upper").fill_null(metric_max),
+    ).rename({
+        f"{metric_name}_{metric_rank}_point": "score",
+        f"{metric_name}_{metric_rank}_lower": "score_lower",
+        f"{metric_name}_{metric_rank}_upper": "score_upper"
+    }).to_pandas()
 
     # Compute marker size
     size_coefficient = 400.0
@@ -116,16 +134,30 @@ def main(debug: bool = False) -> None:
         include_lowest=True
     )
 
+    # Add geometry
+    rl = pl.read_parquet(
+        "/ised/nwm_explorer_data/routelink.parquet",
+        columns=["nwm_feature_id", "latitude", "longitude"]
+        ).to_pandas().set_index("nwm_feature_id")
+    scores["latitude"] = scores["nwm_feature_id"].map(rl["latitude"])
+    scores["longitude"] = scores["nwm_feature_id"].map(rl["longitude"])
+    scores["geometry"] = gpd.points_from_xy(
+        x=scores["longitude"],
+        y=scores["latitude"],
+        crs="EPSG:4326"
+    )
+    scores = gpd.GeoDataFrame(scores).to_crs(crs_proj4)
+
     # Load river names
     ifiles = [
         Path.home() / (
-        "Downloads/"
-        "ne_10m_rivers_lake_centerlines/"
+        "Projects/"
+        "data/ne/ne_10m_rivers_lake_centerlines/"
         "ne_10m_rivers_lake_centerlines.shp"
         ),
         Path.home() / (
-        "Downloads/"
-        "ne_10m_rivers_north_america/"
+        "Projects/"
+        "data/ne/ne_10m_rivers_north_america/"
         "ne_10m_rivers_north_america.shp"
         ),]
     river_names = pd.concat([
@@ -195,6 +227,9 @@ def main(debug: bool = False) -> None:
 
     # Generate plots
     for row in conus.itertuples():
+        # Reset layer counter
+        zlayer = count(1)
+
         # Create new map
         fig, ax = plt.subplots(
             figsize=(width, height),
@@ -230,7 +265,8 @@ def main(debug: bool = False) -> None:
                 tiler,
                 config.zoom_override.get(row.rfc, config.default_zoom),
                 interpolation="spline36",
-                regrid_shape=4000
+                regrid_shape=4000,
+                zorder=next(zlayer)
                 )
 
         # X-ticks
@@ -265,10 +301,10 @@ def main(debug: bool = False) -> None:
         ax.yaxis.set_major_formatter(lat_formatter)
 
         # Add lakes and rivers
-        ax.add_feature(lakes)
-        ax.add_feature(lakes_na)
-        ax.add_feature(river_lake_centerlines)
-        ax.add_feature(rivers_na)
+        ax.add_feature(lakes, zorder=next(zlayer))
+        ax.add_feature(lakes_na, zorder=next(zlayer))
+        ax.add_feature(river_lake_centerlines, zorder=next(zlayer))
+        ax.add_feature(rivers_na, zorder=next(zlayer))
 
         # Build shaded polygon
         shaded = gpd.GeoDataFrame(
@@ -308,7 +344,8 @@ def main(debug: bool = False) -> None:
                 size=6,
                 ha="left",
                 va="bottom",
-                alpha=0.7
+                alpha=0.7,
+                zorder=next(zlayer)
             )
 
         # "Cut" out boundary
@@ -322,7 +359,8 @@ def main(debug: bool = False) -> None:
             shaded.geometry,
             crs=crs,
             alpha=0.25,
-            facecolor="black"
+            facecolor="black",
+            zorder=next(zlayer)
             )
 
         # Boundary outline
@@ -330,7 +368,8 @@ def main(debug: bool = False) -> None:
             [row.geometry],
             crs=crs,
             alpha=0.25,
-            facecolor="white"
+            facecolor="white",
+            zorder=next(zlayer)
             )
 
         # Boundary outline
@@ -339,7 +378,8 @@ def main(debug: bool = False) -> None:
             crs=crs,
             facecolor="None",
             linewidth=2,
-            linestyle="--"
+            linestyle="--",
+            zorder=next(zlayer)
             )
 
         # Add scores
@@ -353,7 +393,8 @@ def main(debug: bool = False) -> None:
                 c=c,
                 s=df["marker_size"].values,
                 transform=crs,
-                edgecolors="black"
+                edgecolors="black",
+                zorder=next(zlayer)
             )
             ax.scatter(
                 [],
@@ -389,7 +430,7 @@ def main(debug: bool = False) -> None:
             "National Water Model v3.0",
             textprops={"size": 9, "color": "black", "weight": "bold"}
         )
-        model_configuration = TextArea(
+        model_config_box = TextArea(
             "Medium Range Forecast (GFS)",
             textprops={"size": 8, "color": "black", "weight": "bold"}
         )
@@ -398,7 +439,7 @@ def main(debug: bool = False) -> None:
             textprops={"size": 7, "color": "black", "weight": "bold"}
         )
         model_lead_times = TextArea(
-            "Lead times: 0 to 24 hours",
+            f"Lead times: {metric_lead_times[0]} to {metric_lead_times[1]} hours",
             textprops={"size": 7, "color": "black", "weight": "bold"}
         )
         header = VPacker(
@@ -406,7 +447,7 @@ def main(debug: bool = False) -> None:
                 model_region,
                 title,
                 model_version,
-                model_configuration,
+                model_config_box,
                 model_lead_times,
                 model_dates
                 ],
