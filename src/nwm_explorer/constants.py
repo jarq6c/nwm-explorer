@@ -74,6 +74,26 @@ class CategoricalMetric(StrEnum):
     BASE_CHANCE = "base_chance"
     EQUITABLE_THREAT_SCORE = "equitable_threat_score"
 
+class EvaluationMetric(StrEnum):
+    """Combined symbols for metrics."""
+    NASH_SUTCLIFFE_EFFICIENCY = "nash_sutcliffe_efficiency"
+    RELATIVE_MEAN_BIAS = "relative_mean_bias"
+    PEARSON_CORRELATION_COEFFICIENT = "pearson_correlation_coefficient"
+    RELATIVE_MEAN = "relative_mean"
+    RELATIVE_MEDIAN = "relative_median"
+    RELATIVE_MINIMUM = "relative_minimum"
+    RELATIVE_MAXIMUM = "relative_maximum"
+    RELATIVE_STANDARD_DEVIATION = "relative_standard_deviation"
+    KLING_GUPTA_EFFICIENCY = "kling_gupta_efficiency"
+    PROBABILITY_OF_DETECTION = "probability_of_detection"
+    PROBABILITY_OF_FALSE_DETECTION = "probability_of_false_detection"
+    PROBABILITY_OF_FALSE_ALARM = "probability_of_false_alarm"
+    THREAT_SCORE = "threat_score"
+    FREQUENCY_BIAS = "frequency_bias"
+    PERCENT_CORRECT = "percent_correct"
+    BASE_CHANCE = "base_chance"
+    EQUITABLE_THREAT_SCORE = "equitable_threat_score"
+
 class SiteTypeSlug(StrEnum):
     """Machine-friendly site types."""
     STREAM = "stream"

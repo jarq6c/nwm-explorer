@@ -15,7 +15,7 @@ from nwm_explorer.usgs import download_usgs
 from nwm_explorer.pairs import pair_nwm_usgs
 from nwm_explorer.evaluate import evaluate as run_evaluation
 from nwm_explorer.evaluate import scan_evaluations
-from nwm_explorer.constants import (ModelConfiguration, Metric,
+from nwm_explorer.constants import (ModelConfiguration, EvaluationMetric,
     COLUMN_DESCRIPTIONS, NO_THRESHOLD_LABEL)
 from nwm_explorer.gui import serve_dashboards
 
@@ -180,7 +180,7 @@ def export(
         root: Path,
         label: str,
         configuration: ModelConfiguration,
-        metric: Metric,
+        metric: EvaluationMetric,
         threshold: str = NO_THRESHOLD_LABEL,
         output: typer.FileTextWrite | None = None,
         lead_time_hours_min: int = 0,
@@ -261,7 +261,7 @@ def plot(
         root: Path,
         label: str,
         configuration: ModelConfiguration,
-        metric: Metric,
+        metric: EvaluationMetric,
         threshold: str = NO_THRESHOLD_LABEL,
         lead_time_hours_min: int = 0,
         rank: Literal["min", "median", "max"] = "median"
@@ -284,6 +284,7 @@ def plot(
     ).collect()
 
     # Plot metrics
+    print(data)
 
 def run() -> None:
     """Main entry point for CLI."""
