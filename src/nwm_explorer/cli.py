@@ -15,7 +15,8 @@ from nwm_explorer.usgs import download_usgs
 from nwm_explorer.pairs import pair_nwm_usgs
 from nwm_explorer.evaluate import evaluate as run_evaluation
 from nwm_explorer.evaluate import scan_evaluations
-from nwm_explorer.constants import ModelConfiguration, Metric, COLUMN_DESCRIPTIONS
+from nwm_explorer.constants import (ModelConfiguration, Metric,
+    COLUMN_DESCRIPTIONS, NO_THRESHOLD_LABEL)
 from nwm_explorer.gui import serve_dashboards
 
 app = typer.Typer()
@@ -180,6 +181,7 @@ def export(
         label: str,
         configuration: ModelConfiguration,
         metric: Metric,
+        threshold: str = NO_THRESHOLD_LABEL,
         output: typer.FileTextWrite | None = None,
         lead_time_hours_min: int = 0,
         rank: Literal["min", "median", "max"] = "median",
@@ -211,6 +213,8 @@ def export(
             f"observed_cfs_{rank}",
             "sample_size"
         ]
+        if threshold != NO_THRESHOLD_LABEL:
+            additional_columns += ["threshold", "threshold_value"]
 
     # Load metrics
     data = scan_evaluations(
@@ -218,7 +222,8 @@ def export(
     ).filter(
         pl.col("label") == label,
         pl.col("configuration") == configuration,
-        pl.col("lead_time_hours_min") == lead_time_hours_min
+        pl.col("lead_time_hours_min") == lead_time_hours_min,
+        pl.col("threshold") == threshold
     ).select(
         additional_columns + [
             f"{metric}_{rank}_lower",
@@ -250,6 +255,35 @@ def display(configuration: Path = Path("config.json")) -> None:
     serve_dashboards(
         configuration_file=configuration
     )
+
+@app.command()
+def plot(
+        root: Path,
+        label: str,
+        configuration: ModelConfiguration,
+        metric: Metric,
+        threshold: str = NO_THRESHOLD_LABEL,
+        lead_time_hours_min: int = 0,
+        rank: Literal["min", "median", "max"] = "median"
+    ) -> None:
+    """
+    Plot evaluation results on a map.
+    """
+    # Load metrics
+    data = scan_evaluations(
+        root
+    ).filter(
+        pl.col("label") == label,
+        pl.col("configuration") == configuration,
+        pl.col("lead_time_hours_min") == lead_time_hours_min,
+        pl.col("threshold") == threshold
+    ).select(
+        f"{metric}_{rank}_lower",
+        f"{metric}_{rank}_point",
+        f"{metric}_{rank}_upper"
+    ).collect()
+
+    # Plot metrics
 
 def run() -> None:
     """Main entry point for CLI."""

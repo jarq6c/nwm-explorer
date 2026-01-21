@@ -552,6 +552,8 @@ COLUMN_DESCRIPTIONS: dict[str, str] = {
     "observed_value_time_min": "Earliest observation valid time",
     "observed_value_time_max": "Latest observation valid time",
     "sample_size": "Number of prediction-observation pairs",
+    "threshold": "Streamflow threshold label",
+    "threshold_value": "Streamflow threshold value in cubic feet per second",
     "nash_sutcliffe_efficiency_min_point": "Nash-Sutcliffe model efficiency of minimum predicted streamflow, point estimate",
     "nash_sutcliffe_efficiency_min_lower": "Nash-Sutcliffe model efficiency of minimum predicted streamflow, lower 95% confidence estimate",
     "nash_sutcliffe_efficiency_min_upper": "Nash-Sutcliffe model efficiency of minimum predicted streamflow, upper 95% confidence estimate",
