@@ -4,6 +4,7 @@ import inspect
 from typing import Literal
 from dataclasses import dataclass
 
+import numpy as np
 import polars as pl
 import pandas as pd
 import geopandas as gpd
@@ -16,13 +17,33 @@ from nwm_explorer.routelink import download_routelink
 from nwm_explorer.logger import get_logger
 from nwm_explorer.constants import (ModelConfiguration, EvaluationMetric,
     METRIC_PLOTTING_LIMITS, CONFIGURATION_LOOKUP, METRIC_LOOKUP,
-    GROUP_SPECIFICATIONS)
+    GROUP_SPECIFICATIONS, Metric, CategoricalMetric)
 
 COLOR_RAMPS: dict[str, list[str]] = {
     "C0": ["#ca0020", "#f4a582", "#ffffff", "#bababa", "#404040"],
     "C1": ["#a6611a", "#d4af69", "#ded3b7", "#b8d7d2", "#67bfb1", "#018571"]
 }
 """Color ramps for markers."""
+
+METRIC_PLOTTING_COLORS: dict[Metric | CategoricalMetric, str] = {
+    Metric.RELATIVE_MEAN_BIAS: "C1",
+    Metric.PEARSON_CORRELATION_COEFFICIENT: "C1",
+    Metric.NASH_SUTCLIFFE_EFFICIENCY: "C1",
+    Metric.RELATIVE_MEAN: "C1",
+    Metric.RELATIVE_STANDARD_DEVIATION: "C1",
+    Metric.RELATIVE_MEDIAN: "C1",
+    Metric.RELATIVE_MINIMUM: "C1",
+    Metric.RELATIVE_MAXIMUM: "C1",
+    Metric.KLING_GUPTA_EFFICIENCY: "C1",
+    CategoricalMetric.PROBABILITY_OF_DETECTION: "C0",
+    CategoricalMetric.PROBABILITY_OF_FALSE_DETECTION: "C0",
+    CategoricalMetric.PROBABILITY_OF_FALSE_ALARM: "C0",
+    CategoricalMetric.THREAT_SCORE: "C0",
+    CategoricalMetric.FREQUENCY_BIAS: "C1",
+    CategoricalMetric.PERCENT_CORRECT: "C0",
+    CategoricalMetric.EQUITABLE_THREAT_SCORE: "C0",
+}
+"""Mapping from Metrics to plotting color ramp codes."""
 
 METRIC_LOOKUP_REVERSE: dict[EvaluationMetric, str] = {v: k for k, v in METRIC_LOOKUP.items()}
 """Reverse lookup from metric to metric label."""
@@ -58,7 +79,8 @@ def plot_preprocess(
         rank: Literal["min", "median", "max"],
         title: str = "Evaluation",
         model_title: str = "NWM",
-        model_domain: str = "CONUS"
+        model_domain: str = "CONUS",
+        size_coefficient: float = 400.0
     ) -> PlotParameters:
     """
     Load and preprocess evaluation results for plotting.
@@ -138,6 +160,25 @@ def plot_preprocess(
         y=df["latitude"]
     )
 
+    # Compute marker size
+    numerator = -1.0 * df["upper"].sub(df["lower"])
+    denominator = df["point"].mul(2.0)
+    df["marker_size"] = size_coefficient * (size_coefficient ** (numerator / denominator))
+    df.loc[df["marker_size"] < 1.0, "marker_size"] = 1.0
+
+    # Classify scores (assign colors)
+    colors = COLOR_RAMPS[METRIC_PLOTTING_COLORS[metric]]
+    print(colors)
+    print(np.linspace(cmin, cmax, len(colors)+1))
+    # FIXME 6 bins doesn't divide up nicely
+    quit()
+    df["marker_color"] = pd.cut(
+        df["point"],
+        bins=np.linspace(cmin, cmax, len(colors)+1),
+        labels=colors,
+        include_lowest=True
+    )
+
     # Determine simulation period
     logger.info("Extracting period of record")
     start: pd.Timestamp = df["reference_time_min"].min()
@@ -164,6 +205,8 @@ def plot_preprocess(
             "point",
             "lower",
             "upper",
+            "marker_size",
+            "marker_color",
             "geometry"
         ]],
         title=title,
