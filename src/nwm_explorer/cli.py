@@ -16,7 +16,7 @@ from nwm_explorer.pairs import pair_nwm_usgs
 from nwm_explorer.evaluate import evaluate as run_evaluation
 from nwm_explorer.evaluate import scan_evaluations
 from nwm_explorer.constants import (ModelConfiguration, EvaluationMetric,
-    COLUMN_DESCRIPTIONS, NO_THRESHOLD_LABEL)
+    COLUMN_DESCRIPTIONS, NO_THRESHOLD_LABEL, METRIC_PLOTTING_LIMITS)
 from nwm_explorer.gui import serve_dashboards
 
 app = typer.Typer()
@@ -269,7 +269,10 @@ def plot(
     """
     Plot evaluation results on a map.
     """
-    # Load metrics
+    # Look-up plotting limits
+    cmin, cmax = METRIC_PLOTTING_LIMITS[str(metric)]
+
+    # Load metrics, drop or fill missing values
     data = scan_evaluations(
         root
     ).filter(
@@ -281,7 +284,19 @@ def plot(
         f"{metric}_{rank}_lower",
         f"{metric}_{rank}_point",
         f"{metric}_{rank}_upper"
-    ).collect()
+    ).collect().drop_nulls(
+        subset=f"{metric}_{rank}_point"
+    ).with_columns(
+        pl.col(f"{metric}_{rank}_lower").fill_null(cmin),
+        pl.col(f"{metric}_{rank}_upper").fill_null(cmax)
+    ).with_columns(
+        pl.when(
+            pl.col(f"{metric}_{rank}_lower") > pl.col(f"{metric}_{rank}_point")
+            ).then(
+                pl.col(f"{metric}_{rank}_point")
+                ).otherwise(pl.col(f"{metric}_{rank}_lower")
+        ).alias(f"{metric}_{rank}_lower")
+    )
 
     # Plot metrics
     print(data)
