@@ -14,7 +14,8 @@ def plot(
         lead_time_hours_min: int = 6,
         rank: Literal["min", "median", "max"] = "max",
         title: str = "High Flow Evaluation",
-        model_title: str = "National Water Model v3.0"
+        model_title: str = "National Water Model v3.0",
+        model_domain: str = "CONUS"
     ) -> None:
     """
     Plot evaluation results on a map.
@@ -29,7 +30,8 @@ def plot(
         lead_time_hours_min=lead_time_hours_min,
         rank=rank,
         title=title,
-        model_title=model_title
+        model_title=model_title,
+        model_domain=model_domain
     )
 
     # Plot metrics

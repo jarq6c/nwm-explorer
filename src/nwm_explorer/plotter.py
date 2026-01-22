@@ -27,6 +27,14 @@ COLOR_RAMPS: dict[str, list[str]] = {
 METRIC_LOOKUP_REVERSE: dict[EvaluationMetric, str] = {v: k for k, v in METRIC_LOOKUP.items()}
 """Reverse lookup from metric to metric label."""
 
+THRESHOLD_LOOKUP: dict[str, str] = {
+    "None": "None",
+    "q85_cfs": "NWM Retro Daily Max Streamflow 85th Percentile",
+    "q95_cfs": "NWM Retro Daily Max Streamflow 95th Percentile",
+    "q99_cfs": "NWM Retro Daily Max Streamflow 99th Percentile"
+}
+"""Mapping from parquet thresholds to descriptive text."""
+
 @dataclass
 class PlotParameters:
     """Parameters used to generate map of metrics."""
@@ -36,6 +44,7 @@ class PlotParameters:
     configuration: ModelConfiguration
     metric: EvaluationMetric
     period: str
+    threshold: str = "None"
     domain: str | None = None
     lead_times: str | None = None
 
@@ -48,7 +57,8 @@ def plot_preprocess(
         lead_time_hours_min: int,
         rank: Literal["min", "median", "max"],
         title: str = "Evaluation",
-        model_title: str = "NWM"
+        model_title: str = "NWM",
+        model_domain: str = "CONUS"
     ) -> PlotParameters:
     """
     Load and preprocess evaluation results for plotting.
@@ -141,7 +151,7 @@ def plot_preprocess(
     specs = GROUP_SPECIFICATIONS[configuration]
     if specs.lead_time_hours_max == 0:
         lead_times = None
-    elif specs.lead_time_hours_max == specs.lead_time_hours_max:
+    elif lead_time_hours_min == specs.lead_time_hours_max:
         lead_times = f"Lead time: {lead_time_hours_min} hours"
     else:
         l = lead_time_hours_min + specs.window_interval
@@ -161,7 +171,9 @@ def plot_preprocess(
         configuration=CONFIGURATION_LOOKUP[configuration],
         metric=METRIC_LOOKUP_REVERSE[metric],
         period=period,
-        lead_times=lead_times
+        lead_times=lead_times,
+        threshold=THRESHOLD_LOOKUP[threshold],
+        domain=model_domain
     )
 
 def plot_map(plot_parameters: PlotParameters) -> Figure:
