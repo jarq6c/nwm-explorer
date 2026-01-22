@@ -18,6 +18,7 @@ from nwm_explorer.evaluate import scan_evaluations
 from nwm_explorer.constants import (ModelConfiguration, EvaluationMetric,
     COLUMN_DESCRIPTIONS, NO_THRESHOLD_LABEL, METRIC_PLOTTING_LIMITS)
 from nwm_explorer.gui import serve_dashboards
+from nwm_explorer.plotter import map_metrics
 
 app = typer.Typer()
 """Main typer command-line application."""
@@ -269,7 +270,7 @@ def plot(
     """
     Plot evaluation results on a map.
     """
-    # Look-up plotting limits
+    # Look-up plotting limits to fill missing CIs for plotting
     cmin, cmax = METRIC_PLOTTING_LIMITS[str(metric)]
 
     # Load metrics, drop or fill missing values
@@ -281,6 +282,7 @@ def plot(
         pl.col("lead_time_hours_min") == lead_time_hours_min,
         pl.col("threshold") == threshold
     ).select(
+        "nwm_feature_id",
         f"{metric}_{rank}_lower",
         f"{metric}_{rank}_point",
         f"{metric}_{rank}_upper"
@@ -298,8 +300,18 @@ def plot(
         ).alias(f"{metric}_{rank}_lower")
     )
 
+    # Get routelink
+    rl = download_routelink(root=root).select(
+        "nwm_feature_id",
+        "latitude",
+        "longitude"
+    ).collect()
+
     # Plot metrics
-    print(data)
+    map_metrics(
+        data=data,
+        routelink=rl
+    )
 
 def run() -> None:
     """Main entry point for CLI."""
