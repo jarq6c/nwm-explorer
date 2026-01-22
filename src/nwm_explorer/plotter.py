@@ -2,8 +2,10 @@
 from pathlib import Path
 import inspect
 from typing import Literal
+from dataclasses import dataclass
 
 import polars as pl
+import pandas as pd
 import geopandas as gpd
 
 import matplotlib.pyplot as plt
@@ -13,7 +15,8 @@ from nwm_explorer.evaluate import scan_evaluations
 from nwm_explorer.routelink import download_routelink
 from nwm_explorer.logger import get_logger
 from nwm_explorer.constants import (ModelConfiguration, EvaluationMetric,
-    METRIC_PLOTTING_LIMITS)
+    METRIC_PLOTTING_LIMITS, CONFIGURATION_LOOKUP, METRIC_LOOKUP,
+    GROUP_SPECIFICATIONS)
 
 COLOR_RAMPS: dict[str, list[str]] = {
     "C0": ["#ca0020", "#f4a582", "#ffffff", "#bababa", "#404040"],
@@ -21,15 +24,32 @@ COLOR_RAMPS: dict[str, list[str]] = {
 }
 """Color ramps for markers."""
 
-def plotting_preprocess(
+METRIC_LOOKUP_REVERSE: dict[EvaluationMetric, str] = {v: k for k, v in METRIC_LOOKUP.items()}
+"""Reverse lookup from metric to metric label."""
+
+@dataclass
+class PlotParameters:
+    """Parameters used to generate map of metrics."""
+    data: gpd.GeoDataFrame
+    title: str
+    model: str
+    configuration: ModelConfiguration
+    metric: EvaluationMetric
+    period: str
+    domain: str | None = None
+    lead_times: str | None = None
+
+def plot_preprocess(
         root: Path,
         label: str,
         configuration: ModelConfiguration,
         metric: EvaluationMetric,
         threshold: str,
         lead_time_hours_min: int,
-        rank: Literal["min", "median", "max"]
-    ) -> gpd.GeoDataFrame:
+        rank: Literal["min", "median", "max"],
+        title: str = "Evaluation",
+        model_title: str = "NWM"
+    ) -> PlotParameters:
     """
     Load and preprocess evaluation results for plotting.
     """
@@ -58,7 +78,9 @@ def plotting_preprocess(
         "nwm_feature_id",
         f"{metric}_{rank}_lower",
         f"{metric}_{rank}_point",
-        f"{metric}_{rank}_upper"
+        f"{metric}_{rank}_upper",
+        "reference_time_min",
+        "reference_time_max"
     ).collect().drop_nulls(
         subset=f"{metric}_{rank}_point"
     ).with_columns(
@@ -71,6 +93,12 @@ def plotting_preprocess(
                 pl.col(f"{metric}_{rank}_point")
                 ).otherwise(pl.col(f"{metric}_{rank}_lower")
         ).alias(f"{metric}_{rank}_lower")
+    ).rename(
+        {
+            f"{metric}_{rank}_lower": "lower",
+            f"{metric}_{rank}_point": "point",
+            f"{metric}_{rank}_upper": "upper"
+        }
     )
 
     # Get routelink
@@ -99,23 +127,48 @@ def plotting_preprocess(
         x=df["longitude"],
         y=df["latitude"]
     )
-    return gpd.GeoDataFrame(
-        df[[
-            "nwm_feature_id",
-            f"{metric}_{rank}_lower",
-            f"{metric}_{rank}_point",
-            f"{metric}_{rank}_upper",
-            "geometry"
-        ]]
+
+    # Determine simulation period
+    logger.info("Extracting period of record")
+    start: pd.Timestamp = df["reference_time_min"].min()
+    end: pd.Timestamp = df["reference_time_max"].max()
+    period = (
+        start.strftime("%Y %b %d") + " to " + end.strftime("%Y %b %d")
     )
 
-def map_metrics(
-        data: pl.DataFrame
-        ) -> Figure:
+    # Build lead times
+    logger.info("Inspecting lead times")
+    specs = GROUP_SPECIFICATIONS[configuration]
+    if specs.lead_time_hours_max == 0:
+        lead_times = None
+    elif specs.lead_time_hours_max == specs.lead_time_hours_max:
+        lead_times = f"Lead time: {lead_time_hours_min} hours"
+    else:
+        l = lead_time_hours_min + specs.window_interval
+        lead_times = f"Lead times: {lead_time_hours_min} to {l} hours"
+
+    # Build parameters
+    logger.info("Configuring plot parameters")
+    return PlotParameters(
+        data=df[[
+            "point",
+            "lower",
+            "upper",
+            "geometry"
+        ]],
+        title=title,
+        model=model_title,
+        configuration=CONFIGURATION_LOOKUP[configuration],
+        metric=METRIC_LOOKUP_REVERSE[metric],
+        period=period,
+        lead_times=lead_times
+    )
+
+def plot_map(plot_parameters: PlotParameters) -> Figure:
     """Map metrics and return a Figure."""
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
 
     logger.info("Plotting metrics")
-    print(data)
+    print(plot_parameters)
