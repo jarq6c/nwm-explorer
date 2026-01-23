@@ -4,7 +4,6 @@ import inspect
 from typing import Literal
 from dataclasses import dataclass
 
-import numpy as np
 import polars as pl
 import pandas as pd
 import geopandas as gpd
@@ -21,19 +20,27 @@ from nwm_explorer.constants import (ModelConfiguration, EvaluationMetric,
 
 COLOR_RAMPS: dict[str, list[str]] = {
     "C0": ["#ca0020", "#f4a582", "#ffffff", "#bababa", "#404040"],
-    "C1": ["#a6611a", "#d4af69", "#ded3b7", "#b8d7d2", "#67bfb1", "#018571"]
+    "C1": ["#a6611a", "#d4af69", "#ded3b7", "#b8d7d2", "#67bfb1", "#018571"],
+    "C2": ["#a6611a", "#d4af69", "#ded3b7", "#b8d7d2", "#67bfb1", "#018571"]
 }
 """Color ramps for markers."""
+
+BINS: dict[str, list[float]] = {
+    "C0": [0.0, 0.2, 0.4, 0.6, 1.0],
+    "C1": [-1.0, -0.5, -0.25, 0.0, 0.25, 0.5, 1.0],
+    "C2": [0.0, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
+}
+"""Bins to categorize values."""
 
 METRIC_PLOTTING_COLORS: dict[Metric | CategoricalMetric, str] = {
     Metric.RELATIVE_MEAN_BIAS: "C1",
     Metric.PEARSON_CORRELATION_COEFFICIENT: "C1",
     Metric.NASH_SUTCLIFFE_EFFICIENCY: "C1",
-    Metric.RELATIVE_MEAN: "C1",
-    Metric.RELATIVE_STANDARD_DEVIATION: "C1",
-    Metric.RELATIVE_MEDIAN: "C1",
-    Metric.RELATIVE_MINIMUM: "C1",
-    Metric.RELATIVE_MAXIMUM: "C1",
+    Metric.RELATIVE_MEAN: "C2",
+    Metric.RELATIVE_STANDARD_DEVIATION: "C2",
+    Metric.RELATIVE_MEDIAN: "C2",
+    Metric.RELATIVE_MINIMUM: "C2",
+    Metric.RELATIVE_MAXIMUM: "C2",
     Metric.KLING_GUPTA_EFFICIENCY: "C1",
     CategoricalMetric.PROBABILITY_OF_DETECTION: "C0",
     CategoricalMetric.PROBABILITY_OF_FALSE_DETECTION: "C0",
@@ -161,22 +168,32 @@ def plot_preprocess(
     )
 
     # Compute marker size
+    logger.info("Computing marker sizes")
     numerator = -1.0 * df["upper"].sub(df["lower"])
     denominator = df["point"].mul(2.0)
     df["marker_size"] = size_coefficient * (size_coefficient ** (numerator / denominator))
     df.loc[df["marker_size"] < 1.0, "marker_size"] = 1.0
 
     # Classify scores (assign colors)
+    logger.info("Assigning marker colors")
+    point_color = df["point"].copy()
+    point_color[point_color <= cmin] = cmin * 0.99
+    point_color[point_color >= cmax] = cmax * 0.99
     colors = COLOR_RAMPS[METRIC_PLOTTING_COLORS[metric]]
-    print(colors)
-    print(np.linspace(cmin, cmax, len(colors)+1))
-    # FIXME 6 bins doesn't divide up nicely
-    quit()
+    bins = BINS[METRIC_PLOTTING_COLORS[metric]]
     df["marker_color"] = pd.cut(
-        df["point"],
-        bins=np.linspace(cmin, cmax, len(colors)+1),
+        point_color,
+        bins=bins,
         labels=colors,
-        include_lowest=True
+        right=True
+    )
+    bin_labels = [f"{bins[i-1]:.2f} to {bins[i]:.2f}" for i in range(1, len(bins))]
+    df["bin_label"] = pd.cut(
+        point_color,
+        bins=bins,
+        labels=bin_labels,
+        right=True,
+        precision=1
     )
 
     # Determine simulation period
@@ -207,6 +224,7 @@ def plot_preprocess(
             "upper",
             "marker_size",
             "marker_color",
+            "bin_label",
             "geometry"
         ]],
         title=title,
