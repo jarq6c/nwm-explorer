@@ -224,7 +224,7 @@ def plot_preprocess(
     logger.info("Grouping points")
     cols = ["bin_label", "marker_color"]
     df = df[cols+["marker_size", "geometry"]]
-    grouped_data: dict[PointStyle, gpd.GeoSeries] = {}
+    grouped_data: dict[PointStyle, gpd.GeoDataFrame] = {}
     for grp, pts in df.groupby(cols, observed=True):
         grouped_data[PointStyle(*grp)] = pts[["marker_size", "geometry"]]
 
