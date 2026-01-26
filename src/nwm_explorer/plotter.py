@@ -249,4 +249,5 @@ def plot_map(plot_parameters: PlotData) -> Figure:
     logger = get_logger(name)
 
     logger.info("Plotting metrics")
-    print(plot_parameters)
+    for (l, c), gdf in plot_parameters.data.items():
+        print(l, c)
