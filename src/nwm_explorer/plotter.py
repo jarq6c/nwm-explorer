@@ -3,6 +3,7 @@ from pathlib import Path
 import inspect
 from typing import Literal
 from dataclasses import dataclass
+from collections import namedtuple
 
 import polars as pl
 import pandas as pd
@@ -63,10 +64,14 @@ THRESHOLD_LOOKUP: dict[str, str] = {
 }
 """Mapping from parquet thresholds to descriptive text."""
 
+PointStyle = namedtuple("PointStyle", ["label", "color"])
+"""Named tuple for storing ('label', 'color')."""
+PointStyle.__doc__ = "Named tuple for storing point style information."
+
 @dataclass
-class PlotParameters:
+class PlotData:
     """Parameters used to generate map of metrics."""
-    data: gpd.GeoDataFrame
+    data: dict[PointStyle, gpd.GeoDataFrame]
     title: str
     model: str
     configuration: ModelConfiguration
@@ -88,7 +93,7 @@ def plot_preprocess(
         model_title: str = "NWM",
         model_domain: str = "CONUS",
         size_coefficient: float = 400.0
-    ) -> PlotParameters:
+    ) -> PlotData:
     """
     Load and preprocess evaluation results for plotting.
     """
@@ -215,18 +220,18 @@ def plot_preprocess(
         l = lead_time_hours_min + specs.window_interval
         lead_times = f"Lead times: {lead_time_hours_min} to {l} hours"
 
+    # Group data
+    logger.info("Grouping points")
+    cols = ["bin_label", "marker_color"]
+    df = df[cols+["marker_size", "geometry"]]
+    grouped_data: dict[PointStyle, gpd.GeoSeries] = {}
+    for grp, pts in df.groupby(cols, observed=True):
+        grouped_data[PointStyle(*grp)] = pts[["marker_size", "geometry"]]
+
     # Build parameters
     logger.info("Configuring plot parameters")
-    return PlotParameters(
-        data=df[[
-            "point",
-            "lower",
-            "upper",
-            "marker_size",
-            "marker_color",
-            "bin_label",
-            "geometry"
-        ]],
+    return PlotData(
+        data=grouped_data,
         title=title,
         model=model_title,
         configuration=CONFIGURATION_LOOKUP[configuration],
@@ -237,7 +242,7 @@ def plot_preprocess(
         domain=model_domain
     )
 
-def plot_map(plot_parameters: PlotParameters) -> Figure:
+def plot_map(plot_parameters: PlotData) -> Figure:
     """Map metrics and return a Figure."""
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
