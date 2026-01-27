@@ -78,6 +78,7 @@ class Configuration(BaseModel):
     endpoint: str
     root: Path
     usgs_api_key: str
+    stadia_api_key: str
     map_layers: list[MapLayer]
     evaluations: list[Evaluation]
     processes: int = 1
