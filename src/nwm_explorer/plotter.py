@@ -5,7 +5,9 @@ from typing import Literal
 from dataclasses import dataclass
 from collections import namedtuple
 from itertools import count
+import logging
 
+import numpy as np
 import polars as pl
 import pandas as pd
 import geopandas as gpd
@@ -13,7 +15,7 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
-# from shapely.geometry import Polygon
+from shapely.geometry import Polygon
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from cartopy.mpl.ticker import LatitudeFormatter, LongitudeFormatter
@@ -34,7 +36,7 @@ COLOR_RAMPS: dict[str, list[str]] = {
 """Color ramps for markers."""
 
 BINS: dict[str, list[float]] = {
-    "C0": [0.0, 0.2, 0.4, 0.6, 1.0],
+    "C0": [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
     "C1": [-1.0, -0.5, -0.25, 0.0, 0.25, 0.5, 1.0],
     "C2": [0.0, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
 }
@@ -43,7 +45,7 @@ BINS: dict[str, list[float]] = {
 METRIC_PLOTTING_COLORS: dict[Metric | CategoricalMetric, str] = {
     Metric.RELATIVE_MEAN_BIAS: "C1",
     Metric.PEARSON_CORRELATION_COEFFICIENT: "C1",
-    Metric.NASH_SUTCLIFFE_EFFICIENCY: "C1",
+    Metric.NASH_SUTCLIFFE_EFFICIENCY: "C0",
     Metric.RELATIVE_MEAN: "C2",
     Metric.RELATIVE_STANDARD_DEVIATION: "C2",
     Metric.RELATIVE_MEDIAN: "C2",
@@ -93,10 +95,13 @@ class PlotData:
     map_directory: Path
     threshold: str = "None"
     lead_times: str | None = None
-    width:float = 6.4
-    height: float = 3.6
+    width:float = 12.8
+    height: float = 7.2
     dpi: int = 300
     buffer: float = 0.025
+
+    def __post_init__(self) -> None:
+        self.aspect_ratio = self.width / self.height
 
 @dataclass
 class FeatureSet:
@@ -172,7 +177,7 @@ def handle_rivers_and_lakes(
         facecolor="#aad3df",
         edgecolor="#aad3df"
         ))
-    
+
     return FeatureSet(
         names=river_names,
         features=features
@@ -190,7 +195,8 @@ def plot_preprocess(
         title: str = "Evaluation",
         model_title: str = "NWM",
         model_domain: str = "CONUS",
-        size_coefficient: float = 400.0
+        size_coefficient: float = 20.0,
+        minimum_size: float = 5.0
     ) -> PlotData:
     """
     Load and preprocess evaluation results for plotting.
@@ -267,7 +273,8 @@ def plot_preprocess(
     logger.info("Georeferencing evaluation metrics")
     df["geometry"] = gpd.points_from_xy(
         x=df["longitude"],
-        y=df["latitude"]
+        y=df["latitude"],
+        crs="EPSG:4326"
     )
 
     # Compute marker size
@@ -275,7 +282,9 @@ def plot_preprocess(
     numerator = -1.0 * df["upper"].sub(df["lower"])
     denominator = df["point"].mul(2.0)
     df["marker_size"] = size_coefficient * (size_coefficient ** (numerator / denominator))
-    df.loc[df["marker_size"] < 1.0, "marker_size"] = 1.0
+    df.loc[df["marker_size"] < minimum_size, "marker_size"] = minimum_size
+    size_limit = size_coefficient * size_coefficient
+    df.loc[df["marker_size"] > size_limit, "marker_size"] = size_limit
 
     # Classify scores (assign colors)
     logger.info("Assigning marker colors")
@@ -324,7 +333,8 @@ def plot_preprocess(
     df = df[cols+["marker_size", "geometry"]]
     grouped_data: dict[PointStyle, gpd.GeoDataFrame] = {}
     for grp, pts in df.groupby(cols, observed=True):
-        grouped_data[PointStyle(*grp)] = pts[["marker_size", "geometry"]]
+        grouped_data[PointStyle(*grp)] = gpd.GeoDataFrame(
+            pts[["marker_size", "geometry"]], crs="EPSG:4326")
 
     # Load RFC boundaries
     logger.info("Loading RFC boundaries")
@@ -355,11 +365,15 @@ def plot_preprocess(
         map_directory=root/"map_layers"
     )
 
-def plot_map(plot_parameters: PlotData) -> Figure:
+def plot_map(plot_parameters: PlotData, enable_logging: bool = True) -> Figure:
     """Map metrics and return a Figure."""
     # Get logger
     name = __loader__.name + "." + inspect.currentframe().f_code.co_name
     logger = get_logger(name)
+
+    # Disable logging (for multiprocessing)
+    if not enable_logging:
+        logger.setLevel(logging.CRITICAL + 1)
 
     # Setup tile map
     logger.info("Setting tiles")
@@ -395,25 +409,216 @@ def plot_map(plot_parameters: PlotData) -> Figure:
         zlayer = count(1)
 
         # Create new map
+        logger.info("Grab new figure")
         fig, ax = plt.subplots(
             figsize=(plot_parameters.width, plot_parameters.height),
             dpi=plot_parameters.dpi,
             subplot_kw={"projection": crs}
             )
 
-        # # Plot
-        # logger.info("Plotting metrics")
-        # for (l, c), gdf in plot_parameters.data.items():
-        #     print(l, c)
-        #     break
+        # Convert boundary CRS
+        boundary = gpd.GeoDataFrame(
+            {"geometry": [ds.geometry]},
+            crs="EPSG:4326"
+            ).to_crs(crs_proj4)
+
+        # Set extent
+        logger.info("Set map extent")
+        minx, miny, maxx, maxy = boundary["geometry"].iloc[0].bounds
+        w, h = maxx - minx, maxy - miny
+        w_adjust = (max(w, plot_parameters.aspect_ratio * h) - w) / 2.0
+        h_adjust = (max(h, w / plot_parameters.aspect_ratio) - h) / 2.0
+        minx, maxx, miny, maxy = (
+            minx-w_adjust-(w*plot_parameters.buffer),
+            maxx+w_adjust+(w*plot_parameters.buffer),
+            miny-h_adjust-(h*plot_parameters.buffer),
+            maxy+h_adjust+(h*plot_parameters.buffer)
+            )
+        ax.set_extent([
+                minx-w_adjust-(w*plot_parameters.buffer),
+                maxx+w_adjust+(w*plot_parameters.buffer),
+                miny-h_adjust-(h*plot_parameters.buffer),
+                maxy+h_adjust+(h*plot_parameters.buffer)
+            ],
+            crs=crs)
+        ax.set_extent([minx, maxx, miny, maxy], crs=crs)
+
+        # Add tiles
+        logger.info("Add base map tiles")
+        ax.add_image(
+            tiler,
+            7,
+            interpolation="spline36",
+            regrid_shape=4000,
+            zorder=next(zlayer)
+            )
+
+        # X-ticks
+        logger.info("Set xticks (longitude)")
+        xticks = np.linspace(minx, maxx, 7)[1:-1]
+        ax.set_xticks(xticks, crs=crs)
+        ax.tick_params(
+            axis="x",
+            which="both",
+            direction="in",
+            length=3,
+            top=True,
+            pad=-10,
+            labeltop=True,
+            labelsize=4
+            )
+        ax.xaxis.set_major_formatter(lon_formatter)
+
+        # Y-ticks
+        logger.info("Set yticks (latitude)")
+        yticks = np.linspace(miny, maxy, 7)[1:-1]
+        ax.set_yticks(yticks, crs=crs)
+        ax.tick_params(
+            axis="y",
+            which="both",
+            direction="in",
+            length=3,
+            right=True,
+            labelrotation=90,
+            pad=-10,
+            labelright=True,
+            labelsize=4
+            )
+        ax.yaxis.set_major_formatter(lat_formatter)
+
+        # Add extra features
+        logger.info("Adding rivers and lakes")
+        for fs in rivers.features:
+            ax.add_feature(fs, zorder=next(zlayer))
+
+        # Build shaded polygon
+        logger.info("Computing background shade")
+        shaded = gpd.GeoDataFrame(
+            index=[0],
+            crs=crs_proj4,
+            geometry=[
+                Polygon([
+                (minx, miny),
+                (minx, maxy),
+                (maxx, maxy),
+                (maxx, miny),
+                (minx, miny)
+            ])]
+        )
+
+        # Add labels
+        logger.info("Adding labels")
+        w, h = maxx - minx, maxy - miny
+        x_tol, y_tol = 0.05 * w, 0.05 * h
+        labels = rivers.names.sjoin(shaded, how="inner").drop_duplicates(
+            subset="name")
+        for l in labels.itertuples():
+            # Check boundaries
+            if (maxx - l.geometry.x) <= 2.0 * x_tol:
+                continue
+            if (l.geometry.x - minx) <= x_tol:
+                continue
+            if (maxy - l.geometry.y) <= y_tol:
+                continue
+            if (l.geometry.y - miny) <= y_tol:
+                continue
+
+            # Add river name
+            ax.annotate(
+                l.name,
+                xy=(l.geometry.x, l.geometry.y),
+                transform=crs,
+                size=6,
+                ha="left",
+                va="bottom",
+                alpha=0.7,
+                zorder=next(zlayer)
+            )
+
+        # "Cut" out boundary
+        logger.info("Highlight region of interest")
+        shaded = shaded.overlay(
+            boundary,
+            how="symmetric_difference"
+        )
+
+        # Add shaded area
+        ax.add_geometries(
+            shaded.geometry,
+            crs=crs,
+            alpha=0.25,
+            facecolor="black",
+            zorder=next(zlayer)
+            )
+
+        # Boundary outline
+        ax.add_geometries(
+            boundary.geometry,
+            crs=crs,
+            alpha=0.25,
+            facecolor="white",
+            zorder=next(zlayer)
+            )
+
+        # Boundary outline
+        ax.add_geometries(
+            boundary.geometry,
+            crs=crs,
+            facecolor="None",
+            linewidth=2,
+            linestyle="--",
+            zorder=next(zlayer)
+            )
+
+        # Add metrics
+        logger.info("Plotting metrics")
+        for (l, c), scores in plot_parameters.data.items():
+            # Cut out region of interest
+            rfc_scores = scores.to_crs(crs_proj4).sjoin(boundary, how="inner")
+
+            # Plot points
+            ax.scatter(
+                rfc_scores["geometry"].x,
+                rfc_scores["geometry"].y,
+                c=c,
+                s=rfc_scores["marker_size"].values,
+                transform=crs,
+                edgecolors="black",
+                zorder=next(zlayer)
+            )
+
+            # Add stub for legend
+            ax.scatter(
+                [],
+                [],
+                c=c,
+                s=100.0,
+                transform=crs,
+                edgecolors="black",
+                label=l
+            )
+
+        # Add legend
+        logger.info("Adding legend")
+        ax.legend(
+            title=plot_parameters.metric,
+            loc="lower left",
+            edgecolor="black",
+            facecolor="white",
+            framealpha=1.0,
+            fancybox=False,
+            alignment="left"
+        )
 
         # Render map
-        # filename = row.rfc.lower() + "_" + pod_style.slug
-        # ofile = Path("plots") / f"{filename}_mrf_lt0.png"
-        # fig.savefig(
-        #     ofile,
-        #     bbox_inches="tight",
-        #     dpi=plot_parameters.dpi
-        # )
+        logger.info("Rendering map")
+        ofile = "test_map.png"
+        fig.savefig(
+            ofile,
+            bbox_inches="tight",
+            dpi=plot_parameters.dpi
+        )
+
+        logger.info("Clear figure for next map")
         fig.clear()
         break
