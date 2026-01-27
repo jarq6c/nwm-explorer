@@ -14,6 +14,7 @@ import geopandas as gpd
 
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
+from matplotlib.offsetbox import VPacker, TextArea, AnchoredOffsetbox
 
 from shapely.geometry import Polygon
 import cartopy.crs as ccrs
@@ -72,6 +73,23 @@ THRESHOLD_LOOKUP: dict[str, str] = {
     "q99_cfs": "NWM Retro Daily Max Streamflow 99th Percentile"
 }
 """Mapping from parquet thresholds to descriptive text."""
+
+REGIONS: dict[str, str] = {
+    "ABRFC": "Arkansas-Red Basin",
+    "APRFC": "Alaska-Pacific",
+    "CBRFC": "Colorado Basin",
+    "CNRFC": "California-Nevada",
+    "LMRFC": "Lower Mississippi",
+    "MARFC": "Mid-Atlantic",
+    "MBRFC": "Missouri Basin",
+    "NCRFC": "North Central",
+    "NERFC": "Northeast",
+    "NWRFC": "Northwest",
+    "OHRFC": "Ohio Basin",
+    "SERFC": "Southeast",
+    "WGRFC": "West-Gulf"
+}
+"""Mapping from regional abbreviations to full names."""
 
 PointStyle = namedtuple("PointStyle", ["label", "color"])
 """Named tuple for storing ('label', 'color')."""
@@ -183,6 +201,51 @@ def handle_rivers_and_lakes(
         features=features
     )
 
+def make_header(plot_parameters: PlotData, region: str, zorder: int)-> AnchoredOffsetbox:
+    """Generate header box for map."""
+    model_region = TextArea(
+        region,
+        textprops={"size": 11, "color": "black", "weight": "bold"}
+    )
+    title = TextArea(
+        plot_parameters.title,
+        textprops={"size": 10, "color": "black", "weight": "bold"}
+    )
+    model_version = TextArea(
+        plot_parameters.model,
+        textprops={"size": 9, "color": "black", "weight": "bold"}
+    )
+    model_config_box = TextArea(
+        plot_parameters.configuration,
+        textprops={"size": 8, "color": "black", "weight": "bold"}
+    )
+    model_dates = TextArea(
+        plot_parameters.period,
+        textprops={"size": 7, "color": "black", "weight": "bold"}
+    )
+    model_lead_times = TextArea(
+        plot_parameters.lead_times,
+        textprops={"size": 7, "color": "black", "weight": "bold"}
+    )
+    header = VPacker(
+        children=[
+            model_region,
+            title,
+            model_version,
+            model_config_box,
+            model_lead_times,
+            model_dates
+            ],
+        align="right",
+        mode="equal"
+    )
+    return AnchoredOffsetbox(
+        loc="upper right",
+        frameon=True,
+        child=header,
+        zorder=zorder
+    )
+
 def plot_preprocess(
         root: Path,
         label: str,
@@ -195,8 +258,8 @@ def plot_preprocess(
         title: str = "Evaluation",
         model_title: str = "NWM",
         model_domain: str = "CONUS",
-        size_coefficient: float = 20.0,
-        minimum_size: float = 5.0
+        size_coefficient: float = 200.0,
+        minimum_size: float = 20.0
     ) -> PlotData:
     """
     Load and preprocess evaluation results for plotting.
@@ -597,9 +660,9 @@ def plot_map(plot_parameters: PlotData, enable_logging: bool = True) -> Figure:
                 label=l
             )
 
-        # Add legend
+        # Add legend and bring to front
         logger.info("Adding legend")
-        ax.legend(
+        l = ax.legend(
             title=plot_parameters.metric,
             loc="lower left",
             edgecolor="black",
@@ -608,6 +671,15 @@ def plot_map(plot_parameters: PlotData, enable_logging: bool = True) -> Figure:
             fancybox=False,
             alignment="left"
         )
+        l.set_zorder(next(zlayer))
+
+        # Add header box
+        logger.info("Adding header box")
+        ax.add_artist(make_header(
+            plot_parameters,
+            REGIONS.get(ds.rfc, "United States"),
+            zorder=next(zlayer)
+        ))
 
         # Render map
         logger.info("Rendering map")
