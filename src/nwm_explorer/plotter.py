@@ -576,7 +576,6 @@ def plot_map(plot_parameters: PlotData, enable_logging: bool = True) -> Figure:
             # Cut out region of interest
             rfc_scores = scores.to_crs(crs_proj4).sjoin(boundary, how="inner")
 
-            # Plot points
             ax.scatter(
                 rfc_scores["geometry"].x,
                 rfc_scores["geometry"].y,
