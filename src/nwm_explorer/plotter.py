@@ -101,6 +101,14 @@ REGIONS: dict[str, str] = {
 }
 """Mapping from regional abbreviations to full names."""
 
+HEADER_LOCATION: dict[str, str] = {
+    "LMRFC": "lower right",
+    "NERFC": "lower right",
+    "OHRFC": "lower right",
+    "SERFC": "lower right"
+}
+"""Mapping from regional abbreviations to full names."""
+
 PointStyle = namedtuple("PointStyle", ["label", "color"])
 """Named tuple for storing ('label', 'color')."""
 PointStyle.__doc__ = "Named tuple for storing point style information."
@@ -211,7 +219,12 @@ def handle_rivers_and_lakes(
         features=features
     )
 
-def make_header(plot_parameters: PlotData, region: str, zorder: int)-> AnchoredOffsetbox:
+def make_header(
+        plot_parameters: PlotData,
+        region: str,
+        zorder: int,
+        loc: str
+        )-> AnchoredOffsetbox:
     """Generate header box for map."""
     model_region = TextArea(
         region,
@@ -255,7 +268,7 @@ def make_header(plot_parameters: PlotData, region: str, zorder: int)-> AnchoredO
         mode="equal"
     )
     return AnchoredOffsetbox(
-        loc="upper right",
+        loc=loc,
         frameon=True,
         child=header,
         zorder=zorder
@@ -674,7 +687,8 @@ def plot_single_map(
     ax.add_artist(make_header(
         plot_parameters,
         REGIONS.get(domain_style.rfc, "United States"),
-        zorder=next(zlayer)
+        zorder=next(zlayer),
+        HEADER_LOCATION.get(domain_style.rfc, "upper right")
     ))
 
     # Render
