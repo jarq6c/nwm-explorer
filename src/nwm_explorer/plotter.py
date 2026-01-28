@@ -688,7 +688,7 @@ def plot_single_map(
         plot_parameters,
         REGIONS.get(domain_style.rfc, "United States"),
         zorder=next(zlayer),
-        HEADER_LOCATION.get(domain_style.rfc, "upper right")
+        loc=HEADER_LOCATION.get(domain_style.rfc, "upper right")
     ))
 
     # Render
