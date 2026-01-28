@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Literal
 
 from nwm_explorer.constants import ModelConfiguration, EvaluationMetric
-from nwm_explorer.plotter import plot_preprocess, plot_map
+from nwm_explorer.plotter import plot_preprocess, plot_maps
 from nwm_explorer.configuration import load_configuration
 
 def plot(
@@ -39,7 +39,7 @@ def plot(
     )
 
     # Plot metrics
-    plot_map(parameters)
+    plot_maps(parameters)
 
 if __name__ == "__main__":
     plot()
