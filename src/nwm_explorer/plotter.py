@@ -67,12 +67,19 @@ METRIC_LOOKUP_REVERSE: dict[EvaluationMetric, str] = {v: k for k, v in METRIC_LO
 """Reverse lookup from metric to metric label."""
 
 THRESHOLD_LOOKUP: dict[str, str] = {
-    "None": "None",
-    "q85_cfs": "NWM Retro Daily Max Streamflow 85th Percentile",
-    "q95_cfs": "NWM Retro Daily Max Streamflow 95th Percentile",
-    "q99_cfs": "NWM Retro Daily Max Streamflow 99th Percentile"
+    "None": "Threshold: None",
+    "q85_cfs": "Threshold: 85th Prc. (NWMv3.0 Retro)",
+    "q95_cfs": "Threshold: 85th Prc. (NWMv3.0 Retro)",
+    "q99_cfs": "Threshold: 85th Prc. (NWMv3.0 Retro)"
 }
 """Mapping from parquet thresholds to descriptive text."""
+
+RANK_LOOKUP: dict[str, str] = {
+    "min": "Minimum streamflow",
+    "median": "Median streamflow",
+    "max": "Maximum streamflow"
+}
+"""Mapping from resampling functions to descriptive text."""
 
 REGIONS: dict[str, str] = {
     "ABRFC": "Arkansas-Red Basin",
@@ -209,7 +216,7 @@ def make_header(plot_parameters: PlotData, region: str, zorder: int)-> AnchoredO
     )
     title = TextArea(
         plot_parameters.title,
-        textprops={"size": 10, "color": "black", "weight": "bold"}
+        textprops={"size": 7, "color": "black", "weight": "bold"}
     )
     model_version = TextArea(
         plot_parameters.model,
@@ -227,12 +234,17 @@ def make_header(plot_parameters: PlotData, region: str, zorder: int)-> AnchoredO
         plot_parameters.lead_times,
         textprops={"size": 7, "color": "black", "weight": "bold"}
     )
+    model_threshold = TextArea(
+        plot_parameters.threshold,
+        textprops={"size": 7, "color": "black", "weight": "bold"}
+    )
     header = VPacker(
         children=[
             model_region,
-            title,
             model_version,
             model_config_box,
+            title,
+            model_threshold,
             model_lead_times,
             model_dates
             ],
@@ -255,7 +267,6 @@ def plot_preprocess(
         lead_time_hours_min: int,
         api_key: str,
         rank: Literal["min", "median", "max"],
-        title: str = "Evaluation",
         model_title: str = "NWM",
         model_domain: str = "CONUS",
         size_coefficient: float = 200.0,
@@ -416,7 +427,7 @@ def plot_preprocess(
     logger.info("Configuring plot parameters")
     return PlotData(
         data=grouped_data,
-        title=title,
+        title=RANK_LOOKUP[rank],
         model=model_title,
         configuration=CONFIGURATION_LOOKUP[configuration],
         metric=METRIC_LOOKUP_REVERSE[metric],
@@ -690,6 +701,6 @@ def plot_map(plot_parameters: PlotData, enable_logging: bool = True) -> Figure:
             dpi=plot_parameters.dpi
         )
 
-        logger.info("Clear figure for next map")
+        logger.info("Clear figure")
         fig.clear()
         break
