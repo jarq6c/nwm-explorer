@@ -57,6 +57,8 @@ class Dashboard(Viewer):
         ).collect()
 
         filter_widgets = FilterWidgets(
+            root=root,
+            routelink=routelink,
             evaluation_options=scan_evaluations(root, cache=True).select(
                 "label").collect().unique()["label"].to_list(),
             threshold_options=scan_evaluations(root, cache=True).select(

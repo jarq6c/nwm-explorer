@@ -2,6 +2,7 @@
 from typing import Callable, Any, Generator
 from itertools import cycle, count
 from dataclasses import dataclass
+from pathlib import Path
 
 import polars as pl
 import panel as pn
@@ -23,6 +24,72 @@ from nwm_explorer.configuration import MapLayer
 from nwm_explorer.hypothesis import HYPOTHESIS_TESTS
 
 pn.extension('tabulator')
+
+### TODO
+from io import BytesIO
+from typing import Protocol
+import matplotlib.pyplot as plt
+from nwm_explorer.evaluate import load_metrics
+
+class FilterObject(Protocol):
+    """Filter object protocol."""
+    label: str
+    threshold: str
+    configuration: ModelConfiguration
+    metric: Metric | CategoricalMetric
+    metric_label: str
+    rank: str
+    hypothesis: bool
+    hypothesis_test: bool
+    point_column: str
+    upper_column: str
+    lower_column: str
+    domain: ModelDomain
+    lead_time: int
+
+def file_callback(
+        root: Path,
+        routelink: pl.DataFrame,
+        filter_object: FilterObject
+        ) -> BytesIO:
+    # Retrieve data
+    data = load_metrics(
+        root=root,
+        label=filter_object.label,
+        configuration=filter_object.configuration,
+        metric=filter_object.metric,
+        lead_time_hours_min=filter_object.lead_time,
+        rank=filter_object.rank,
+        additional_columns=(
+            "nwm_feature_id",
+            "usgs_site_code",
+            "sample_size",
+            "observed_value_time_min",
+            "observed_value_time_max",
+            "reference_time_min",
+            "reference_time_max"
+            ),
+        condition=filter_object.hypothesis,
+        threshold=filter_object.threshold,
+        cache=True
+    ).with_columns(
+        latitude=pl.col("nwm_feature_id").replace_strict(
+            old=routelink["nwm_feature_id"].implode(),
+            new=routelink["latitude"].implode()
+        ),
+        longitude=pl.col("nwm_feature_id").replace_strict(
+            old=routelink["nwm_feature_id"].implode(),
+            new=routelink["longitude"].implode()
+        )
+    )
+
+    # Generate map
+    fig, ax = plt.subplots()
+    bio = BytesIO()
+    fig.savefig(bio, format="png")
+    bio.seek(0)
+    return bio
+### TODO
 
 def build_lead_time_lookup(
         group_specificiations: dict[ModelConfiguration, NWMGroupSpecification] | None = None
@@ -66,6 +133,8 @@ class FilterWidgets(Viewer):
     """Holds various data filtering widgets and values."""
     def __init__(
             self,
+            root: Path,
+            routelink: pl.DataFrame,
             evaluation_options: list[str],
             threshold_options: list[str],
             **params
@@ -103,7 +172,18 @@ class FilterWidgets(Viewer):
                 name="Alt. Hypothesis (95% confidence)",
                 options=list(HYPOTHESIS_TESTS.keys())
             ),
-            "lead_time": pn.pane.Placeholder()
+            "lead_time": pn.pane.Placeholder(),
+            "export_map": pn.widgets.FileDownload(
+                callback=pn.bind(
+                    file_callback,
+                    root=root,
+                    routelink=routelink,
+                    filter_object=self
+                ),
+                label="Export map",
+                filename="nwm_evaluation_map.png",
+                width=300
+            )
         }
 
         # Generate lead times

@@ -1,12 +1,13 @@
 """Generate static maps of evaluation metrics."""
 from pathlib import Path
+from itertools import count
 
 import polars as pl
 
 from nwm_explorer.routelink import download_routelink
 from nwm_explorer.evaluate import load_metrics
 from nwm_explorer.constants import (DOMAIN_LOOKUP, CONFIGURATION_LOOKUP,
-    METRIC_LOOKUP)
+    METRIC_LOOKUP, METRIC_PLOTTING_LIMITS)
 from nwm_explorer.views import build_lead_time_lookup
 
 def main(
@@ -30,11 +31,15 @@ def main(
     lead_time_lookup = build_lead_time_lookup()
 
     # Iterate over model configurations
+    counter = count()
     for title, (domain, configuration) in configuration_lookup.items():
         # Iterate over lead times
         for lead_time in lead_time_lookup[configuration]:
             # Iterate over metrics
             for metric_label, metric in METRIC_LOOKUP.items():
+                # Set plotting limits
+                vmin, vmax = METRIC_PLOTTING_LIMITS[metric]
+
                 # Load data
                 data = load_metrics(
                     root=root,
@@ -64,8 +69,7 @@ def main(
                     )
                 )
 
-                print(data)
-                return
+                print(next(counter))
 
 if __name__ == "__main__":
     main(
