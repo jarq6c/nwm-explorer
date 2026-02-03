@@ -31,7 +31,7 @@ from nwm_explorer.routelink import download_routelink
 from nwm_explorer.logger import get_logger
 from nwm_explorer.constants import (ModelConfiguration, EvaluationMetric,
     METRIC_PLOTTING_LIMITS, CONFIGURATION_LOOKUP, METRIC_LOOKUP,
-    GROUP_SPECIFICATIONS, Metric, CategoricalMetric)
+    GROUP_SPECIFICATIONS, Metric, CategoricalMetric, DOMAIN_LOOKUP)
 
 COLOR_RAMPS: dict[str, list[str]] = {
     "C0": ["#ca0020", "#f4a582", "#ffffff", "#bababa", "#404040"],
@@ -288,7 +288,6 @@ def plot_preprocess(
         api_key: str,
         rank: Literal["min", "median", "max"],
         model_title: str = "NWM",
-        model_domain: str = "CONUS",
         size_coefficient: float = 200.0,
         minimum_size: float = 20.0
     ) -> PlotData:
@@ -440,6 +439,7 @@ def plot_preprocess(
     boundaries = gpd.read_file(ifile)
 
     # Set domain
+    model_domain = DOMAIN_LOOKUP[configuration]
     boundaries = boundaries[boundaries["domain"] == model_domain]
 
     # Build parameters
