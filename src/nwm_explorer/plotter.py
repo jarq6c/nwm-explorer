@@ -438,6 +438,8 @@ def plot_preprocess(
     boundaries = gpd.read_file(ifile)
 
     # Set domain
+    # TODO purge domain selection and refactor to default to full domain
+    # NOTE will have to add regional (RFC) plots later
     model_domain = DOMAIN_LOOKUP[configuration]
     boundaries = boundaries[boundaries["domain"] == model_domain]
 
@@ -752,6 +754,7 @@ def plot_maps(
     # Generate plots
     logger.info("Gathering plots")
     plot_count = count()
+    print(plot_parameters.domains)
     for ds in plot_parameters.domains:
         logger.info("Building output file path")
         ofile = Path("plots") / f"plot_{next(plot_count)}.png"
