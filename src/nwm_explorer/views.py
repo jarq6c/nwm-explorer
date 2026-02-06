@@ -28,8 +28,8 @@ pn.extension('tabulator')
 ### TODO
 from io import BytesIO
 from typing import Protocol
+
 import matplotlib.pyplot as plt
-from nwm_explorer.evaluate import load_metrics
 
 class FilterObject(Protocol):
     """Filter object protocol."""
@@ -47,43 +47,12 @@ class FilterObject(Protocol):
     domain: ModelDomain
     lead_time: int
 
-def file_callback(
+def generate_static_map(
         root: Path,
         routelink: pl.DataFrame,
         filter_object: FilterObject
         ) -> BytesIO:
-    # Retrieve data
-    data = load_metrics(
-        root=root,
-        label=filter_object.label,
-        configuration=filter_object.configuration,
-        metric=filter_object.metric,
-        lead_time_hours_min=filter_object.lead_time,
-        rank=filter_object.rank,
-        additional_columns=(
-            "nwm_feature_id",
-            "usgs_site_code",
-            "sample_size",
-            "observed_value_time_min",
-            "observed_value_time_max",
-            "reference_time_min",
-            "reference_time_max"
-            ),
-        condition=filter_object.hypothesis,
-        threshold=filter_object.threshold,
-        cache=True
-    ).with_columns(
-        latitude=pl.col("nwm_feature_id").replace_strict(
-            old=routelink["nwm_feature_id"].implode(),
-            new=routelink["latitude"].implode()
-        ),
-        longitude=pl.col("nwm_feature_id").replace_strict(
-            old=routelink["nwm_feature_id"].implode(),
-            new=routelink["longitude"].implode()
-        )
-    )
-
-    # Generate map
+    """Generate static map data."""
     fig, ax = plt.subplots()
     bio = BytesIO()
     fig.savefig(bio, format="png")
@@ -175,7 +144,7 @@ class FilterWidgets(Viewer):
             "lead_time": pn.pane.Placeholder(),
             "export_map": pn.widgets.FileDownload(
                 callback=pn.bind(
-                    file_callback,
+                    generate_static_map,
                     root=root,
                     routelink=routelink,
                     filter_object=self
