@@ -1,77 +1,58 @@
-"""Generate static maps of evaluation metrics."""
+"""Test script."""
 from pathlib import Path
-from itertools import count
+from typing import Literal
 
-import polars as pl
+from nwm_explorer.constants import ModelConfiguration, EvaluationMetric, GROUP_SPECIFICATIONS
+from nwm_explorer.plotter import plot_preprocess, plot_maps, NoDataError
+from nwm_explorer.configuration import load_configuration
 
-from nwm_explorer.routelink import download_routelink
-from nwm_explorer.evaluate import load_metrics
-from nwm_explorer.constants import (DOMAIN_LOOKUP, CONFIGURATION_LOOKUP,
-    METRIC_LOOKUP, METRIC_PLOTTING_LIMITS)
-from nwm_explorer.views import build_lead_time_lookup
-
-def main(
-        root: Path,
+def plot(
+        root: Path = Path("/ised/nwm_explorer_data"),
         label: str = "FY2024-FY2025",
-        rank: str = "max",
-        threshold: str = "q85_cfs"
+        threshold: str = "q85_cfs",
+        rank: Literal["min", "median", "max"] = "max",
+        model_title: str = "National Water Model v3.0",
+        app_config: Path = Path("config.json")
     ) -> None:
-    """Main."""
-    # Open routelink
-    routelink = download_routelink(root).select(
-        ["nwm_feature_id", "latitude", "longitude"]
-    ).collect()
+    """
+    Plot evaluation maps.
+    """
+    # Load app configuration
+    app_config = load_configuration(configuration_file=app_config)
 
-    # Merge domain and configuration look-ups
-    configuration_lookup = {
-        DOMAIN_LOOKUP[k]+v: (DOMAIN_LOOKUP[k], k) for k, v in CONFIGURATION_LOOKUP.items()
-        }
+    # Process each model configuration
+    for c in list(ModelConfiguration):
+        # Get lead times
+        specs = GROUP_SPECIFICATIONS[c]
+        lead_times = range(
+            0,
+            specs.lead_time_hours_max+specs.window_interval,
+            specs.window_interval
+            )
 
-    # Get lead time mapping
-    lead_time_lookup = build_lead_time_lookup()
-
-    # Iterate over model configurations
-    counter = count()
-    for title, (domain, configuration) in configuration_lookup.items():
-        # Iterate over lead times
-        for lead_time in lead_time_lookup[configuration]:
-            # Iterate over metrics
-            for metric_label, metric in METRIC_LOOKUP.items():
-                # Set plotting limits
-                vmin, vmax = METRIC_PLOTTING_LIMITS[metric]
-
-                # Load data
-                data = load_metrics(
-                    root=root,
-                    label=label,
-                    configuration=configuration,
-                    metric=metric,
-                    lead_time_hours_min=lead_time,
-                    rank=rank,
-                    additional_columns=(
-                        "nwm_feature_id",
-                        "usgs_site_code",
-                        "sample_size",
-                        "observed_value_time_min",
-                        "observed_value_time_max",
-                        "reference_time_min",
-                        "reference_time_max"
-                        ),
-                    threshold=threshold
-                ).with_columns(
-                    latitude=pl.col("nwm_feature_id").replace_strict(
-                        old=routelink["nwm_feature_id"].implode(),
-                        new=routelink["latitude"].implode()
-                    ),
-                    longitude=pl.col("nwm_feature_id").replace_strict(
-                        old=routelink["nwm_feature_id"].implode(),
-                        new=routelink["longitude"].implode()
+        # Process each lead time
+        for l in lead_times:
+            # Process each metric
+            for m in list(EvaluationMetric):
+                # Get parameters
+                try:
+                    parameters = plot_preprocess(
+                        root=root,
+                        label=label,
+                        configuration=c,
+                        metric=m,
+                        threshold=threshold,
+                        lead_time_hours_min=l,
+                        api_key=app_config.stadia_api_key,
+                        rank=rank,
+                        model_title=model_title
                     )
-                )
+                except NoDataError as e:
+                    print(e)
+                    continue
 
-                print(next(counter))
+                # Plot metrics by region
+                plot_maps(parameters)
 
 if __name__ == "__main__":
-    main(
-        root=Path("/ised/nwm_explorer_data")
-    )
+    plot()
