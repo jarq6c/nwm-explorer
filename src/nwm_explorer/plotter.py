@@ -12,10 +12,6 @@ import polars as pl
 import pandas as pd
 import geopandas as gpd
 
-# This import and use statement must occur before any other matplotlib imports
-import matplotlib
-matplotlib.use("agg")
-
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.offsetbox import VPacker, TextArea, AnchoredOffsetbox
@@ -32,6 +28,9 @@ from nwm_explorer.logger import get_logger
 from nwm_explorer.constants import (ModelConfiguration, EvaluationMetric,
     METRIC_PLOTTING_LIMITS, CONFIGURATION_LOOKUP, METRIC_LOOKUP,
     GROUP_SPECIFICATIONS, Metric, CategoricalMetric, DOMAIN_LOOKUP)
+
+# Switch to non-interactive backend
+plt.switch_backend("agg")
 
 COLOR_RAMPS: dict[str, list[str]] = {
     "C0": ["#ca0020", "#f4a582", "#ffffff", "#bababa", "#404040"],
