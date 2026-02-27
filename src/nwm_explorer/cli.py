@@ -1,8 +1,9 @@
 """Command-line Interface."""
 from pathlib import Path
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional, Annotated, TextIO, Generator
 from sys import stdout
+from contextlib import contextmanager
 
 import typer
 import pandas as pd
@@ -175,6 +176,16 @@ def evaluate(configuration: Path = Path("config.json")) -> None:
             threshold_columns=config.threshold_columns
         )
 
+@contextmanager
+def get_output_stream(path: Optional[Path] = None) -> Generator[TextIO, None, None]:
+    """Yields a file-like object; handles stdout vs file automatically."""
+    # If no path provided, or if they explicitly passed "-"
+    if path is None or str(path) == "-":
+        yield stdout
+    else:
+        with path.open("w", encoding="utf-8") as f:
+            yield f
+
 @app.command()
 def export(
         root: Path,
@@ -182,7 +193,7 @@ def export(
         configuration: ModelConfiguration,
         metric: EvaluationMetric,
         threshold: str = NO_THRESHOLD_LABEL,
-        output: typer.FileTextWrite | None = None,
+        output_path: Annotated[Optional[Path], typer.Option("--output")] = None,
         lead_time_hours_min: int = 0,
         rank: Literal["min", "median", "max"] = "median",
         additional_columns: tuple[str] | None = None,
@@ -191,13 +202,9 @@ def export(
     """
     Export evaluation metrics to CSV.
     """
-    # Set output
-    if output is None:
-        output = stdout
-
     # Set additional columns
     if additional_columns is None:
-        additional_columns = [
+        columns = [
             "label",
             "configuration",
             "nwm_feature_id",
@@ -214,7 +221,9 @@ def export(
             "sample_size"
         ]
         if threshold != NO_THRESHOLD_LABEL:
-            additional_columns += ["threshold", "threshold_value"]
+            columns += ["threshold", "threshold_value"]
+    else:
+        columns = list(additional_columns)
 
     # Load metrics
     data = scan_evaluations(
@@ -225,7 +234,7 @@ def export(
         pl.col("lead_time_hours_min") == lead_time_hours_min,
         pl.col("threshold") == threshold
     ).select(
-        additional_columns + [
+        columns + [
             f"{metric}_{rank}_lower",
             f"{metric}_{rank}_point",
             f"{metric}_{rank}_upper"
@@ -237,14 +246,17 @@ def export(
     for col in data.columns:
         header += f"# {col}: {COLUMN_DESCRIPTIONS.get(col)}\n"
     header += "# \n"
-    output.write(header)
 
-    # Write data
-    output.write(data.write_csv(
-        float_precision=2,
-        datetime_format="%Y-%m-%dT%H:%M",
-        null_value=no_data_value
-    ))
+    # Write output
+    with get_output_stream(output_path) as output:
+        output.write(header)
+
+        # Write data
+        output.write(data.write_csv(
+            float_precision=2,
+            datetime_format="%Y-%m-%dT%H:%M",
+            null_value=no_data_value
+        ))
 
 @app.command()
 def display(configuration: Path = Path("config.json")) -> None:

@@ -578,7 +578,7 @@ def usgs_site_generator(
     start_time: pd.Timestamp,
     end_time: pd.Timestamp,
     cache: bool = False
-    ) -> Generator[pl.DataFrame]:
+    ) -> Generator[pl.DataFrame, None, None]:
     """
     Iteratively return polars.DataFrames of USGS observations.
 

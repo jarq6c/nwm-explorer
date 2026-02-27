@@ -1154,7 +1154,7 @@ def prediction_pool_generator(
         sites_per_chunk: int = 1,
         threshold_map: pl.DataFrame | None = None,
         threshold_column: str | None = None
-) -> Generator[list[pd.DataFrame]]:
+) -> Generator[list[pd.DataFrame], None, None]:
     """
     Iteratively, load and group forecast pairs into lead time pools. Returns a
     list of DataFrame for each nwm_feature_id and lead_time_hours_min combination.

@@ -981,7 +981,7 @@ class ECDFSelector(Viewer):
     def __panel__(self):
         return pn.Column("# Empirical CDF", *self._widgets)
 
-    def __iter__(self) -> Generator[ECDFParameters]:
+    def __iter__(self) -> Generator[ECDFParameters, None, None]:
         for idx, w in enumerate(self._widgets):
             metric = METRIC_LOOKUP[w.value]
             yield ECDFParameters(
